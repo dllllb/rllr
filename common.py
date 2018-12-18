@@ -24,35 +24,44 @@ class MLPPolicy(nn.Module):
     def forward(self, x):    
         return self.model(x)
 
-
-def update_policy(gamma, optimizer, pred_hist, reward_hist):
-    R = 0
-    rewards = []
-    
-    # Discount future rewards back to the present using gamma
-    for r in reward_hist[::-1]:
-        R = r + gamma * R
-        rewards.insert(0,R)
+class PGUpdater:
+    def __init__(self, optimizer, gamma):
+        self.optimizer = optimizer
+        self.gamma = gamma
         
-    # Scale rewards
-    rewards = torch.FloatTensor(rewards)
-    rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
+    def __call__(self, pred_hist, reward_hist):
+        # See https://github.com/pytorch/examples reinforcement_learning/reinforce.py
     
-    # Calculate loss
-    loss = (torch.sum(torch.mul(pred_hist, Variable(rewards)).mul(-1), -1))
-    
-    # Update network weights
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
+        R = 0
+        rewards = []
+
+        # Discount future rewards back to the present using gamma
+        for r in reward_hist[::-1]:
+            R = r + self.gamma * R
+            rewards.insert(0,R)
+
+        # Scale rewards
+        rewards = torch.FloatTensor(rewards)
+        rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
+
+        # Calculate loss
+        loss = []
+        for log_prob, reward in zip(pred_hist, rewards):
+            loss.append(-log_prob * reward)
+        loss = torch.cat(loss).sum()
+
+        # Update network weights
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
     
 
-def train_loop(env, policy, optimizer, n_eposodes, gamma):
+def train_loop(env, policy, updater, n_eposodes):
     running_reward = 10
     for episode in range(n_eposodes):
         pred_hist, reward_hist, time, _ = play_episode(env, policy, render=False)
         
-        update_policy(gamma, optimizer, pred_hist, reward_hist)
+        updater(pred_hist, reward_hist)
         
         # Used to determine when the environment is solved
         running_reward = (running_reward * 0.99) + (time * 0.01)
