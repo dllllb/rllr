@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 from torch.distributions import Categorical
 
 class MLPPolicy(nn.Module):
@@ -47,7 +46,7 @@ class PGUpdater:
         # Calculate loss
         loss = []
         for log_prob, reward in zip(pred_hist, rewards):
-            loss.append(-log_prob * reward)
+            loss.append((-log_prob * reward).view(1))
         loss = torch.cat(loss).sum()
 
         # Update network weights
@@ -85,15 +84,15 @@ def play_episode(env, policy, render):
             frames.append(env.render(mode='rgb_array'))
         
         #Select an action by running policy model and choosing based on the probabilities in state
-        state = Variable(torch.from_numpy(state).type(torch.FloatTensor))
+        state = torch.from_numpy(state).type(torch.FloatTensor)
         c = Categorical(policy(state))
         action = c.sample()
         
         # Add log probability of our chosen action to our history
-        pred_hist.append(c.log_prob(action))
+        pred_hist.append(c.log_prob(action).view(1))
 
         # Step through environment using chosen action
-        state, reward, done, _ = env.step(action.data[0])
+        state, reward, done, _ = env.step(action.item())
         # Save reward
         reward_hist.append(reward)
 
