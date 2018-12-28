@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 
+
 class MLPPolicy(nn.Module):
     def __init__(self, env):
         super(MLPPolicy, self).__init__()
@@ -22,6 +23,7 @@ class MLPPolicy(nn.Module):
         
     def forward(self, x):    
         return self.model(x)
+
 
 class PGUpdater:
     def __init__(self, optimizer, gamma):
