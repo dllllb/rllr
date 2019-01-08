@@ -21,7 +21,7 @@ class CheckersGame(gaming.Game):
                     move_x, move_y = pos_x+direction*shift, pos_y+shift
                     if move_x >= size_x or move_y >= size_y:
                         break
-                    elif state[move_x, move_y] == player:
+                    elif state[move_x, move_y] // 10 == player:
                         break
                     elif state[move_x, move_y] != 0:
                         action.append((move_x, move_y))
@@ -36,8 +36,8 @@ class CheckersGame(gaming.Game):
         for pos_x, pos_y in action[1:-1]:
             new_state[pos_x, pos_y] = 0
 
+        new_state[action[-1]] = state[action[0]]
         new_state[action[0]] = 0
-        new_state[action[-1]] = player
 
         return new_state
 
@@ -49,18 +49,18 @@ class CheckersGame(gaming.Game):
 
         for i in range(1):
             for j in range(0, self.size_x, 2):
-                initial_state[i, j + i] = 1
+                initial_state[i, j + i] = 10
 
         for i in range(self.size_y-1, self.size_y+1):
             for j in range(0, self.size_x, 2):
-                initial_state[i, j + i] = 2
+                initial_state[i, j + i] = 20
 
         return initial_state
 
     def get_winner(self, state) -> int:
-        if sum(state == 1) == 0:
+        if sum((state // 10) == 1) == 0:
             return 2
-        elif sum(state == 2) == 0:
+        elif sum((state // 10) == 2) == 0:
             return 1
         else:
             return -1
@@ -81,3 +81,33 @@ def test_possible_actions():
     board = ttt.get_initial_state()
     actions = ttt.get_possible_actions(board, 1)
     print(actions)
+
+
+def test_capture_action():
+    ttt = CheckersGame(4, 4)
+    board = np.zeros((4, 4), dtype=np.byte)
+    board[0, 0] = 1
+    board[1, 1] = 2
+    actions = ttt.get_possible_actions(board, 1)
+    print(actions)
+
+
+def test_perform_capture_action():
+    ttt = CheckersGame(4, 4)
+    board = np.zeros((4, 4), dtype=np.byte)
+    board[0, 0] = 1
+    board[1, 1] = 2
+    action = [(0, 0), (1, 1), (2, 2)]
+    res = ttt.get_result_state(board, action, player=1)
+    print(res)
+
+
+def test_win():
+    ttt = CheckersGame(4, 4)
+    board = np.zeros((4, 4), dtype=np.byte)
+    board[0, 0] = 1
+    res = ttt.get_winner(board)
+    assert(res == 1)
+    board[1, 1] = 2
+    res = ttt.get_winner(board)
+    assert (res == -1)
