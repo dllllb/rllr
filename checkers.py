@@ -14,13 +14,15 @@ class CheckersGame(gaming.Game):
         max_shift = min(state.shape)
         figure_pos = np.argwhere(state // 10 == player)
         moves = []
+        base_dir = 1 if player == 1 else -1
+
         for pos_x, pos_y in figure_pos:
-            action = [(pos_x, pos_y)]
-            if figure_pos % 10 == 0:  # normal figures
+            if state[(pos_x, pos_y)] % 10 == 0:  # normal figures
                 for direction in [-1, 1]:
+                    action = [(pos_x, pos_y)]
                     for shift in range(1, max_shift):
-                        move_x, move_y = pos_x+direction*shift, pos_y+shift
-                        if move_x >= size_x or move_y >= size_y:
+                        move_x, move_y = pos_x+shift*base_dir, pos_y+direction*shift
+                        if move_x >= size_x or move_y >= size_y or move_x < 0 or move_y < 0:
                             break
                         elif state[move_x, move_y] // 10 == player:
                             break
@@ -33,9 +35,10 @@ class CheckersGame(gaming.Game):
             else:  # kings
                 for dir_x in [-1, 1]:
                     for dir_y in [-1, 1]:
+                        action = [(pos_x, pos_y)]
                         for shift in range(1, max_shift):
                             move_x, move_y = pos_x+dir_x*shift, pos_y+dir_y
-                            if move_x >= size_x or move_y >= size_y:
+                            if move_x >= size_x or move_y >= size_y or move_x < 0 or move_y < 0:
                                 break
                             elif state[move_x, move_y] // 10 == player:
                                 break
@@ -56,8 +59,12 @@ class CheckersGame(gaming.Game):
         new_state[action[-1]] = state[action[0]]
         new_state[action[0]] = 0
 
-        if action[-1][1] == (state.shape[1] - 1):
-            new_state[action[-1]] = player+1
+        if player == 1:
+            if action[-1][0] == (state.shape[0] - 1):
+                new_state[action[-1]] = 11
+        else:
+            if action[-1][0] == 0:
+                new_state[action[-1]] = 21
 
         return new_state
 
@@ -71,70 +78,118 @@ class CheckersGame(gaming.Game):
             for j in range(0, self.size_x, 2):
                 initial_state[i, j + i % 2] = 10
 
-        for i in range(self.size_y-2, self.size_y+1):
+        for i in range(self.size_y-3, self.size_y):
             for j in range(0, self.size_x, 2):
                 initial_state[i, j + i % 2] = 20
 
         return initial_state
 
     def get_winner(self, state) -> int:
-        if sum(state // 10 == 1) == 0:
+        if np.sum(state // 10 == 1) == 0:
             return 2
-        elif sum(state // 10 == 2) == 0:
+        elif np.sum(state // 10 == 2) == 0:
             return 1
         else:
             return -1
 
 
 def test_play():
-    ttt = CheckersGame(4, 4)
-    s1 = mcts.MCTS(ttt, 5)
+    ttt = CheckersGame(8, 8)
+    s1 = mcts.MCTS(ttt, n_plays=5, max_depth=100)
     s2 = gaming.RandomStrategy(ttt)
 
-    state, winner, log = gaming.play_game(ttt, [s1, s2])
+    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=10)
     print(f'the winner is the player {winner}')
     print(state)
     print(log)
 
 
 def test_initial_state():
-    ttt = CheckersGame(4, 4)
+    ttt = CheckersGame(8, 8)
     board = ttt.get_initial_state()
+    print()
     print(board)
 
 
-def test_possible_actions():
-    ttt = CheckersGame(4, 4)
-    board = ttt.get_initial_state()
+def test_simple_action():
+    ttt = CheckersGame(8, 8)
+    board = np.zeros((8, 8), dtype=np.byte)
+    board[0, 2] = 10
     actions = ttt.get_possible_actions(board, 1)
+    print()
+    print(board)
     print(actions)
+    res = ttt.get_result_state(board, actions[0], player=1)
+    print(res)
+
+
+def test_simple_action_king():
+    ttt = CheckersGame(8, 8)
+    board = np.zeros((8, 8), dtype=np.byte)
+    board[0, 2] = 11
+    actions = ttt.get_possible_actions(board, 1)
+    print()
+    print(board)
+    print(actions)
+    res = ttt.get_result_state(board, actions[0], player=1)
+    print(res)
+
+
+def test_simple_edge_action():
+    ttt = CheckersGame(8, 8)
+    board = np.zeros((8, 8), dtype=np.byte)
+    board[0, 0] = 10
+    actions = ttt.get_possible_actions(board, 1)
+    print()
+    print(board)
+    print(actions)
+    res = ttt.get_result_state(board, actions[0], player=1)
+    print(res)
 
 
 def test_capture_action():
-    ttt = CheckersGame(4, 4)
-    board = np.zeros((4, 4), dtype=np.byte)
-    board[0, 0] = 1
-    board[1, 1] = 2
+    ttt = CheckersGame(8, 8)
+    board = np.zeros((8, 8), dtype=np.byte)
+    board[0, 0] = 10
+    board[1, 1] = 20
     actions = ttt.get_possible_actions(board, 1)
+    print()
+    print(board)
     print(actions)
+    res = ttt.get_result_state(board, actions[0], player=1)
+    print(res)
 
 
-def test_perform_capture_action():
-    ttt = CheckersGame(4, 4)
-    board = np.zeros((4, 4), dtype=np.byte)
-    board[0, 0] = 1
-    board[1, 1] = 2
-    action = [(0, 0), (1, 1), (2, 2)]
-    res = ttt.get_result_state(board, action, player=1)
+def test_king_action():
+    ttt = CheckersGame(8, 8)
+    board = np.zeros((8, 8), dtype=np.byte)
+    board[6, 2] = 10
+    actions = ttt.get_possible_actions(board, 1)
+    print()
+    print(board)
+    print(actions)
+    res = ttt.get_result_state(board, actions[0], player=1)
+    print(res)
+
+
+def test_king_action_p2():
+    ttt = CheckersGame(8, 8)
+    board = np.zeros((8, 8), dtype=np.byte)
+    board[1, 2] = 20
+    actions = ttt.get_possible_actions(board, 2)
+    print()
+    print(board)
+    print(actions)
+    res = ttt.get_result_state(board, actions[0], player=2)
     print(res)
 
 
 def test_win():
-    ttt = CheckersGame(4, 4)
-    board = np.zeros((4, 4), dtype=np.byte)
-    board[0, 0] = 1
+    ttt = CheckersGame(8, 8)
+    board = np.zeros((8, 8), dtype=np.byte)
+    board[0, 0] = 10
     res = ttt.get_winner(board)
     assert(res == 1)
-    board[1, 1] = 2
+    board[1, 1] = 20
     res = ttt.get_winner(board)
     assert (res == -1)

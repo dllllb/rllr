@@ -38,8 +38,9 @@ class Node:
 
 
 class MCTS(gaming.AgentStrategy):
-    def __init__(self, game, n_plays: int):
+    def __init__(self, game, n_plays: int, max_depth=500):
         self.n_plays = n_plays
+        self.max_depth = max_depth
         self.game = game
 
     def suggest_action(self, root_state, player):
@@ -48,7 +49,7 @@ class MCTS(gaming.AgentStrategy):
         for i in range(self.n_plays):
             current_node = root
             current_state = root_state
-            while True:
+            for j in range(self.max_depth):
                 current_node, current_state = self.perform_action(current_node, current_state, player)
 
                 winner = self.game.get_winner(current_state)
@@ -72,16 +73,18 @@ class MCTS(gaming.AgentStrategy):
 
         return best_action
 
-    def perform_action(self, node, current_state, player):
+    def perform_action(self, node, state, player):
         if len(node.children) == 0:
-            actions = self.game.get_possible_actions(current_state, player)
+            actions = self.game.get_possible_actions(state, player)
             for action in actions:
                 node.add_child(Node(action))
 
-        node = node.select_child()
-        state = self.game.get_result_state(current_state, node.action, player)
-
-        return node, state
+        if len(node.children) != 0:
+            node = node.select_child()
+            state = self.game.get_result_state(state, node.action, player)
+            return node, state
+        else:
+            return node, state
 
 
 class OneTwoGame(gaming.Game):

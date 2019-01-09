@@ -53,7 +53,7 @@ def test_play():
     s1 = mcts.MCTS(ttt, 5)
     s2 = gaming.RandomStrategy(ttt)
 
-    state, winner, log = gaming.play_game(ttt, [s1, s2])
+    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
     print(f'the winner is the player {winner}')
     print(state)
     print(log)
