@@ -37,13 +37,15 @@ class RandomStrategy:
 def play_game(game: Game, strategies: List[AgentStrategy], max_turns=1000):
     state = game.get_initial_state()
 
+    action_log = []
     for i in range(max_turns):
         for player, strategy in zip(game.get_players(), strategies):
             action = strategy.suggest_action(state, player)
+            action_log.append((player, action))
             state = game.get_result_state(state, action, player)
 
             winner = game.get_winner(state)
             if winner != -1:
-                return state, winner
+                return state, winner, action_log
 
-    return state, 0  # draw by turns limit
+    return state, 0, action_log  # draw by turns limit

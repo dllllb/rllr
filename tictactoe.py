@@ -42,10 +42,10 @@ class TicTacToeGame(gaming.Game):
                     if sum(line[i:j] == np.full(self.len_to_win, player)) >= self.len_to_win:
                         return player
 
-            if sum(state == 0) == 0:
-                return 0
-            else:
-                return -1
+        if np.sum(state == 0) == 0:
+            return 0
+        else:
+            return -1
 
 
 def test_play():
@@ -53,9 +53,10 @@ def test_play():
     s1 = mcts.MCTS(ttt, 5)
     s2 = gaming.RandomStrategy(ttt)
 
-    state, winner = gaming.play_game(ttt, [s1, s2])
-    print('winner is player N{winner}')
+    state, winner, log = gaming.play_game(ttt, [s1, s2])
+    print(f'the winner is the player {winner}')
     print(state)
+    print(log)
 
 
 def test_possible_actions():
@@ -67,14 +68,37 @@ def test_possible_actions():
     print(actions)
 
 
-def test_draw():
-    ttt = TicTacToeGame(size_x=4, size_y=4, len_to_win=3, n_players=2)
-    board = np.zeros((4, 4), dtype=np.byte)
+def test_in_progress():
+    ttt = TicTacToeGame(size_x=3, size_y=3, len_to_win=3, n_players=2)
+    board = np.zeros((3, 3), dtype=np.byte)
     winner = ttt.get_winner(board)
     assert(winner == -1)
-    board = np.ones((4, 4), dtype=np.byte)
+
+
+def test_draw():
+    ttt = TicTacToeGame(size_x=3, size_y=3, len_to_win=3, n_players=2)
+    board = np.ones((3, 3), dtype=np.byte)
+    board[1, 1] = 2
+    board[2, 2] = 2
+    board[0, 1] = 2
+    board[0, 2] = 2
+    board[1, 0] = 2
+    print()
+    print(board)
     winner = ttt.get_winner(board)
     assert (winner == 0)
+
+
+def test_win():
+    ttt = TicTacToeGame(size_x=4, size_y=4, len_to_win=3, n_players=2)
+    board = np.ones((4, 4), dtype=np.byte)
+    for i in range(0, 4, 2):
+        for j in range(0, 4, 2):
+            board[i, j] = 2
+    print()
+    print(board)
+    winner = ttt.get_winner(board)
+    assert (winner == 1)
 
 
 def test_win_diag():
