@@ -95,10 +95,10 @@ class CheckersGame(gaming.Game):
 
 def test_play():
     ttt = CheckersGame(8, 8)
-    s1 = mcts.MCTS(ttt, n_plays=5, max_depth=100)
+    s1 = mcts.MCTS(ttt, n_plays=20, max_depth=500)
     s2 = gaming.RandomStrategy(ttt)
 
-    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=10)
+    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=100)
     print(f'the winner is the player {winner}')
     print(state)
     print(log)
