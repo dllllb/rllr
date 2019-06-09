@@ -19,7 +19,7 @@
     - state estimator which estimates the reward of being it state $s_t$
     - reward estimator can be trained along with the world model
 3. g = pg(u_t)
-    - generate a sequience of sub-goals (plan)
+    - generate a sequence of sub-goals (plan)
 4. for each g_i in g repeat the next steps
 5. $ p_c = reg(u_t, g_i) $
   - select a sub-policy from sub-policy registry
