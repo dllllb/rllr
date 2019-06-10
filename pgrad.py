@@ -1,32 +1,47 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import gym
 from torch.distributions import Categorical
+
+from learner import Updater, BufferedLearner
+from policy import Policy
+
+
+class NNPolicy(BufferedLearner, Policy):
+    def __init__(self, model: nn.Module, updater: Updater):
+        super().__init__(updater)
+        self.model = model
+
+    def __call__(self, state):
+        c = self.model(state)
+        action = c.sample()
+        self.pred_buffer.append(c.log_prob(action).view(1))
+        return action.item()
 
 
 class MLPPolicy(nn.Module):
-    def __init__(self, env):
-        super(MLPPolicy, self).__init__()
-        self.state_space = env.observation_space.shape[0]
-        self.action_space = env.action_space.n
-        
-        self.l1 = nn.Linear(self.state_space, 128, bias=False)
-        self.l2 = nn.Linear(128, self.action_space, bias=False)
-        
+    def __init__(self, env: gym.Env):
+        super().__init__()
+        state_space = env.observation_space.shape[0]
+        action_space = env.action_space.n
+
         self.model = nn.Sequential(
-            self.l1,
+            nn.Linear(state_space, 128, bias=False),
             nn.Dropout(p=0.6),
             nn.ReLU(),
-            self.l2,
+            nn.Linear(128, action_space, bias=False),
             nn.Softmax(dim=-1)
         )
-        
-    def forward(self, x):    
-        return self.model(x)
+
+    def forward(self, state):
+        state = torch.from_numpy(state).type(torch.FloatTensor)
+        c = Categorical(self.model(state))
+        return c
 
 
-class PGUpdater:
-    def __init__(self, optimizer, gamma):
+class PGUpdater(Updater):
+    def __init__(self, optimizer, gamma: float):
         self.optimizer = optimizer
         self.gamma = gamma
         
@@ -57,12 +72,10 @@ class PGUpdater:
         self.optimizer.step()
     
 
-def train_loop(env, policy, updater, n_eposodes):
+def train_loop(env, policy, n_eposodes, episode_len=1000):
     running_reward = 10
     for episode in range(n_eposodes):
-        pred_hist, reward_hist, time, _ = play_episode(env, policy, render=False)
-        
-        updater(pred_hist, reward_hist)
+        time, _ = play_episode(env, policy, episode_len=episode_len, render=False)
         
         # Used to determine when the environment is solved
         running_reward = (running_reward * 0.99) + (time * 0.01)
@@ -72,35 +85,39 @@ def train_loop(env, policy, updater, n_eposodes):
         if running_reward > env.spec.reward_threshold:
             print(f"Solved! Running reward is now {running_reward} and the last episode runs to {time} time steps!")
             break
-            
 
-def play_episode(env, policy, render):
-    state = env.reset() # Reset environment and record the starting state
+
+def play_episode(env, policy, render, episode_len=1000):
+    state = env.reset()
     frames = []
-    
-    pred_hist = []
-    reward_hist = []
-    
-    for time in range(1000):
+
+    time = 0
+    for i in range(episode_len):
+        time = i
+
         if render:
             frames.append(env.render(mode='rgb_array'))
-        
-        #Select an action by running policy model and choosing based on the probabilities in state
-        state = torch.from_numpy(state).type(torch.FloatTensor)
-        c = Categorical(policy(state))
-        action = c.sample()
-        
-        # Add log probability of our chosen action to our history
-        pred_hist.append(c.log_prob(action).view(1))
 
-        # Step through environment using chosen action
-        state, reward, done, _ = env.step(action.item())
-        # Save reward
-        reward_hist.append(reward)
+        action = policy(state)
+        state, reward, done, _ = env.step(action)
+        policy.update(reward)
 
         if done:
             break
-            
-    pred_hist = torch.cat(pred_hist)
+
+    policy.end_episode()
     
-    return pred_hist, reward_hist, time, frames
+    return time, frames
+
+
+def test_train_loop():
+    env = gym.make('CartPole-v1')
+    env.seed(1)
+    torch.manual_seed(1)
+
+    nn = MLPPolicy(env)
+    optimizer = torch.optim.Adam(nn.parameters(), lr=0.01)
+    updater = PGUpdater(optimizer, gamma=.99)
+    policy = NNPolicy(MLPPolicy(env), updater)
+
+    train_loop(env=env, policy=policy, n_eposodes=1, episode_len=5)
