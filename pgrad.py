@@ -16,8 +16,7 @@ class NNPolicy(BufferedLearner, Policy):
     def __call__(self, state):
         c = self.model(state)
         action = c.sample()
-        self.pred_buffer.append(c.log_prob(action).view(1))
-        return action.item()
+        return action.item(), c.log_prob(action).view(1)
 
 
 class MLPPolicy(nn.Module):
@@ -45,16 +44,14 @@ class PGUpdater(Updater):
         self.optimizer = optimizer
         self.gamma = gamma
         
-    def __call__(self, pred_hist, reward_hist):
-        # See https://github.com/pytorch/examples reinforcement_learning/reinforce.py
-    
+    def __call__(self, context_hist, state_hist, reward_hist):
         R = 0
         rewards = []
 
         # Discount future rewards back to the present using gamma
         for r in reward_hist[::-1]:
             R = r + self.gamma * R
-            rewards.insert(0,R)
+            rewards.insert(0, R)
 
         # Scale rewards
         rewards = torch.FloatTensor(rewards)
@@ -62,7 +59,7 @@ class PGUpdater(Updater):
 
         # Calculate loss
         loss = []
-        for log_prob, reward in zip(pred_hist, rewards):
+        for log_prob, reward in zip(context_hist, rewards):
             loss.append((-log_prob * reward).view(1))
         loss = torch.cat(loss).sum()
 
@@ -98,9 +95,9 @@ def play_episode(env, policy, render, episode_len=1000):
         if render:
             frames.append(env.render(mode='rgb_array'))
 
-        action = policy(state)
+        action, context = policy(state)
         state, reward, done, _ = env.step(action)
-        policy.update(reward)
+        policy.update(context, state, reward)
 
         if done:
             break

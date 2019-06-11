@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import gym
-import numpy as np
 
 from learner import BufferedLearner, Updater
+from pgrad import PGUpdater
+from policy import Policy
 
 
 class WorldModel:
@@ -13,7 +14,7 @@ class WorldModel:
     def end_episode(self):
         pass
 
-    def __call__(self, state, action):
+    def __call__(self, state):
         """
         :param state: current state of the environment
         :param action: proposed action
@@ -65,44 +66,62 @@ class MLPRewardPred(nn.Module):
         return r
 
 
-class WMUpdater(Updater):
+class MSEUpdater(Updater):
     def __init__(self, optimizer):
         self.optimizer = optimizer
         self.mse = nn.MSELoss()
 
-    def __call__(self, pred_hist, true_hist):
-        state_pred_hist, reward_pred_hist = zip(*pred_hist)
-        state_hist, reward_hist = zip(*true_hist)
-        # Calculate loss
-        psh = torch.stack(state_pred_hist)
-        tsh = torch.stack(state_hist)
-        state_loss = torch.dist(psh, tsh).mean()
-
-        prh = torch.FloatTensor(reward_pred_hist)
+    def __call__(self, context, state_hist, reward_hist):
+        prh = torch.stack(context)
         trh = torch.FloatTensor(reward_hist)
-        rew_loss = self.mse(prh, trh)
+        loss = self.mse(prh, trh)
 
-        loss = state_loss + rew_loss
-
-        # Update network weights
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
 
-class NNWorldModel(BufferedLearner, WorldModel):
-    def __init__(self, sp_nn, rp_nn, encoder, updater):
+class DistUpdater(Updater):
+    def __init__(self, optimizer):
+        self.optimizer = optimizer
+
+    def __call__(self, context, state_hist, reward_hist):
+        psh = torch.stack(context)
+        tsh = torch.stack(state_hist)
+        loss = torch.dist(psh, tsh).mean()
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+
+class SPPolicy(BufferedLearner, Policy):
+    def __init__(self, sp_nn, policy_nn, encoder, updater):
         super().__init__(updater)
         self.sp_nn = sp_nn
-        self.rp_nn = rp_nn
+        self.policy_nn = policy_nn
         self.encoder = encoder
 
-    def update(self, state, action):
+    def update(self, context, state, reward):
         s = torch.from_numpy(state).type(torch.FloatTensor)
-        super().update(self.encoder(s), action)
+        e = self.encoder(s)
+        super().update(context, e, reward)
 
-    def __call__(self, state, action):
+    def __call__(self, state):
+        c = self.policy_nn(state)
+        action = c.sample().item()
         next_state = self.sp_nn(state, action)
+        return action, next_state
+
+
+class RPPolicy(BufferedLearner, Policy):
+    def __init__(self, rp_nn, policy_nn, updater):
+        super().__init__(updater)
+        self.rp_nn = rp_nn
+        self.policy_nn = policy_nn
+
+    def __call__(self, state):
+        c = self.policy_nn(state)
+        action = c.sample().item()
         reward = self.rp_nn(state, action)
-        self.pred_buffer.append((next_state, reward))
-        return next_state, reward
+        return action, reward

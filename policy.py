@@ -2,9 +2,6 @@ from learner import Learner
 
 
 class Policy(Learner):
-    def update(self, reward):
-        pass
-
     def __call__(self, state):
         """
         :param state: current state of the environment
@@ -18,4 +15,4 @@ class RandomActionPolicy(Policy):
         self.actions = env.action_space
 
     def __call__(self, _):
-        return self.actions.sample()
+        return self.actions.sample(), None
