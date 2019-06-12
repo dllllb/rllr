@@ -54,6 +54,10 @@
 - sub-policy learning tasks
   - random pos
     - train a sub-policy to reach random state $u_t'$ from $u_t$
+      - positive reward can be provided for the diminishing difference between $u_t'$ and $u_t$
+        - this removes the requirement to reach the exact target state which is not always possible in changing environments
+        - image similarity function can be used to measure distance between $u_t'$ and $u_t$ when observed state is an image
+          - e. g. structural similarity index (SSIM) can be used to measure distance
   - there and back
     - train a sub-policy to change a $u_t$ to $u_t'$ in a certain way and then return to the starting state $u_t$
       - a $u_t$ has both controllable part and non-controllable part only controllable part should be taken to the account
@@ -63,7 +67,7 @@
 ### Plan generator learning
 
 - train pg to generate a plan to reach random state $u_t'$ from $u_t$
-  - reward sould be inversely proportional to the number of performed actions in order to reach the goal state
+  - reward should be inversely proportional to the number of performed actions in order to reach the goal state
 
 - problem: some possible states are not attainable from $u_t$
   - solution 1:
@@ -76,3 +80,7 @@
 ## Plan-based exploration with curiosity reward
 
 - when there is a good plan generator it can be used to reach the state with good possibilities for exploration (see Go-Explore paper)
+
+# Imaginary world planning
+
+- use Monte-Carlo Tree Search to find effective trajectory in imaginary world based on world model
