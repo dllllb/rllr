@@ -39,6 +39,41 @@ class MLPPolicy(nn.Module):
         return c
 
 
+class ConvPolicy(nn.Module):
+    def __init__(self, env: gym.Env):
+        super().__init__()
+
+        img_height, img_width, img_channels = env.observation_space.shape
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(img_channels, 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU()
+        )
+
+        o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
+        conv_out_size = int(np.prod(o.size()))
+
+        self.fc = nn.Sequential(
+            nn.Linear(conv_out_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, env.action_space.n),
+            nn.Softmax(dim=-1)
+        )
+
+    def forward(self, state):
+        state = torch.from_numpy(state).float() / 256
+        if len(state.shape) == 3:
+            state = state.view(1, *state.shape)
+        state = state.permute(0, 3, 1, 2)
+        conv_out = self.conv(state).view(state.size(0), -1)
+        c = Categorical(self.fc(conv_out))
+        return c
+
+
 class PGUpdater(Updater):
     def __init__(self, optimizer, gamma: float):
         self.optimizer = optimizer
@@ -79,9 +114,6 @@ def train_loop(env, policy, n_eposodes, episode_len=1000):
         
         if episode % 50 == 0:
             print(f'Episode {episode}\tLast length: {time:5d}\tAverage length: {running_reward:.2f}')
-        if running_reward > env.spec.reward_threshold:
-            print(f"Solved! Running reward is now {running_reward} and the last episode runs to {time} time steps!")
-            break
 
 
 def play_episode(env, policy, render, episode_len=1000):
@@ -115,6 +147,19 @@ def test_train_loop():
     nn = MLPPolicy(env)
     optimizer = torch.optim.Adam(nn.parameters(), lr=0.01)
     updater = PGUpdater(optimizer, gamma=.99)
-    policy = NNPolicy(MLPPolicy(env), updater)
+    policy = NNPolicy(nn, updater)
+
+    train_loop(env=env, policy=policy, n_eposodes=1, episode_len=5)
+
+
+def test_conv_policy():
+    env = gym.make('BreakoutDeterministic-v4')
+    env.seed(1)
+    torch.manual_seed(1)
+
+    nn = ConvPolicy(env)
+    optimizer = torch.optim.Adam(nn.parameters(), lr=0.01)
+    updater = PGUpdater(optimizer, gamma=.99)
+    policy = NNPolicy(nn, updater)
 
     train_loop(env=env, policy=policy, n_eposodes=1, episode_len=5)

@@ -1,9 +1,9 @@
 import gym
 import numpy as np
 import torch
+from skimage.measure import compare_ssim
 
 import pgrad
-import wmpolicy
 from policy import RandomActionPolicy, Policy
 
 
@@ -58,40 +58,63 @@ def generate_train_trajectories(trajectory_explorer: TrajectoryExplorer, n_initi
     return tasks
 
 
+def ssim_dist(state, target):
+    return (compare_ssim(state, target, multichannel=True)+1)/2
+
+
+def mse_dist(state, target):
+    return ((state - target)**2).mean()
+
+
 class NavigationTrainer:
     def __init__(
             self,
             env: gym.Env,
             navigation_policy: Policy,
             n_steps_per_episode,
-            n_trials_per_task):
+            n_trials_per_task=3,
+            n_actions_without_reward=20,
+            state_dist=compare_ssim):
         self.env = env
         self.navigation_policy = navigation_policy
         self.n_steps_per_episode = n_steps_per_episode
         self.n_trials_per_task = n_trials_per_task
+        self.n_actions_without_reward = n_actions_without_reward
+        self.state_dist = state_dist
 
     def __call__(self, tasks):
         n_steps = 0
         for initial_trajectory, known_trajectory, desired_state in tasks:
             for _ in range(self.n_trials_per_task):
                 n_steps += 1
-                for j in range(len(known_trajectory)*3):
-                    state = self.env.reset()
-                    if initial_trajectory is not None:
-                        for a in initial_trajectory:
-                            state, reward, done, _ = self.env.step(a)
 
+                state = self.env.reset()
+                if initial_trajectory is not None:
+                    for a in initial_trajectory:
+                        state, reward, done, _ = self.env.step(a)
+
+                max_sim = self.state_dist(state, desired_state)
+                no_reward_actions = 0
+
+                for j in range(len(known_trajectory)*100):
                     action, context = self.navigation_policy(state)
                     state, _, done, _ = self.env.step(action)
 
-                    if np.array_equal(state, desired_state):
+                    sim = self.state_dist(state, desired_state)
+                    if sim > max_sim:
+                        max_sim = sim
+                        no_reward_actions = 0
                         self.navigation_policy.update(context, state, 1)
-                        break
+                        if max_sim > 0.999:
+                            break
                     elif done:
-                        self.navigation_policy.update(context, state, 0)
+                        self.navigation_policy.update(context, state, -1)
                         break
                     else:
+                        no_reward_actions += 1
                         self.navigation_policy.update(context, state, 0)
+                        if no_reward_actions > self.n_actions_without_reward:
+                            break
 
                 if n_steps > self.n_steps_per_episode:
                     n_steps = 0
@@ -101,10 +124,10 @@ class NavigationTrainer:
 def test_train_navigation_policy():
     env = gym.make('CartPole-v1')
     env.seed(1)
+    torch.manual_seed(1)
+
     explore_policy = RandomActionPolicy(env)
 
-    embed_size = 32
-    encoder_nn = wmpolicy.mlp_encoder(env, embed_size)
     nav_nn = pgrad.MLPPolicy(env)
 
     np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)
@@ -114,21 +137,25 @@ def test_train_navigation_policy():
     te = TrajectoryExplorer(env, explore_policy, 5, 2)
     tasks = generate_train_trajectories(te, 3, .5)
 
-    nt = NavigationTrainer(env, policy, n_trials_per_task=5, n_steps_per_episode=5)
+    nt = NavigationTrainer(env, policy, n_steps_per_episode=3, state_dist=mse_dist)
     nt(tasks)
 
-    sp_nn = wmpolicy.MLPNextStatePred(encoder_nn, embed_size)
-    sp_optimizer = torch.optim.Adam(list(sp_nn.parameters()) + list(encoder_nn.parameters()), lr=0.01)
-    sp_updater = wmpolicy.DistUpdater(sp_optimizer)
-    policy = wmpolicy.SPPolicy(sp_nn, nav_nn, encoder_nn, sp_updater)
 
-    nt = NavigationTrainer(env, policy, n_trials_per_task=5, n_steps_per_episode=5)
-    nt(tasks)
+def test_train_navigation_policy_ssim():
+    env = gym.make('BreakoutDeterministic-v4')
+    env.seed(1)
+    torch.manual_seed(1)
 
-    rp_nn = wmpolicy.MLPRewardPred(encoder_nn, embed_size)
-    mse_optimizer = torch.optim.Adam(list(rp_nn.parameters()) + list(encoder_nn.parameters()), lr=0.01)
-    mse_updater = wmpolicy.MSEUpdater(mse_optimizer)
-    policy = wmpolicy.RPPolicy(rp_nn, nav_nn, mse_updater)
+    explore_policy = RandomActionPolicy(env)
 
-    nt = NavigationTrainer(env, policy, n_trials_per_task=5, n_steps_per_episode=5)
+    nav_nn = pgrad.ConvPolicy(env)
+
+    np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)
+    np_updater = pgrad.PGUpdater(np_optimizer, gamma=.99)
+    policy = pgrad.NNPolicy(nav_nn, np_updater)
+
+    te = TrajectoryExplorer(env, explore_policy, 5, 2)
+    tasks = generate_train_trajectories(te, 3, .5)
+
+    nt = NavigationTrainer(env, policy, n_steps_per_episode=3, state_dist=ssim_dist)
     nt(tasks)
