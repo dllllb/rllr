@@ -84,7 +84,8 @@ class NavigationTrainer:
 
     def __call__(self, tasks):
         n_steps = 0
-        for initial_trajectory, known_trajectory, desired_state in tasks:
+        running_reward = list()
+        for i, (initial_trajectory, known_trajectory, desired_state) in enumerate(tasks):
             for _ in range(self.n_trials_per_task):
                 n_steps += 1
 
@@ -95,6 +96,7 @@ class NavigationTrainer:
 
                 max_sim = self.state_dist(state, desired_state)
                 no_reward_actions = 0
+                positive_reward = 0
 
                 for j in range(len(known_trajectory)*100):
                     action, context = self.navigation_policy(state)
@@ -104,6 +106,7 @@ class NavigationTrainer:
                     if sim > max_sim:
                         max_sim = sim
                         no_reward_actions = 0
+                        positive_reward += 1
                         self.navigation_policy.update(context, state, 1)
                         if max_sim > 0.999:
                             break
@@ -116,9 +119,13 @@ class NavigationTrainer:
                         if no_reward_actions > self.n_actions_without_reward:
                             break
 
+                running_reward.append(positive_reward)
+
                 if n_steps > self.n_steps_per_episode:
-                    n_steps = 0
                     self.navigation_policy.end_episode()
+
+            if i % 10 == 0:
+                print(f'tasks processed: {i}, mean reward: {np.array(running_reward).mean()}')
 
 
 def test_train_navigation_policy():
