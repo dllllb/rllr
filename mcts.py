@@ -39,7 +39,7 @@ class Node:
 
 
 class MCTS(Policy):
-    def __init__(self, game, n_plays: int, player: int, max_depth=500):
+    def __init__(self, game: gaming.Game, n_plays: int, player: int, max_depth=500):
         self.n_plays = n_plays
         self.max_depth = max_depth
         self.game = game
@@ -87,41 +87,3 @@ class MCTS(Policy):
             return node, state
         else:
             return node, state
-
-
-class OneTwoGame(gaming.Game):
-    def get_possible_actions(self, state, player):
-        return list(range(1, 5))
-
-    def get_result_state(self, state, action, player):
-        new_state = state.copy()
-        player_state = state[player]
-        if player_state == 0 and action in [1, 2]:
-            new_state[player] = 1
-        elif player_state == 1 and action in [3, 4]:
-            new_state[player] = 2
-
-        return new_state
-
-    def get_players(self):
-        return [1, 2]
-
-    def get_initial_state(self):
-        return {1: 0, 2: 0}
-
-    def get_winner(self, state) -> int:
-        for player, state in state.items():
-            if state == 2:
-                return player
-        return -1
-
-
-def test_mcts_play():
-    ttt = OneTwoGame()
-    s1 = MCTS(ttt, 50, player=1)
-    s2 = gaming.RandomStrategy(ttt, player=2)
-
-    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
-    print(f'the winner is the player {winner}')
-    print(state)
-    print(log)
