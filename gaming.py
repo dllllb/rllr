@@ -19,7 +19,7 @@ class Game:
         return np.array(0)
 
     def clone(self, state):
-        pass
+        return state
 
 
 class PlayerPolicy(Policy):
