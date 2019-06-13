@@ -1,75 +1,75 @@
 import math
+from typing import List
+
 import numpy as np
 
 import gaming
-from policy import Policy
 
 
-class Node:
-    def __init__(self, action):
-        self.parent = None
+class UcbNode:
+    def __init__(self, action, parent):
+        self.parent: UcbNode = parent
         self.action = action
-        self.children = []
+        self.children: List[UcbNode] = list()
         self.n_sim = 0
-        self.n_win = 0
+        self.reward = 0
         self.c = math.sqrt(2)
         self.sf = np.finfo(np.float).tiny
 
-    def add_child(self, child):
+    def add_child(self, action):
+        child = UcbNode(action, self)
         self.children.append(child)
-        child.parent = self
 
-    def get_uct(self):
-        base = (self.n_win + 1) / (self.n_sim + 1)
-        exp = math.sqrt(2)*math.sqrt(math.log(self.parent.n_sim+1, math.e)/(self.n_sim+1))
-        return base + exp
+    def get_score(self):
+        # Upper-confidence bound (UCT)
+        base = (self.reward + 1) / (self.n_sim + 1)
+        exp = math.sqrt(math.log(self.parent.n_sim+1, math.e)/(self.n_sim+1))
+        return base + self.c * exp
 
     def select_child(self):
-        ucts = np.array([e.get_uct() for e in self.children])
+        ucts = np.array([e.get_score() for e in self.children])
         pos = np.argwhere(ucts == max(ucts))
         selected_child = np.random.randint(0, len(pos))
         return self.children[selected_child]
 
-    def update_stats(self, win_flag):
+    def update_stats(self, reward):
         self.n_sim += 1
-        self.n_win += win_flag
+        self.reward += reward
 
         if self.parent is not None:
-            self.parent.update_stats(win_flag)
+            self.parent.update_stats(reward)
 
 
-class MCTS(Policy):
-    def __init__(self, game: gaming.Game, n_plays: int, player: int, max_depth=500):
+class MCTS(gaming.PlayerPolicy):
+    def __init__(self, game: gaming.Game, n_plays: int, player: int, max_depth=500, use_reward=False):
         self.n_plays = n_plays
         self.max_depth = max_depth
         self.game = game
         self.player = player
+        self.use_reward = use_reward
 
     def __call__(self, root_state):
-        root = Node(None)
+        root = UcbNode(None, None)
 
         for i in range(self.n_plays):
             current_node = root
             current_state = root_state
             for j in range(self.max_depth):
-                current_node, current_state = self.perform_action(current_node, current_state, self.player)
+                ssrd = self.perform_action(current_node, current_state, self.player)
+                current_node, current_state, reward, done = ssrd
 
-                winner = self.game.get_winner(current_state)
-                if winner != -1:
-                    current_node.update_stats(winner == self.player)
+                if done:
+                    current_node.update_stats(reward)
                     break
 
-                for adversary in self.game.get_players():
+                for adversary in range(1, self.game.get_player_count()):
                     if adversary != self.player:
-                        current_node, current_state = self.perform_action(current_node, current_state, adversary)
+                        ssrd = self.perform_action(current_node, current_state, adversary)
+                        current_node, current_state, reward, done = ssrd
 
-                        winner = self.game.get_winner(current_state)
-                        if winner != -1:
-                            current_node.update_stats(winner == self.player)
+                        if done:
+                            current_node.update_stats(reward * -1)
                             break
-
-                if winner != -1:
-                    break
 
         best_action = root.select_child().action
 
@@ -79,11 +79,14 @@ class MCTS(Policy):
         if len(node.children) == 0:
             actions = self.game.get_possible_actions(state, player)
             for action in actions:
-                node.add_child(Node(action))
+                node.add_child(action)
 
         if len(node.children) != 0:
             node = node.select_child()
-            state = self.game.get_result_state(state, node.action, player)
-            return node, state
+            state, reward, done = self.game.get_result_state(state, node.action, player)
+            return node, state, reward, done
         else:
-            return node, state
+            return node, state, 0, False
+
+    def get_player(self) -> int:
+        return self.player

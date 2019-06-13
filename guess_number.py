@@ -23,13 +23,14 @@ class GuessNumber(gaming.Game):
         else:
             state[player] = 1
 
-        return state
+        winner = self.get_winner(state)
+        return state, winner == player, winner != -1
 
-    def get_players(self):
-        return list(range(1, self.n_players+1))
+    def get_player_count(self):
+        return self.n_players
 
     def get_initial_state(self):
-        return dict((p, None) for p in self.get_players())
+        return dict((p, None) for p in range(1, self.n_players+1))
 
     def get_winner(self, state) -> int:
         for player, state in state.items():
@@ -43,8 +44,9 @@ def test_mcts_play():
     s1 = MCTS(ttt, 50, player=1)
     s2 = gaming.RandomStrategy(ttt, player=2)
 
-    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
-    print(f'the winner is the player {winner}')
+    state, rewards, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
+    print()
+    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}')
     print(state)
     print(log)
 
@@ -53,7 +55,8 @@ def test_mcts_play_1player():
     ttt = GuessNumber(n_players=1)
     s1 = MCTS(ttt, 50, player=1)
 
-    state, winner, log = gaming.play_game(ttt, [s1], max_turns=50)
-    print(f'the winner is the player {winner}')
+    state, rewards, log = gaming.play_game(ttt, [s1], max_turns=50)
+    print()
+    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}')
     print(state)
     print(log)

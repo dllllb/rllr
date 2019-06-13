@@ -17,10 +17,12 @@ class TicTacToeGame(gaming.Game):
     def get_result_state(self, state, action, player):
         new_state = state.copy()
         new_state[action] = player
-        return new_state
 
-    def get_players(self):
-        return range(1, self.n_players+1)
+        winner = self.get_winner(new_state)
+        return new_state, winner == player, winner != -1
+
+    def get_player_count(self):
+        return self.n_players
 
     def get_initial_state(self):
         return np.zeros((self.size_x, self.size_y), dtype=np.byte)
@@ -53,13 +55,15 @@ def test_play():
     s1 = mcts.MCTS(ttt, n_plays=50, max_depth=500, player=1)
     s2 = gaming.RandomStrategy(ttt, player=2)
 
-    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
-    print(f'the winner is the player {winner}')
+    state, rewards, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
+    print()
+    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}')
     print(state)
     print(log)
 
-    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
-    print(f'the winner is the player {winner}')
+    state, rewards, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
+    print()
+    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}')
     print(state)
     print(log)
 

@@ -1,28 +1,30 @@
 import random
-from typing import List
+from typing import List, Tuple, Any
 import numpy as np
 
 from policy import Policy
 
 
 class Game:
-    def get_possible_actions(self, state, player) -> List[int]:
+    def get_possible_actions(self, state, player) -> List[Any]:
         pass
 
-    def get_result_state(self, state, action, player):
-        return np.array(0)
+    def get_result_state(self, state, action, player) -> Tuple[Any, int, bool]:
+        return np.array(0), 0, False
 
-    def get_players(self) -> List[int]:
-        pass
+    def get_player_count(self) -> int:
+        return 1
 
     def get_initial_state(self):
         return np.array(0)
 
-    def get_winner(self, state) -> int:
-        pass
+
+class PlayerPolicy(Policy):
+    def get_player(self) -> int:
+        return 1
 
 
-class RandomStrategy(Policy):
+class RandomStrategy(PlayerPolicy):
     def __init__(self, game: Game, player: int):
         self.game = game
         self.player = player
@@ -31,19 +33,26 @@ class RandomStrategy(Policy):
         actions = self.game.get_possible_actions(state, self.player)
         return actions[random.randint(0, len(actions)-1)]
 
+    def get_player(self) -> int:
+        return self.player
 
-def play_game(game: Game, strategies: List[Policy], max_turns=1000):
+
+def play_game(game: Game, strategies: List[PlayerPolicy], max_turns=1000):
     state = game.get_initial_state()
 
     action_log = []
+    tatal_reward = dict((strategy.get_player(), 0) for strategy in strategies)
+
     for i in range(max_turns):
-        for player, strategy in zip(game.get_players(), strategies):
+        for strategy in strategies:
+            player = strategy.get_player()
             action = strategy(state)
             action_log.append((player, action))
-            state = game.get_result_state(state, action, player)
+            state, reward, done = game.get_result_state(state, action, player)
 
-            winner = game.get_winner(state)
-            if winner != -1:
-                return state, winner, action_log
+            tatal_reward[player] += reward
 
-    return state, 0, action_log  # draw by turns limit
+            if done:
+                return state, tatal_reward, action_log
+
+    return state, tatal_reward, action_log  # draw by turns limit

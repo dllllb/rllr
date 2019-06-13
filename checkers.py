@@ -66,10 +66,11 @@ class CheckersGame(gaming.Game):
             if action[-1][0] == 0:
                 new_state[action[-1]] = 21
 
-        return new_state
+        winner = self.get_winner(new_state)
+        return new_state, winner == player, winner != -1
 
-    def get_players(self):
-        return [1, 2]
+    def get_player_count(self):
+        return 2
 
     def get_initial_state(self):
         initial_state = np.zeros((self.size_x, self.size_y), dtype=np.byte)
@@ -98,8 +99,9 @@ def test_play():
     s1 = mcts.MCTS(ttt, n_plays=20, max_depth=500, player=1)
     s2 = gaming.RandomStrategy(ttt, player=2)
 
-    state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=100)
-    print(f'the winner is the player {winner}')
+    state, rewards, log = gaming.play_game(ttt, [s1, s2], max_turns=100)
+    print()
+    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}')
     print(state)
     print(log)
 
