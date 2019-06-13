@@ -99,9 +99,9 @@ def test_play():
     s1 = mcts.MCTS(ttt, n_plays=20, max_depth=500, player=1)
     s2 = gaming.RandomStrategy(ttt, player=2)
 
-    state, rewards, log = gaming.play_game(ttt, [s1, s2], max_turns=100)
+    state, rewards, turn, log = gaming.play_game(ttt, [s1, s2], max_turns=100)
     print()
-    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}')
+    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}, turn: {turn}')
     print(state)
     print(log)
 

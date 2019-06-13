@@ -46,7 +46,8 @@ def play_game(game: Game, strategies: List[PlayerPolicy], max_turns=1000):
     action_log = []
     tatal_reward = dict((strategy.get_player(), 0) for strategy in strategies)
 
-    for i in range(max_turns):
+    turn = 0
+    for turn in range(max_turns):
         for strategy in strategies:
             player = strategy.get_player()
             action = strategy(state)
@@ -56,6 +57,6 @@ def play_game(game: Game, strategies: List[PlayerPolicy], max_turns=1000):
             tatal_reward[player] += reward
 
             if done:
-                return state, tatal_reward, action_log
+                return state, tatal_reward, turn, action_log
 
-    return state, tatal_reward, action_log  # draw by turns limit
+    return state, tatal_reward, turn, action_log  # draw by turns limit

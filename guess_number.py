@@ -41,22 +41,22 @@ class GuessNumber(gaming.Game):
 
 def test_mcts_play():
     ttt = GuessNumber(n_players=2)
-    s1 = MCTS(ttt, 50, player=1)
+    s1 = MCTS(ttt, n_plays=50, max_depth=4, player=1)
     s2 = gaming.RandomStrategy(ttt, player=2)
 
-    state, rewards, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
+    state, rewards, turn, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
     print()
-    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}')
+    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}, turn: {turn}')
     print(state)
     print(log)
 
 
 def test_mcts_play_1player():
     ttt = GuessNumber(n_players=1)
-    s1 = MCTS(ttt, 50, player=1)
+    s1 = MCTS(ttt, n_plays=50, max_depth=20, player=1)
 
-    state, rewards, log = gaming.play_game(ttt, [s1], max_turns=50)
+    state, rewards, turn, log = gaming.play_game(ttt, [s1], max_turns=50)
     print()
-    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}')
+    print(f'the winner is the player {[p for p, r in rewards.items() if r == 1]}, turn: {turn}')
     print(state)
     print(log)

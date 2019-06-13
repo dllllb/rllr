@@ -1,7 +1,7 @@
 import gym
 
 import gaming
-from mcts import MCTS
+from mcts import DepthMCTS
 
 
 class GymGame(gaming.Game):
@@ -38,9 +38,10 @@ class GymGame(gaming.Game):
 
 def test_play():
     ttt = GymGame('CartPole-v1')
-    s1 = MCTS(ttt, 50, player=1)
+    s1 = DepthMCTS(ttt, n_plays=50, max_depth=30, player=1)
 
-    state, rewards, log = gaming.play_game(ttt, [s1], max_turns=50)
+    state, rewards, steps, log = gaming.play_game(ttt, [s1], max_turns=50)
     print()
+    print(f'steps: {steps}')
     print(rewards)
-    print(log)
+    print([a for p, a in log])
