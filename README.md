@@ -84,3 +84,5 @@
 # Imaginary world planning
 
 - use Monte-Carlo Tree Search to find effective trajectory in imaginary world based on world model
+  - i. e. mark trajectory elements according to the sum of imaginary rewards from the word model
+    - use sum of node rewards in bandits algorithm to select the next action for the explored trajectory
