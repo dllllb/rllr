@@ -11,19 +11,29 @@ class GymGame(gaming.Game):
     def get_initial_state(self):
         env = gym.make(self.env_name)
         state = env.reset()
-        return env, state
+        return env, state, list()
 
     def get_possible_actions(self, state, player):
-        env, _ = state
+        env, _, _ = state
         return list(range(env.action_space.n))
 
     def get_player_count(self):
         return 1
 
     def get_result_state(self, state, action, player):
-        env, _ = state
+        env, _, actions = state
         state, reward, done, _ = env.step(action)
-        return (env, state), reward, done
+        actions = actions.copy()
+        actions.append(action)
+        return (env, state, actions), reward, done
+
+    def clone(self, state):
+        _, _, actions = state
+        actions = actions.copy()
+        env, _, _ = self.get_initial_state()
+        for a in actions:
+            state, reward, done, _ = env.step(a)
+        return env, state, actions
 
 
 def test_play():

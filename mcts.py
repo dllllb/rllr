@@ -53,7 +53,7 @@ class MCTS(gaming.PlayerPolicy):
 
         for i in range(self.n_plays):
             current_node = root
-            current_state = root_state
+            current_state = self.game.clone(root_state)
             for j in range(self.max_depth):
                 ssrd = self.perform_action(current_node, current_state, self.player)
                 current_node, current_state, reward, done = ssrd

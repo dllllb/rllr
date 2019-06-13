@@ -18,6 +18,9 @@ class Game:
     def get_initial_state(self):
         return np.array(0)
 
+    def clone(self, state):
+        pass
+
 
 class PlayerPolicy(Policy):
     def get_player(self) -> int:
