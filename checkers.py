@@ -95,8 +95,8 @@ class CheckersGame(gaming.Game):
 
 def test_play():
     ttt = CheckersGame(8, 8)
-    s1 = mcts.MCTS(ttt, n_plays=20, max_depth=500)
-    s2 = gaming.RandomStrategy(ttt)
+    s1 = mcts.MCTS(ttt, n_plays=20, max_depth=500, player=1)
+    s2 = gaming.RandomStrategy(ttt, player=2)
 
     state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=100)
     print(f'the winner is the player {winner}')

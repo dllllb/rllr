@@ -2,6 +2,7 @@ import math
 import numpy as np
 
 import gaming
+from policy import Policy
 
 
 class Node:
@@ -37,33 +38,34 @@ class Node:
             self.parent.update_stats(win_flag)
 
 
-class MCTS(gaming.AgentStrategy):
-    def __init__(self, game, n_plays: int, max_depth=500):
+class MCTS(Policy):
+    def __init__(self, game, n_plays: int, player: int, max_depth=500):
         self.n_plays = n_plays
         self.max_depth = max_depth
         self.game = game
+        self.player = player
 
-    def suggest_action(self, root_state, player):
+    def __call__(self, root_state):
         root = Node(None)
 
         for i in range(self.n_plays):
             current_node = root
             current_state = root_state
             for j in range(self.max_depth):
-                current_node, current_state = self.perform_action(current_node, current_state, player)
+                current_node, current_state = self.perform_action(current_node, current_state, self.player)
 
                 winner = self.game.get_winner(current_state)
                 if winner != -1:
-                    current_node.update_stats(winner == player)
+                    current_node.update_stats(winner == self.player)
                     break
 
                 for adversary in self.game.get_players():
-                    if adversary != player:
+                    if adversary != self.player:
                         current_node, current_state = self.perform_action(current_node, current_state, adversary)
 
                         winner = self.game.get_winner(current_state)
                         if winner != -1:
-                            current_node.update_stats(winner == player)
+                            current_node.update_stats(winner == self.player)
                             break
 
                 if winner != -1:
@@ -116,8 +118,8 @@ class OneTwoGame(gaming.Game):
 
 def test_mcts_play():
     ttt = OneTwoGame()
-    s1 = MCTS(ttt, 50)
-    s2 = gaming.RandomStrategy(ttt)
+    s1 = MCTS(ttt, 50, player=1)
+    s2 = gaming.RandomStrategy(ttt, player=2)
 
     state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
     print(f'the winner is the player {winner}')

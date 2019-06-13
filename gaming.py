@@ -2,6 +2,8 @@ import random
 from typing import List
 import numpy as np
 
+from policy import Policy
+
 
 class Game:
     def get_possible_actions(self, state, player) -> List[int]:
@@ -20,27 +22,23 @@ class Game:
         pass
 
 
-class AgentStrategy:
-    def suggest_action(self, state, player):
-        pass
-
-
-class RandomStrategy:
-    def __init__(self, game: Game):
+class RandomStrategy(Policy):
+    def __init__(self, game: Game, player: int):
         self.game = game
+        self.player = player
 
-    def suggest_action(self, state, player):
-        actions = self.game.get_possible_actions(state, player)
+    def __call__(self, state):
+        actions = self.game.get_possible_actions(state, self.player)
         return actions[random.randint(0, len(actions)-1)]
 
 
-def play_game(game: Game, strategies: List[AgentStrategy], max_turns=1000):
+def play_game(game: Game, strategies: List[Policy], max_turns=1000):
     state = game.get_initial_state()
 
     action_log = []
     for i in range(max_turns):
         for player, strategy in zip(game.get_players(), strategies):
-            action = strategy.suggest_action(state, player)
+            action = strategy(state)
             action_log.append((player, action))
             state = game.get_result_state(state, action, player)
 

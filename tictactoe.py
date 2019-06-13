@@ -50,8 +50,8 @@ class TicTacToeGame(gaming.Game):
 
 def test_play():
     ttt = TicTacToeGame(size_x=4, size_y=4, len_to_win=3, n_players=2)
-    s1 = mcts.MCTS(ttt, n_plays=50, max_depth=500)
-    s2 = gaming.RandomStrategy(ttt)
+    s1 = mcts.MCTS(ttt, n_plays=50, max_depth=500, player=1)
+    s2 = gaming.RandomStrategy(ttt, player=2)
 
     state, winner, log = gaming.play_game(ttt, [s1, s2], max_turns=50)
     print(f'the winner is the player {winner}')
