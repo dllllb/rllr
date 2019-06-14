@@ -40,21 +40,12 @@ class UcbNode:
             self.parent.update_stats(reward)
 
 
-def env_reward(depth, env_reward, done):
-    return env_reward
-
-
-def depth_reward(depth, env_reward, done):
-    return depth if done else 0
-
-
 class MCTS(gaming.PlayerPolicy):
-    def __init__(self, game: gaming.Game, n_plays: int, player: int, max_depth=500, reward_calc=env_reward):
+    def __init__(self, game: gaming.Game, n_plays: int, player: int, max_depth=500):
         self.n_plays = n_plays
         self.max_depth = max_depth
         self.game = game
         self.player = player
-        self.reward_calc = reward_calc
 
     def __call__(self, root_state):
         root = UcbNode(None, None)
@@ -66,7 +57,6 @@ class MCTS(gaming.PlayerPolicy):
                 ssrd = self.perform_action(current_node, current_state, self.player)
                 current_node, current_state, reward, done = ssrd
 
-                reward = self.reward_calc(j, reward, done)
                 current_node.update_stats(reward)
                 if done:
                     break
@@ -76,7 +66,7 @@ class MCTS(gaming.PlayerPolicy):
                         ssrd = self.perform_action(current_node, current_state, adversary)
                         current_node, current_state, reward, done = ssrd
 
-                        reward = self.reward_calc(j, reward, done) * -1
+                        reward = reward * -1
                         current_node.update_stats(reward)
                         if done:
                             break
@@ -84,9 +74,6 @@ class MCTS(gaming.PlayerPolicy):
         best_action = root.select_child().action
 
         return best_action
-
-    def get_reward(self, depth, env_reward, done):
-        return env_reward
 
     def perform_action(self, node, state, player):
         if len(node.children) == 0:
@@ -103,11 +90,3 @@ class MCTS(gaming.PlayerPolicy):
 
     def get_player(self) -> int:
         return self.player
-
-
-class DepthMCTS(MCTS):
-    def __init__(self, game: gaming.Game, n_plays: int, player: int, max_depth=500):
-        super().__init__(game, n_plays, player, max_depth)
-
-    def get_reward(self, depth, env_reward, done):
-        return depth if done else 0

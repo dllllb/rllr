@@ -1,7 +1,7 @@
 import gym
 
 import gaming
-from mcts import DepthMCTS
+from mcts import MCTS
 
 
 class GymGame(gaming.Game):
@@ -22,10 +22,10 @@ class GymGame(gaming.Game):
 
     def get_result_state(self, state, action, player):
         env, _, actions = state
-        state, reward, done, _ = env.step(action)
+        inner_state, reward, done, _ = env.step(action)
         actions = actions.copy()
         actions.append(action)
-        return (env, state, actions), reward, done
+        return (env, inner_state, actions), reward, done
 
     def clone(self, state):
         _, _, actions = state
@@ -36,9 +36,19 @@ class GymGame(gaming.Game):
         return env, state, actions
 
 
+class GymNStepsGame(GymGame):
+    def __init__(self, env_name: str):
+        super().__init__(env_name)
+
+    def get_result_state(self, state, action, player):
+        (env, inner_state, actions), reward, done = super().get_result_state(state, action, player)
+        reward = len(actions)
+        return (env, inner_state, actions), reward, done
+
+
 def test_play():
-    ttt = GymGame('CartPole-v1')
-    s1 = DepthMCTS(ttt, n_plays=50, max_depth=30, player=1)
+    ttt = GymNStepsGame('CartPole-v1')
+    s1 = MCTS(ttt, n_plays=50, max_depth=30, player=1)
 
     state, rewards, steps, log = gaming.play_game(ttt, [s1], max_turns=50)
     print()
