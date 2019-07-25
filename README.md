@@ -13,10 +13,10 @@
     - wm trasfroms state to its compact representation
       - wm can be trained on the task to predict $wm(s_{t+1})$ from $wm(s_t)$
         - alternative: predict $wm(s_{t+k})$ from $wm(s_t)$
-      - different policies can be used for exploration on world model building phase
+      - different policies $p_e$ can be used for exploration on the world model building phase
     - ideally wm should factor space to the vector of independent components
 2. $r = se(s_t)$
-    - state estimator which estimates the reward of being it state $s_t$
+    - state estimator which estimates the reward of being in state $s_t$
     - reward estimator can be trained along with the world model
 3. g = pg(u_t)
     - generate a sequence of sub-goals (plan)
@@ -79,4 +79,4 @@
 
 ## Plan-based exploration with curiosity reward
 
-- when there is a good plan generator it can be used to reach the state with good possibilities for exploration (see Go-Explore paper)
+- when there is a good plan generator it can be used to reach the state with good possibilities for exploration (see Go-Explore paper) and hence find the states where sparce extrinsic revard is gained
