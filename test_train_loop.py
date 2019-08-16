@@ -2,8 +2,9 @@ import gym
 import torch
 
 import models
-from pgrad import PGUpdater, NNPolicy
+from pgrad import PGUpdater
 from train import train_loop
+from policy import NNPolicy
 
 
 def test_train_loop():
