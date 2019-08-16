@@ -1,3 +1,5 @@
+from torch.distributions import Categorical
+
 from learner import Learner, Updater, BufferedLearner
 import torch.nn as nn
 
@@ -25,6 +27,18 @@ class NNPolicy(BufferedLearner, Policy):
         self.model = model
 
     def __call__(self, state):
-        c = self.model(state)
+        c = Categorical(self.model(state))
         action = c.sample()
         return action.item(), c.log_prob(action).view(1)
+
+
+class NNPolicyAV(BufferedLearner, Policy):
+    def __init__(self, model: nn.Module, updater: Updater):
+        super().__init__(updater)
+        self.model = model
+
+    def __call__(self, state):
+        ap, v = self.model(state)
+        c = Categorical(ap)
+        action = c.sample()
+        return action.item(), (c.log_prob(action).view(1), v.item())

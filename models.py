@@ -21,8 +21,38 @@ class MLPPolicy(nn.Module):
 
     def forward(self, state):
         state = torch.from_numpy(state).type(torch.FloatTensor)
-        c = Categorical(self.model(state))
-        return c
+        ap = self.model(state)
+        return ap
+
+
+class MLPPolicyAV(nn.Module):
+    def __init__(self, env: gym.Env):
+        super().__init__()
+        state_space = env.observation_space.shape[0]
+        action_space = env.action_space.n
+
+        self.basenet = nn.Sequential(
+            nn.Linear(state_space, 128, bias=False),
+            nn.Dropout(p=0.6),
+            nn.ReLU(),
+        )
+
+        self.action_head = nn.Sequential(
+            nn.Linear(128, action_space, bias=False),
+            nn.Softmax(dim=-1)
+        )
+
+        self.value_head = nn.Sequential(
+            nn.Linear(128, 1, bias=False),
+            nn.Softmax(dim=-1)
+        )
+
+    def forward(self, state):
+        state = torch.from_numpy(state).type(torch.FloatTensor)
+        state_embed = self.basenet(state)
+        ap = self.action_head(state_embed)
+        v = self.value_head(state_embed)
+        return ap, v
 
 
 class ConvPolicy(nn.Module):
@@ -59,5 +89,5 @@ class ConvPolicy(nn.Module):
             state = state.view(1, 1, *state.shape)
 
         conv_out = self.conv(state).view(state.size(0), -1)
-        c = Categorical(self.fc(conv_out))
-        return c
+        ap = self.fc(conv_out)
+        return ap
