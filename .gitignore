@@ -3,3 +3,5 @@
 __pycache__/
 __temp__.mp4
 .idea
+env/AnimalAI.app
+env/UnitySDK.log

@@ -2,6 +2,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import gym
+from ignite.contrib.handlers import ProgressBar
+from ignite.engine import Engine, Events
+from ignite.metrics import RunningAverage
 from torch.distributions import Categorical
 
 from learner import Updater, BufferedLearner
@@ -68,7 +71,10 @@ class ConvPolicy(nn.Module):
         state = torch.from_numpy(state).float() / 256
         if len(state.shape) == 3:
             state = state.view(1, *state.shape)
-        state = state.permute(0, 3, 1, 2)
+            state = state.permute(0, 3, 1, 2)
+        elif len(state.shape) == 2:
+            state = state.view(1, 1, *state.shape)
+
         conv_out = self.conv(state).view(state.size(0), -1)
         c = Categorical(self.fc(conv_out))
         return c
@@ -104,39 +110,41 @@ class PGUpdater(Updater):
         self.optimizer.step()
     
 
-def train_loop(env, policy, n_eposodes, episode_len=1000):
-    running_reward = 10
-    for episode in range(n_eposodes):
-        time, _ = play_episode(env, policy, episode_len=episode_len, render=False)
-        
-        # Used to determine when the environment is solved
-        running_reward = (running_reward * 0.99) + (time * 0.01)
-        
-        if episode % 50 == 0:
-            print(f'Episode {episode}\tLast length: {time:5d}\tAverage length: {running_reward:.2f}')
-
-
-def play_episode(env, policy, render, episode_len=1000):
-    state = env.reset()
-    frames = []
-
-    time = 0
-    for i in range(episode_len):
-        time = i
-
-        if render:
-            frames.append(env.render(mode='rgb_array'))
-
+def train_loop(env, policy, n_episodes, episode_len=1000, render=False):
+    def train_timestep(engine, timestep):
+        state = engine.state.observation
         action, context = policy(state)
         state, reward, done, _ = env.step(action)
         policy.update(context, state, reward)
-
+        engine.state.total_reward += reward
         if done:
-            break
+            engine.terminate_epoch()
+            engine.state.timestep = timestep
 
-    policy.end_episode()
-    
-    return time, frames
+        return reward
+
+    trainer = Engine(train_timestep)
+
+    @trainer.on(Events.EPOCH_STARTED)
+    def reset_environment_state(engine):
+        engine.state.total_reward = 0
+        engine.state.observation = env.reset()
+
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def update_model(engine):
+        policy.end_episode()
+        print(f'session reward: {engine.state.total_reward}')
+
+    if render:
+        @trainer.on(Events.ITERATION_COMPLETED)
+        def render(_):
+            env.render()
+
+    pbar = ProgressBar(persist=True)
+    pbar.attach(trainer)
+
+    timesteps = list(range(episode_len))
+    trainer.run(timesteps, max_epochs=n_episodes)
 
 
 def test_train_loop():
@@ -149,7 +157,7 @@ def test_train_loop():
     updater = PGUpdater(optimizer, gamma=.99)
     policy = NNPolicy(nn, updater)
 
-    train_loop(env=env, policy=policy, n_eposodes=1, episode_len=5)
+    train_loop(env=env, policy=policy, n_episodes=1, episode_len=5)
 
 
 def test_conv_policy():
@@ -162,4 +170,4 @@ def test_conv_policy():
     updater = PGUpdater(optimizer, gamma=.99)
     policy = NNPolicy(nn, updater)
 
-    train_loop(env=env, policy=policy, n_eposodes=1, episode_len=5)
+    train_loop(env=env, policy=policy, n_episodes=1, episode_len=5)

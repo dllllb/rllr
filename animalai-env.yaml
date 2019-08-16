@@ -1,0 +1,11 @@
+name: animalai
+dependencies:
+  - python=3.6
+  - grpcio=1.11.0
+  - tqdm
+  - pip:
+    - torch==1.2.0
+    - pytorch-ignite>=0.2
+    - gym==0.14.0
+    - gym[atari]
+    - animalai>=1.0
