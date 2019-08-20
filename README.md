@@ -10,8 +10,8 @@
 ### Framework
 
 1. $ u_t = wm(s_t),\ \hat{u}_{t+1} = next(a_t, wm(s_t)) $
-    - wm trasfroms state to its compact representation
-      - wm can be trained on the task to predict $wm(s_{t+1})$ from $wm(s_t)$
+    - world model trasfroms state to its compact representation
+      - world model can be trained on the task to predict $wm(s_{t+1})$ from $wm(s_t)$
         - alternative: predict $wm(s_{t+k})$ from $wm(s_t)$
       - different policies $p_e$ can be used for exploration on the world model building phase
     - ideally wm should factor space to the vector of independent components
