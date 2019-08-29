@@ -46,7 +46,7 @@ class TrajectoryExplorer:
 
 
 def generate_train_trajectories(trajectory_explorer: TrajectoryExplorer, n_initial_points: int, take_prob: float):
-    initial_trajectory = None
+    initial_trajectory = list()
     tasks = list()
     for _ in range(n_initial_points):
         trajectories = trajectory_explorer(initial_trajectory)
