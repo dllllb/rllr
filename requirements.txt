@@ -1,0 +1,4 @@
+gym>=0.14.0
+gym[atari]
+torch>=1.1
+pytorch-ignite>=0.2
