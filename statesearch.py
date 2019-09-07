@@ -1,10 +1,13 @@
+import warnings
+
 import gym
 import numpy as np
 import torch
 from skimage.measure import compare_ssim
 
-import pgrad
-from policy import RandomActionPolicy, Policy
+from models import MLPPolicy, ConvPolicy
+from pgrad import PGUpdater
+from policy import RandomActionPolicy, Policy, NNPolicy
 
 
 class TrajectoryExplorer:
@@ -129,17 +132,19 @@ class NavigationTrainer:
 
 
 def test_train_navigation_policy():
-    env = gym.make('CartPole-v1')
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        env = gym.make('CartPole-v1')
     env.seed(1)
     torch.manual_seed(1)
 
     explore_policy = RandomActionPolicy(env)
 
-    nav_nn = pgrad.MLPPolicy(env)
+    nav_nn = MLPPolicy(env)
 
     np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)
-    np_updater = pgrad.PGUpdater(np_optimizer, gamma=.99)
-    policy = pgrad.NNPolicy(nav_nn, np_updater)
+    np_updater = PGUpdater(np_optimizer, gamma=.99)
+    policy = NNPolicy(nav_nn, np_updater)
 
     te = TrajectoryExplorer(env, explore_policy, 5, 2)
     tasks = generate_train_trajectories(te, 3, .5)
@@ -149,17 +154,19 @@ def test_train_navigation_policy():
 
 
 def test_train_navigation_policy_ssim():
-    env = gym.make('BreakoutDeterministic-v4')
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        env = gym.make('BreakoutDeterministic-v4')
     env.seed(1)
     torch.manual_seed(1)
 
     explore_policy = RandomActionPolicy(env)
 
-    nav_nn = pgrad.ConvPolicy(env)
+    nav_nn = ConvPolicy(env)
 
     np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)
-    np_updater = pgrad.PGUpdater(np_optimizer, gamma=.99)
-    policy = pgrad.NNPolicy(nav_nn, np_updater)
+    np_updater = PGUpdater(np_optimizer, gamma=.99)
+    policy = NNPolicy(nav_nn, np_updater)
 
     te = TrajectoryExplorer(env, explore_policy, 5, 2)
     tasks = generate_train_trajectories(te, 3, .5)
