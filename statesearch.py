@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from skimage.measure import compare_ssim
 
-from models import MLPPolicy, ConvPolicy
+from navigation_models import ConvNavPolicy
 from pgrad import PGUpdater
 from policy import RandomActionPolicy, Policy, NNPolicy
 
@@ -102,7 +102,7 @@ class NavigationTrainer:
                 positive_reward = 0
 
                 for j in range(len(known_trajectory)*100):
-                    action, context = self.navigation_policy(state)
+                    action, context = self.navigation_policy((state, desired_state))
                     state, _, done, _ = self.env.step(action)
 
                     sim = self.state_dist(state, desired_state)
@@ -110,15 +110,15 @@ class NavigationTrainer:
                         max_sim = sim
                         no_reward_actions = 0
                         positive_reward += 1
-                        self.navigation_policy.update(context, state, 1)
+                        self.navigation_policy.update(context, (state, desired_state), 1)
                         if max_sim > 0.999:
                             break
                     elif done:
-                        self.navigation_policy.update(context, state, -1)
+                        self.navigation_policy.update(context, (state, desired_state), -1)
                         break
                     else:
                         no_reward_actions += 1
-                        self.navigation_policy.update(context, state, 0)
+                        self.navigation_policy.update(context, (state, desired_state), 0)
                         if no_reward_actions > self.n_actions_without_reward:
                             break
 
@@ -131,28 +131,6 @@ class NavigationTrainer:
                 print(f'tasks processed: {i}, mean reward: {np.array(running_reward).mean()}')
 
 
-def test_train_navigation_policy():
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        env = gym.make('CartPole-v1')
-    env.seed(1)
-    torch.manual_seed(1)
-
-    explore_policy = RandomActionPolicy(env)
-
-    nav_nn = MLPPolicy(env)
-
-    np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)
-    np_updater = PGUpdater(np_optimizer, gamma=.99)
-    policy = NNPolicy(nav_nn, np_updater)
-
-    te = TrajectoryExplorer(env, explore_policy, 5, 2)
-    tasks = generate_train_trajectories(te, 3, .5)
-
-    nt = NavigationTrainer(env, policy, n_steps_per_episode=3, state_dist=mse_dist)
-    nt(tasks)
-
-
 def test_train_navigation_policy_ssim():
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -162,8 +140,7 @@ def test_train_navigation_policy_ssim():
 
     explore_policy = RandomActionPolicy(env)
 
-    nav_nn = ConvPolicy(env)
-
+    nav_nn = ConvNavPolicy(env)
     np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)
     np_updater = PGUpdater(np_optimizer, gamma=.99)
     policy = NNPolicy(nav_nn, np_updater)

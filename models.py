@@ -66,7 +66,9 @@ class ConvPolicy(nn.Module):
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.Conv2d(64, 64, kernel_size=2, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 1, kernel_size=1, stride=1),
             nn.ReLU()
         )
 
@@ -74,9 +76,9 @@ class ConvPolicy(nn.Module):
         conv_out_size = int(np.prod(o.size()))
 
         self.fc = nn.Sequential(
-            nn.Linear(conv_out_size, 512),
+            nn.Linear(conv_out_size, 128),
             nn.ReLU(),
-            nn.Linear(512, env.action_space.n),
+            nn.Linear(128, env.action_space.n),
             nn.Softmax(dim=-1)
         )
 
