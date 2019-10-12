@@ -7,7 +7,7 @@
 
 - using sub-policies allows to reuse task-specific plicies for different environments
 
-### Framework
+## Framework
 
 1. $ u_t = wm(s_t),\ \hat{u}_{t+1} = next(a_t, wm(s_t)) $
     - world model trasfroms state to its compact representation
@@ -26,7 +26,7 @@
 6. use p_c to reach the goal $g_i$
     - p_c receives reward if $g_i$ is succesfuly reached
 
-#### Desired state distribution plan generator
+## Desired state distribution plan generator
 
 1. $ d = des(u_t) $
     - for the current state $u_t$ predict desired state values distribution
@@ -40,7 +40,7 @@
     - i can be choosen randomly
       - if $g_i$ is already satisfied for the current state then i-th component should be ignored and no plan item should be generated
 
-### Exploration policy options
+## Exploration policy options
 
 - $a_t = p_e(s_t)$
   - $p_e$: a policy for exploration
@@ -49,7 +49,7 @@
   - random policy
   - a policy with curiosity based reward
 
-### Environment control learning
+## Environment control learning
 
 - sub-policy learning tasks
   - random pos
