@@ -27,10 +27,11 @@ p_c receives reward if $g_i$ is succesfuly reached
 
 ## Desired state distribution plan generator
 
-1. $ d = des(u_t) $
+1. $ d = ds(u_t) $
 For the current state $u_t$ predict desired state values distribution. Each state component can have its own distribution.
 Uniform distribution with bounds would define range of possible values. Uniform distribution with loose (poossibly infinite) bounds mark the particular state component as not significant. Uniform distribution with narrow bounds would mark exact value of the particular state component as very significant.
-Reward estimator *se* can be used to train the desired state producer *des*
+Reward estimator *se* can be used to train the desired state producer *ds*
+**Problem:** desired state generator is not penalizeded for the complexity of reaching the d from $u_t$
 
 2. For each component of d produce $P_{d_i}(u_{t_i}) > \epsilon$ as a plan item $g_i$
 $\epsilon$ is a hyperparameter and should be a reasonably high value e. g. 0.5
