@@ -11,27 +11,24 @@ World model trasfroms state to its compact representation. World model can be tr
 Different policies $p_e$ can be used for exploration on the world model building phase
 Ideally wm should factor space to the vector of independent components
 
-2. $r = se(s_t)$ - state reward estimator which estimates the reward or of being in state $s_t$
-Reward estimator can be trained along with the world model
+2. g = pg(u_t) - generate the sequence of sub-goals (plan)
 
-3. g = pg(u_t) - generate the sequence of sub-goals (plan)
+3. Select the current sub-goal g_i e. g. take the first goal of the plan
 
-4. Select the current sub-goal g_i e. g. take the first goal of the plan
+4. $ p_c = reg(u_t, g_i) $ - select a sub-policy from sub-policy registry for the current g_i
 
-5. $ p_c = reg(u_t, g_i) $ - select a sub-policy from sub-policy registry for the current g_i
-
-6. Use p_c to reach the goal $g_i$
+5. Use p_c to reach the goal $g_i$
 p_c receives reward if $g_i$ is succesfuly reached
 
-7. Repeat the process from step 3
+6. Repeat the process from step 3
 
 ## Desired state predictor
 
-Reward estimator $r = se(s_t)$ can not be directly used to predict the desired state for the current state. Hence, additional model for desired state predictor $ u_t^* = ds(u_t) $ is needed.
+Reward estimator $r = se(s_t)$ can be trained to estimate the reward or of being in state $s_t$. Reward estimator can be trained along with the world model. Reward estimator $r = se(s_t)$ can not be directly used to predict the desired state for the current state. Hence, additional model for desired state predictor $ u_t^* = ds(u_t) $ is needed.
 
-One possible approach to learn a model for the  desired state predictor would be the usage of exploration history. I. e. the synyhetic task for desired state predictor would be the predicton of the state with maximum reward $u_t^*$ for every trajectory which is known from the input state. In order to iteratively increase the complexity of the task the trainig process can be started from the states near the s$u_t^*$ with gradual increase of the distance to $u_t^*$ on the state-action graph.
+One possible approach to learn a model for the  desired state predictor would be the usage of exploration history. I. e. the synyhetic task for desired state predictor would be the predicton of the state with maximum reward $u_t^*$ for every trajectory which is known from the input state. In order to iteratively increase the complexity of the task the trainig process can be started from the states near the s$u_t^*$ with gradual increase of the distance to $u_t^*$ on the state-action graph. $-se(ds(u_t))$ can be used as the objective for trainig.
 
-It is also possible to train $ds$ to return the parameters of the distribution of the desired state $ f_{u^*} = ds(u_t) $. The model should be penalized for the states $u_c$ with similar reward to the $u^*$ which are close to the $u^*$ on the state-action graph but have small probability $ f_{u^*}($u_c$) $. Training the exploration agent to perform the state stablity task in the $u^*$ would allow to collect many possible values of the $u_c$.
+It is also possible to train $ds$ to return the parameters of the distribution of the desired state $ f_{u^*} = ds(u_t) $ and then use $ -se(ds(u \sim f_{u^*}) $ as the objective for training
 
 ## Exploration policy options
 
