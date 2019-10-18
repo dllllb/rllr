@@ -51,7 +51,7 @@ Environment control learning can be used as synyhetic task for trainig sub-polic
 
 ### Plan generator learning
 
-Train pg to generate a plan to reach random state $u_t'$ from $u_t$. Reward should be inversely proportional to the number of performed actions in order to reach the goal state.
+Train $pg$ to generate a plan to reach random state $u_t'$ from $u_t$. Reward should be inversely proportional to the number of performed actions in order to reach the goal state.
 
 Problem: some possible states are not attainable from $u_t$.
 Solution 1: Perfrorm world exploration using $p_e$ and log possible state sequiences. Use initial state as $u_t$ and some state from state log as $u_t'$.
