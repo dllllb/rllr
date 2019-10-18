@@ -24,11 +24,9 @@ p_c receives reward if $g_i$ is succesfuly reached
 
 ## Desired state predictor
 
-Reward estimator $r = se(s_t)$ can be trained to estimate the reward or of being in state $s_t$. Reward estimator can be trained along with the world model. Reward estimator $r = se(s_t)$ can not be directly used to predict the desired state for the current state. Hence, additional model for desired state predictor $ u_t^* = ds(u_t) $ is needed.
+Reward estimator $r = se(s_t)$ can be trained to estimate the reward or of being in state $s_t$. Reward estimator can be trained along with the world model. Reward estimator $r = se(s_t)$ can not be directly used to predict the desired state for the current state. Hence, additional model for desired state predictor $ u_t^* = ds(u_t) $ is needed. $-se(ds(u_t))$ can be used as the objective for trainig. It is possible to train $ds$ to return the parameters of the distribution of the desired state $ f_{u^*} = ds(u_t) $ and then use $ -se(ds(u \sim f_{u^*}) $ as the objective for training.
 
-One possible approach to learn a model for the  desired state predictor would be the usage of exploration history. I. e. the synyhetic task for desired state predictor would be the predicton of the state with maximum reward $u_t^*$ for every trajectory which is known from the input state. In order to iteratively increase the complexity of the task the trainig process can be started from the states near the s$u_t^*$ with gradual increase of the distance to $u_t^*$ on the state-action graph. $-se(ds(u_t))$ can be used as the objective for trainig.
-
-It is also possible to train $ds$ to return the parameters of the distribution of the desired state $ f_{u^*} = ds(u_t) $ and then use $ -se(ds(u \sim f_{u^*}) $ as the objective for training
+Other possible approach to learn a model for $ds$ would be the usage of exploration history. I. e. the synyhetic task to train $ds$ would be the predicton of the state with maximum reward $u_t^*$ for every trajectory which is known from the input state. In order to iteratively increase the complexity of the task the trainig process can be started from the states near the s$u_t^*$ with gradual increase of the distance to $u_t^*$ on the state-action graph.
 
 ## Exploration policy options
 
