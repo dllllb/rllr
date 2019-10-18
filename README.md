@@ -25,17 +25,13 @@ p_c receives reward if $g_i$ is succesfuly reached
 
 7. Repeat the process from step 3
 
-## Desired state distribution plan generator
+## Desired state predictor
 
-1. $ d = ds(u_t) $
-For the current state $u_t$ predict desired state values distribution. Each state component can have its own distribution.
-Uniform distribution with bounds would define range of possible values. Uniform distribution with loose (poossibly infinite) bounds mark the particular state component as not significant. Uniform distribution with narrow bounds would mark exact value of the particular state component as very significant.
-Reward estimator *se* can be used to train the desired state producer *ds*
-**Problem:** desired state generator is not penalizeded for the complexity of reaching the d from $u_t$
+Reward estimator $r = se(s_t)$ can not be directly used to predict the desired state for the current state. Hence, additional model for desired state predictor $ u_t^* = ds(u_t) $ is needed.
 
-2. For each component of d produce $P_{d_i}(u_{t_i}) > \epsilon$ as a plan item $g_i$
-$\epsilon$ is a hyperparameter and should be a reasonably high value e. g. 0.5
-If $g_i$ is already satisfied for the current state then i-th component should be ignored and no plan item should be generated
+One possible approach to learn a model for the  desired state predictor would be the usage of exploration history. I. e. the synyhetic task for desired state predictor would be the predicton of the state with maximum reward $u_t^*$ for every trajectory which is known from the input state. In order to iteratively increase the complexity of the task the trainig process can be started from the states near the s$u_t^*$ with gradual increase of the distance to $u_t^*$ on the state-action graph.
+
+It is also possible to train $ds$ to return the parameters of the distribution of the desired state $ f_{u^*} = ds(u_t) $. The model should be penalized for the states $u_c$ with similar reward to the $u^*$ which are close to the $u^*$ on the state-action graph but have small probability $ f_{u^*}($u_c$) $. Training the exploration agent to perform the state stablity task in the $u^*$ would allow to collect many possible values of the $u_c$.
 
 ## Exploration policy options
 
