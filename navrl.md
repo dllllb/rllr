@@ -1,4 +1,4 @@
-# HRL framework
+# NavRL framework
 
 The objective of HRL framework is to decompose environment state to the state of achievement of separate sub-goals. Using sub-policies allows to reuse task-specific plicies for different environments.
 
