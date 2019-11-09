@@ -61,4 +61,4 @@ Solution 2: Use world model $wm$ and exploration policy $p_e$ to generate a $u_t
 
 ## Plan-based exploration with curiosity reward
 
-When there is a good plan generator it can be used to reach the state with good possibilities for exploration (see Go-Explore paper) and hence find the states where sparse extrinsic revard is gained
+When a good naivgation agent is trained it can be used to reach the state with good possibilities for exploration (see Go-Explore paper) and hence find the states where sparse extrinsic revard is gained
