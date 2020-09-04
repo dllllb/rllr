@@ -29,6 +29,7 @@ def train_loop(env, policy, n_episodes, episode_len=1000, render=False, seed=1):
     @trainer.on(Events.EPOCH_COMPLETED)
     def update_model(engine):
         policy.end_episode()
+        torch.save(policy.model, './saved_models/goal_model.pkl')
         print(f'session reward: {engine.state.total_reward}')
 
     if render:

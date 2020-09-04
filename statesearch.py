@@ -128,6 +128,7 @@ class NavigationTrainer:
                     self.navigation_policy.end_episode()
 
             if i % 10 == 0:
+                torch.save(self.navigation_policy.model, './saved_models/pretrained_navigation_model.pkl')
                 print(f'tasks processed: {i}, mean reward: {np.array(running_reward).mean()}')
 
 

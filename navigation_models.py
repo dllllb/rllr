@@ -5,7 +5,8 @@ from torch import nn
 
 
 def prepare_state(state):
-    state = torch.from_numpy(state).float() / 256
+    if isinstance(state, np.ndarray):
+        state = torch.from_numpy(state).float() / 256
     if len(state.shape) == 3:
         state = state.view(1, *state.shape)
         state = state.permute(0, 3, 1, 2)
@@ -58,3 +59,19 @@ class ConvNavPolicy(nn.Module):
 
         ap = self.fc(h)
         return ap
+
+class GoalConvNavPolicy(nn.Module):
+    def __init__(self, model: nn.Module, env: gym.Env, starter: torch.Tensor=None):
+        super().__init__()
+
+        self.model = model
+
+        if starter is None:
+            img_height, img_width, img_channels = env.observation_space.shape
+            self.starter = nn.Parameter(torch.randn(img_height, img_width, img_channels))
+        else:
+            starter = nn.Parameter(starter)
+
+    def forward(self, state):
+        input = (state, self.starter)
+        return self.model(input)
