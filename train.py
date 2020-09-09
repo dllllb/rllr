@@ -2,6 +2,9 @@ import torch
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, Events
 
+from constants import *
+import time
+
 
 def train_loop(env, policy, n_episodes, episode_len=1000, render=False, seed=1):
     env.seed(seed)
@@ -11,6 +14,7 @@ def train_loop(env, policy, n_episodes, episode_len=1000, render=False, seed=1):
         state = engine.state.observation
         action, context = policy(state)
         state, reward, done, _ = env.step(action)
+        time.sleep(1.0/3)
         policy.update(context, state, reward)
         engine.state.total_reward += reward
         if done:
@@ -36,6 +40,7 @@ def train_loop(env, policy, n_episodes, episode_len=1000, render=False, seed=1):
         @trainer.on(Events.ITERATION_COMPLETED)
         def render(_):
             env.render()
+            
 
     pbar = ProgressBar(persist=True)
     pbar.attach(trainer)

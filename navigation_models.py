@@ -2,6 +2,7 @@ import gym
 import torch
 import numpy as np
 from torch import nn
+from constants import *
 
 
 def prepare_state(state):
@@ -12,7 +13,7 @@ def prepare_state(state):
         state = state.permute(0, 3, 1, 2)
     elif len(state.shape) == 2:
         state = state.view(1, 1, *state.shape)
-    return state
+    return state.to(DEVICE)
 
 
 def state_embed_block(img_channels):
