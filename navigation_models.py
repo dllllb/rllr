@@ -43,22 +43,54 @@ class ConvNavPolicy(nn.Module):
         conv_out_size = int(np.prod(o.size()))
 
         self.fc = nn.Sequential(
-            nn.Linear(conv_out_size*2, 128),
+            nn.Linear(conv_out_size*1, 128),
+            nn.LayerNorm([128]),
             nn.ReLU(),
             nn.Linear(128, env.action_space.n),
-            nn.Softmax(dim=-1)
+            #nn.Softmax(dim=-1)
         )
+        self.act = nn.LogSoftmax(dim=-1)
 
     def forward(self, state):
         current_state, desired_state = state
         current_state = prepare_state(current_state)
         desired_state = prepare_state(desired_state)
+        current_state = (current_state - current_state.min())/(current_state.max() - current_state.min())
+        desired_state = (desired_state - desired_state.mean())/(desired_state.max() - desired_state.min())
+
+        if torch.isnan(current_state).any().item():
+            print(f'+++++++++++++++++nan in current_state values +++++++++++++++++++\n')
+
+        if torch.isinf(current_state).any().item():
+            print(f'+++++++++++++++++infinity in current_state  values +++++++++++++++++++\n')
+
+        if torch.isnan(desired_state).any().item():
+            print(f'+++++++++++++++++nan in desired_state values +++++++++++++++++++\n')
+
+        if torch.isinf(desired_state).any().item():
+            print(f'+++++++++++++++++infinity in desired_state  values +++++++++++++++++++\n')
 
         conv_out = self.conv(current_state).view(current_state.size(0), -1)
         conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
-        h = torch.cat((conv_out, conv_target_out), dim=1)
+        #h = torch.cat((conv_out, conv_target_out), dim=1)
+        h = conv_target_out - conv_out
+
+        if torch.isnan(h).any().item():
+            print(f'+++++++++++++++++nan in conv layer values +++++++++++++++++++\n')
+
+        if torch.isinf(h).any().item():
+            print(f'+++++++++++++++++infinity in conv layer  values +++++++++++++++++++\n')
 
         ap = self.fc(h)
+
+        if torch.isnan(ap).any().item():
+            print(f'+++++++++++++++++nan in linear layer values +++++++++++++++++++\n')
+
+        if torch.isinf(ap).any().item():
+            print(f'+++++++++++++++++infinity in linear layer  values +++++++++++++++++++\n')
+
+
+        ap = self.act(ap)
         return ap
 
 class GoalConvNavPolicy(nn.Module):

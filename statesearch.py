@@ -1,5 +1,7 @@
 import warnings
 
+import random
+import math
 import gym
 import numpy as np
 import torch
@@ -11,6 +13,8 @@ from policy import RandomActionPolicy, Policy, NNPolicy
 import time
 
 import matplotlib.pyplot as plt
+from collections import defaultdict
+import cv2
 
 
 class TrajectoryExplorer:
@@ -35,6 +39,7 @@ class TrajectoryExplorer:
 
             trajectory = list()
             done = False
+            n_steps = random.randint(int(0.7*self.n_steps), int(1.3*self.n_steps))
             for _ in range(self.n_steps):
                 action, context = self.exploration_policy(state)
                 state, reward, done, _ = self.env.step(action)
@@ -67,6 +72,11 @@ def generate_train_trajectories(trajectory_explorer: TrajectoryExplorer, n_initi
 def ssim_dist(state, target):
     return (compare_ssim(state, target, multichannel=True)+1)/2
 
+def ssim_dist_euclidian(state, target):
+    p0, p1 = state['agent_pos'], target['agent_pos']
+    return math.exp(-math.sqrt((p0[0] - p1[0])**2 + (p0[1] - p1[1])**2))
+
+
 
 def mse_dist(state, target):
     return ((state - target)**2).mean()
@@ -77,8 +87,8 @@ class NavigationTrainer:
             self,
             env: gym.Env,
             navigation_policy: Policy,
-            n_steps_per_episode,
-            n_trials_per_task=1000,
+            n_steps_per_episode=3,
+            n_trials_per_task=3,
             n_actions_without_reward=30,
             state_dist=compare_ssim,
             render=False,
@@ -95,22 +105,24 @@ class NavigationTrainer:
     def render(self):
         if self.visualize:
             self.env.render()
-            #time.sleep(1.0/6)
+            #time.sleep(1.0/12)
+
 
     def plt_show(self, state, disired_state):
         if self.show_task and self.visualize:
             fig=plt.figure(figsize=(4, 4))
+            #fig=plt.figure()
 
             if state is not None:
                 fig.add_subplot(1, 2, 1)
-                plt.imshow(state)
+                plt.imshow(state['image'])
 
             if disired_state is not None:
                 fig.add_subplot(1, 2, 2)
-                plt.imshow(disired_state)
+                plt.imshow(disired_state['image'])
 
             plt.show()
-
+            input('...')
             plt.close()
 
     def __call__(self, tasks):
@@ -119,10 +131,11 @@ class NavigationTrainer:
         for i, (initial_trajectory, known_trajectory, desired_state) in enumerate(tasks):
             print('\n--------------------------------------------')
             print(f'NEW TASK {i}:')
-            self.plt_show(None, desired_state)
+            #self.plt_show(None, desired_state)
 
             for _ in range(self.n_trials_per_task):
                 print(f'    trial {_+1}/{self.n_trials_per_task}:')
+                task_actions = defaultdict(int)
 
                 n_steps += 1
 
@@ -138,41 +151,58 @@ class NavigationTrainer:
                 positive_reward = 0
 
                 for j in range(len(known_trajectory)*100):
-                    action, context = self.navigation_policy((state, desired_state))
+                    if isinstance(state, np.ndarray):
+                        action, context = self.navigation_policy((state, desired_state))
+                    elif isinstance(state, dict):
+                        action, context = self.navigation_policy((state['image'], desired_state['image']))
+                    else:
+                        raise AttributeError(f'unsupported state type: {type(state)}')
+
+                    task_actions[action] += 1
                     self.render()
+
                     state, _, done, _ = self.env.step(action)
 
                     sim = self.state_dist(state, desired_state)
                     if sim > max_sim:
-                        print(f'        get reward: best sim {sim}')
                         max_sim = sim
                         no_reward_actions = 0
                         positive_reward += 1
                         self.navigation_policy.update(context, (state, desired_state), 1)
+                        print('        +')
                         if max_sim > 0.999:
-                            print(f'        task ***COMPLETED***, best_sim {max_sim}, reward {positive_reward}')
+                            print(f'        ***COMPLETED***')
                             break
                     elif done:
                         self.navigation_policy.update(context, (state, desired_state), -1)
-                        print(f'        env done, no_reward_action {no_reward_actions}, rewards {positive_reward}, best_sim {max_sim}')
+                        #print(f'        env done')
                         break
                     else:
+                        if sim != max_sim:
+                            print('        -')
                         no_reward_actions += 1
                         self.navigation_policy.update(context, (state, desired_state), 0)
                         if no_reward_actions > self.n_actions_without_reward:
-                            print(f'        no_reward_actions more then allowed, reward {positive_reward}, best_sim {max_sim}')
+                            #print(f'        no_reward_actions break')
                             break
 
 
                 running_reward.append(positive_reward)
 
-                #if n_steps > self.n_steps_per_episode:
-                if True:
+                if n_steps > self.n_steps_per_episode:
                     self.navigation_policy.end_episode()
+                    n_steps = 0 # it wasnot done before 
+
+                # show extion distibutions
+                task_actions = [task_actions[k] for k in sorted(list(task_actions.keys()))]
+                #print(f'        trial action distribution: {task_actions}')
+
+                #print(f'        END: trial reward {positive_reward}, best_sim {max_sim}')
+                self.plt_show(state, desired_state)
 
             if i % 10 == 0:
                 torch.save(self.navigation_policy.model, f'./saved_models/pretrained_navigation_model_{self.env.spec.id}.pkl')
-                print(f'tasks processed: {i}, mean reward: {np.array(running_reward).mean()}')
+                #print(f'tasks processed: {i}, mean reward: {np.array(running_reward).mean()}')
 
 
 def test_train_navigation_policy_ssim():

@@ -14,7 +14,6 @@ def train_loop(env, policy, n_episodes, episode_len=1000, render=False, seed=1):
         state = engine.state.observation
         action, context = policy(state)
         state, reward, done, _ = env.step(action)
-        time.sleep(1.0/3)
         policy.update(context, state, reward)
         engine.state.total_reward += reward
         if done:
@@ -33,7 +32,7 @@ def train_loop(env, policy, n_episodes, episode_len=1000, render=False, seed=1):
     @trainer.on(Events.EPOCH_COMPLETED)
     def update_model(engine):
         policy.end_episode()
-        torch.save(policy.model, './saved_models/goal_model.pkl')
+        torch.save(policy.model, f'./saved_models/goal_model_{env.spec.id}.pkl')
         print(f'session reward: {engine.state.total_reward}')
 
     if render:

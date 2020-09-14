@@ -7,12 +7,13 @@ from policy import NNPolicy
 from train import train_loop
 from constants import *
 
-#env = gym.make('BreakoutDeterministic-v4')
-env = gym.make('CartPole-v0')
+env = gym.make('BreakoutDeterministic-v4')
+#env = gym.make('CartPole-v0')
 env.seed(1)
 torch.manual_seed(1)
 
-nav_nn = torch.load('./saved_models/pretrained_navigation_model.pkl')
+nav_nn = torch.load(f'./saved_models/pretrained_navigation_model_{env.spec.id}.pkl')
+#nav_nn = ConvNavPolicy(env)
 # freeze slave agent
 for param in nav_nn.conv.parameters():
     param.requires_grad = False
