@@ -130,7 +130,7 @@ class NavigationTrainer:
         running_reward = list()
         for i, (initial_trajectory, known_trajectory, desired_state) in enumerate(tasks):
             print('\n--------------------------------------------')
-            print(f'NEW TASK {i}:')
+            print(f'NEW TASK {i}/{len(tasks)}:')
             #self.plt_show(None, desired_state)
 
             for _ in range(self.n_trials_per_task):
@@ -175,13 +175,13 @@ class NavigationTrainer:
                             break
                     elif done:
                         self.navigation_policy.update(context, (state, desired_state), -1)
-                        #print(f'        env done')
+                        print(f'        env done REWARD -1')
                         break
                     else:
                         if sim != max_sim:
                             print('        -')
                         no_reward_actions += 1
-                        self.navigation_policy.update(context, (state, desired_state), 0)
+                        self.navigation_policy.update(context, (state, desired_state), -0.01)
                         if no_reward_actions > self.n_actions_without_reward:
                             #print(f'        no_reward_actions break')
                             break
@@ -197,7 +197,7 @@ class NavigationTrainer:
                 task_actions = [task_actions[k] for k in sorted(list(task_actions.keys()))]
                 #print(f'        trial action distribution: {task_actions}')
 
-                #print(f'        END: trial reward {positive_reward}, best_sim {max_sim}')
+                print(f'        END: trial reward {positive_reward}, best_sim {max_sim}')
                 self.plt_show(state, desired_state)
 
             if i % 10 == 0:

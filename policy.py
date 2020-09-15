@@ -3,6 +3,7 @@ from torch.distributions import Categorical
 from learner import Learner, Updater, BufferedLearner
 import torch.nn as nn
 import torch
+from constants import *
 
 
 class Policy(Learner):
@@ -30,19 +31,17 @@ class NNPolicy(BufferedLearner, Policy):
     def __call__(self, state):
         take_probs = self.model(state)
 
-        if torch.isnan(take_probs).any().item():
-            print(f'+++++++++++++++++nan in take probs values {take_probs}+++++++++++++++++++\n')
-
-        if torch.isinf(take_probs).any().item():
-            print(f'+++++++++++++++++infinity in take probs values {take_probs}+++++++++++++++++++\n')
-
-        if take_probs.sum().item() == 0:
-            print(f'+++++++++++++++++sum = 0 in take probs values {take_probs}+++++++++++++++++++\n')
+        is_nan(take_probs, 'probs')
         
         #c = Categorical(take_probs) # with softmax activation
         c = Categorical(logits=take_probs)
         action = c.sample()
-        return action.item(), c.log_prob(action).view(1)
+
+        log_p = c.log_prob(action).view(1)
+        if is_nan(log_p, 'log_p'):
+            print(f'lop_prob is Nan for take_probs {take_probs}, action {action.item()}')
+
+        return action.item(), log_p
 
 
 class NNPolicyAV(BufferedLearner, Policy):
