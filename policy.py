@@ -22,6 +22,13 @@ class RandomActionPolicy(Policy):
     def __call__(self, _):
         return self.actions.sample(), None
 
+class CategoricalActionPolicy(Policy):
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def __call__(self, _):
+        return self.sampler.sample().item(), None
+
 
 class NNPolicy(BufferedLearner, Policy):
     def __init__(self, model: nn.Module, updater: Updater):

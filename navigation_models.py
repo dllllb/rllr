@@ -74,7 +74,7 @@ class ConvNavPolicy(nn.Module):
         conv_out_size = int(np.prod(o.size()))
 
         self.fc = nn.Sequential(
-            nn.Linear(conv_out_size*1, 128),
+            nn.Linear(conv_out_size*2, 128),
             nn.LayerNorm([128]),
             nn.ReLU(),
             nn.Linear(128, env.action_space.n),
@@ -87,15 +87,39 @@ class ConvNavPolicy(nn.Module):
 
     def forward(self, state):
         current_state_, desired_state_ = state
-        current_state = prepare_state(current_state_)
-        desired_state = prepare_state(desired_state_)
+        current_state = prepare_state(current_state_['image'])
+        desired_state = prepare_state(desired_state_['image'])
         #current_state = (current_state - current_state.min())/(current_state.max() - current_state.min())
         #desired_state = (desired_state - desired_state.mean())/(desired_state.max() - desired_state.min())
 
         conv_out = self.conv(current_state).view(current_state.size(0), -1)
         conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
-        #h = torch.cat((conv_out, conv_target_out), dim=1)
-        h = conv_target_out - conv_out
+        h = torch.cat((conv_out, conv_target_out), dim=1)
+        #h = conv_target_out - conv_out
+
+        ap = self.fc(h)
+        return ap
+
+class StateAPINavPolicy(nn.Module):
+    def __init__(self, env: gym.Env):
+        super().__init__()
+
+        self.fc = nn.Sequential(
+            nn.Linear(3, 64),
+            #nn.LayerNorm([64]),
+            nn.ReLU(),
+            nn.Linear(64, 3),#env.action_space.n),
+            nn.LogSoftmax(dim=-1)
+        )
+
+    def forward(self, state):
+        current_state, desired_state = state
+        current_pos = torch.as_tensor(current_state['agent_pos']).float().to(DEVICE)
+        desired_pos = torch.as_tensor(desired_state['agent_pos']).float().to(DEVICE)
+        current_dir = torch.as_tensor(current_state['direction']).float().to(DEVICE)
+
+        #h = torch.cat((current_state, desired_state), dim=0)
+        h = torch.cat((desired_pos - current_pos, current_dir), dim=0)
 
         ap = self.fc(h)
         return ap

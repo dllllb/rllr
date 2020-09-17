@@ -18,8 +18,8 @@ class PGUpdater(Updater):
             rewards_.insert(0, R)
 
         rewards = torch.FloatTensor(rewards_)
-        if rewards.size(0) > 1: # or we get nan values
-            rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
+        #if rewards.size(0) > 1: # or we get nan values
+        #    rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
 
         loss = []
         for log_prob, reward in zip(context_hist, rewards):

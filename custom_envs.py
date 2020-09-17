@@ -1,5 +1,6 @@
 from gym_minigrid.minigrid import *
 from gym_minigrid.register import register
+import random
 
 class MyEmptyEnv(MiniGridEnv):
     """
@@ -31,7 +32,7 @@ class MyEmptyEnv(MiniGridEnv):
         self.grid.wall_rect(0, 0, width, height)
 
         # Place a goal square in the bottom-right corner
-        self.put_obj(Goal(), width - 2, height - 2)
+        #self.put_obj(Goal(), width - 2, height - 2)
 
         # Place the agent
         if self.agent_start_pos is not None:
@@ -42,7 +43,23 @@ class MyEmptyEnv(MiniGridEnv):
 
         self.mission = "get to the green goal square"
 
+class MyEmptyRandomPosEnv(MyEmptyEnv):
+
+
+    def __init__(self,
+                 size=30,
+                 agent_start_dir=0):
+        agent_start_pos = None#(random.randint(1, size-1), random.randint(1, size-1))
+        super().__init__(size, agent_start_pos, agent_start_dir)
+
+
+
 register(
     id='MiniGrid-MyEmpty-8x8-v0',
     entry_point='custom_envs:MyEmptyEnv'
+)
+
+register(
+    id='MiniGrid-MyEmptyRandomPos-8x8-v0',
+    entry_point='custom_envs:MyEmptyRandomPosEnv'
 )

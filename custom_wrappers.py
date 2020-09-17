@@ -1,5 +1,6 @@
 import gym
 from gym import error, spaces, utils
+import numpy as np
 
 class RGBImgAndStateObsWrapper(gym.core.ObservationWrapper):
     """
@@ -31,5 +32,6 @@ class RGBImgAndStateObsWrapper(gym.core.ObservationWrapper):
 
         return {
             'agent_pos': obs['agent_pos'],
-            'image': rgb_img
+            'image': rgb_img,
+            'direction': [obs['direction']]
         }

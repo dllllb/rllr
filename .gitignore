@@ -7,3 +7,5 @@ __temp__.mp4
 env/AnimalAI.app
 env/UnitySDK.log
 saved_models
+*.pkl
+*.jpg
