@@ -47,7 +47,7 @@ class MyEmptyRandomPosEnv(MyEmptyEnv):
 
 
     def __init__(self,
-                 size=30,
+                 size=20,
                  agent_start_dir=0):
         agent_start_pos = None#(random.randint(1, size-1), random.randint(1, size-1))
         super().__init__(size, agent_start_pos, agent_start_dir)

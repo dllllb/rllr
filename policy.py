@@ -37,18 +37,10 @@ class NNPolicy(BufferedLearner, Policy):
 
     def __call__(self, state):
         take_probs = self.model(state)
-
-        is_nan(take_probs, 'probs')
-        
         #c = Categorical(take_probs) # with softmax activation
         c = Categorical(logits=take_probs)
         action = c.sample()
-
-        log_p = c.log_prob(action).view(1)
-        if is_nan(log_p, 'log_p'):
-            print(f'lop_prob is Nan for take_probs {take_probs}, action {action.item()}')
-
-        return action.item(), log_p
+        return action.item(), c.log_prob(action).view(1)
 
 
 class NNPolicyAV(BufferedLearner, Policy):

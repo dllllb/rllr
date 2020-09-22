@@ -16,8 +16,8 @@ import pickle
 
 import matplotlib.pyplot as plt
 
-render_ = False
-show_task = False
+render_ = True
+show_task = True
 
 #env = gym.make('MiniGrid-MyEmpty-8x8-v0')
 env = gym.make('MiniGrid-MyEmptyRandomPos-8x8-v0')
@@ -78,13 +78,14 @@ with torch.no_grad():
             continue
         
         trajectory_way = ''
-        for j in range(140):
+        n_steps = best_sim * 4 # best sim = lenght of optimal path
+        for j in range(n_steps):
             action, context = policy((state, desired_state))
 
             state, _, done, _ = env.step(action)
 
             render(env)
-            #time.sleep(1/ 3.0)
+            #time.sleep(1/ 6.0)
 
             sim = ssim_dist_abs(state, desired_state)
 

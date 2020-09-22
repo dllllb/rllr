@@ -11,13 +11,13 @@ class PGUpdater(Updater):
         
     def __call__(self, context_hist, state_hist, reward_hist):
         R = 0
-        rewards_ = []
+        rewards = []
 
         for r in reward_hist[::-1]:
             R = r + self.gamma * R
-            rewards_.insert(0, R)
+            rewards.insert(0, R)
 
-        rewards = torch.FloatTensor(rewards_)
+        rewards = torch.FloatTensor(rewards)
         #if rewards.size(0) > 1: # or we get nan values
         #    rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
 
@@ -25,16 +25,7 @@ class PGUpdater(Updater):
         for log_prob, reward in zip(context_hist, rewards):
             loss.append((-log_prob * reward).view(1))
         loss = torch.cat(loss).sum()
-
-        if is_nan(loss, 'loss'):
-            print('===')
-            print('-----------------------------------------------------------')
-            print(rewards_)
-            print('-----------------------------------------------------------')
-            print(rewards)
-            print('-----------------------------------------------------------')
-            print('===')
-            
+        print(f'        LOSS: {round(loss.item()/ len(rewards), 2)}')     
 
         self.optimizer.zero_grad()
         loss.backward()
