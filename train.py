@@ -2,9 +2,6 @@ import torch
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, Events
 
-from constants import *
-import time
-
 
 def train_loop(env, policy, n_episodes, episode_len=1000, render=False, seed=1):
     env.seed(seed)
