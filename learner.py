@@ -6,7 +6,6 @@ class MultyEpisodesUpdater:
     def __call__(self, episodes):
         pass
 
-
 class Learner:
     def update(self, context, state, reward):
         pass

@@ -3,11 +3,6 @@ from gym import error, spaces, utils
 import numpy as np
 
 class RGBImgAndStateObsWrapper(gym.core.ObservationWrapper):
-    """
-    Wrapper to use fully observable RGB image as the only observation output,
-    no language/mission. This can be used to have the agent to solve the
-    gridworld in pixel space.
-    """
 
     def __init__(self, env, tile_size=8):
         super().__init__(env)

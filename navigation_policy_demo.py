@@ -4,7 +4,7 @@ import torch
 from navigation_models import ConvNavPolicy, StateAPINavPolicy
 from pgrad import PGUpdater, PGUMultyEpisodesUpdater
 from policy import RandomActionPolicy, NNPolicy, CategoricalActionPolicy
-from statesearch import TrajectoryExplorer, generate_train_trajectories, NavigationTrainer, ssim_dist, ssim_dist_euclidian, ssim_dist_abs
+from statesearch import TrajectoryExplorer, generate_train_trajectories, NavigationTrainer, ssim_dist, ssim_l1_dist
 from constants import *
 
 from gym_minigrid.wrappers import *
@@ -15,24 +15,10 @@ import pickle
 import os
 import warnings
 
-# ---------------------------------------------------------------
-#env = gym.make('BreakoutDeterministic-v4')
-
-# ---------------------------------------------------------------
-#env = gym.make('CartPole-v0')
-
-# ---------------------------------------------------------------
-#env = gym.make('MiniGrid-MyEmpty-8x8-v0')
 env = gym.make('MiniGrid-MyEmptyRandomPos-8x8-v0')
-#env = RGBImgObsWrapper(env) # Get pixel observations
-#env = ImgObsWrapper(env) # Get rid of the 'mission' field
 env = RGBImgAndStateObsWrapper(env)
 
-#env.seed(1)
-#torch.manual_seed(1)
-
 if not os.path.exists('./tasks.pkl'):
-    #explore_policy = RandomActionPolicy(env)
     explore_policy = CategoricalActionPolicy(sampler=Categorical(probs=torch.tensor([0.2, 0.2, 0.6])))
 
     te = TrajectoryExplorer(env, explore_policy, n_steps=150, n_episodes=50)
@@ -45,11 +31,10 @@ else:
     warnings.warn('using casched dataset for navigation policy task')
     
 
-
 #nav_nn = ConvNavPolicy(env)
 nav_nn = StateAPINavPolicy(env)
 nav_nn.to(DEVICE)
-np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)# lr=3e-4)
+np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(np_optimizer, 
                                                step_size=150, 
                                                gamma=0.9)
@@ -59,12 +44,11 @@ policy = NNPolicy(nav_nn, np_updater)
 nt = NavigationTrainer(env, policy, n_steps_per_episode=50, 
                                     n_trials_per_task=1, 
                                     n_actions_without_reward=10,
-                                    state_dist=ssim_dist_abs,#ssim_dist, 
+                                    state_dist=ssim_l1_dist,
                                     render=False, 
                                     show_task=False)
 
-EPOCHS = 4000
+EPOCHS = 300
 for epoch in range(EPOCHS):
-    print(f'================================= EPOCH {epoch+1}/{EPOCHS} =================================')
     nt(tasks, epoch)
     lr_scheduler.step()

@@ -37,7 +37,6 @@ class NNPolicy(BufferedLearner, Policy):
 
     def __call__(self, state):
         take_probs = self.model(state)
-        #c = Categorical(take_probs) # with softmax activation
         c = Categorical(logits=take_probs)
         action = c.sample()
         return action.item(), c.log_prob(action).view(1)

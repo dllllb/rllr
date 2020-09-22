@@ -4,7 +4,7 @@ import torch
 from navigation_models import ConvNavPolicy, StateAPINavPolicy
 from pgrad import PGUpdater
 from policy import RandomActionPolicy, NNPolicy
-from statesearch import TrajectoryExplorer, generate_train_trajectories, NavigationTrainer, ssim_dist, ssim_dist_euclidian, ssim_dist_abs
+from statesearch import TrajectoryExplorer, generate_train_trajectories, NavigationTrainer, ssim_dist, ssim_l1_dist
 from constants import *
 
 from gym_minigrid.wrappers import *
@@ -19,14 +19,11 @@ import matplotlib.pyplot as plt
 render_ = True
 show_task = True
 
-#env = gym.make('MiniGrid-MyEmpty-8x8-v0')
 env = gym.make('MiniGrid-MyEmptyRandomPos-8x8-v0')
 env = RGBImgAndStateObsWrapper(env)
 
 explore_policy = RandomActionPolicy(env)
 
-#te = TrajectoryExplorer(env, explore_policy, n_steps=150, n_episodes=50)
-#tasks = generate_train_trajectories(te, n_initial_points=3, take_prob=.5)
 with open('./tasks.pkl', 'rb') as rfs:
     tasks = pickle.load(rfs)
 warnings.warn('using casched dataset for navigation policy task')
@@ -40,7 +37,6 @@ def plt_show(states, names):
     if not render_ or not show_task:
         return
     fig=plt.figure(figsize=(4, 4))
-    #fig=plt.figure()
     for i, state in enumerate(states):
         fig.add_subplot(1, len(states), i+1)
         plt.imshow(state['image'])
@@ -63,16 +59,13 @@ with torch.no_grad():
         state = env.reset()
         initial_state = state
 
-        #plt_show([initial_state, desired_state], ['initial state', 'desired state'])
-
         if initial_trajectory is not None:
             for a in initial_trajectory:
-                print('    initial tragectory step')
                 render(env)
                 state, reward, done, _ = env.step(a)
 
-        best_sim =  ssim_dist_abs(state, desired_state)
-        if best_sim == 0:#0.999:
+        best_sim =  ssim_l1_dist(state, desired_state)
+        if best_sim == 0:
             print('    trivial task')
             n_trivial_tasks += 1
             continue
@@ -87,7 +80,7 @@ with torch.no_grad():
             render(env)
             #time.sleep(1/ 6.0)
 
-            sim = ssim_dist_abs(state, desired_state)
+            sim = ssim_l1_dist(state, desired_state)
 
             if sim < best_sim:
                 trajectory_way += '+'
@@ -95,11 +88,10 @@ with torch.no_grad():
             else:
                 trajectory_way += '-'
 
-            if sim == 0:# 0.999:
+            if sim == 0:
                 n_completed_tasks += 1
                 break
             elif done:
-                #print('    env Done')
                 break
 
         print(f'    {trajectory_way}')

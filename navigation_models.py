@@ -64,9 +64,9 @@ class ConvNavPolicy(nn.Module):
 
         img_height, img_width, img_channels = env.observation_space.shape
 
-        self.conv = ConvBody(env) #state_embed_block(img_channels)
+        self.conv = state_embed_block(img_channels)
 
-        self.conv_target = ConvBody(env) #state_embed_block(img_channels)
+        self.conv_target = state_embed_block(img_channels)
 
         o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
         conv_out_size = int(np.prod(o.size()))
@@ -78,11 +78,8 @@ class ConvNavPolicy(nn.Module):
             nn.Linear(128, env.action_space.n),
             nn.LogSoftmax(dim=-1)
         )
-        #HooksF = [Hook(layer, f'head_{layer.__repr__()}') for layer in self.fc]
-        #HooksB = [Hook(layer, f'head_{layer.__repr__()}', backward=True) for layer in self.fc]
 
         
-
     def forward(self, state):
         current_state_, desired_state_ = state
         current_state = prepare_state(current_state_['image'])
@@ -91,7 +88,6 @@ class ConvNavPolicy(nn.Module):
         conv_out = self.conv(current_state).view(current_state.size(0), -1)
         conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
         h = torch.cat((conv_out, conv_target_out), dim=1)
-        #h = conv_target_out - conv_out
 
         ap = self.fc(h)
         return ap
@@ -105,7 +101,6 @@ class StateAPINavPolicy(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(2 + 2, 64),
             nn.Tanh(),
-            #nn.ReLU(),
             nn.Linear(64, 3),#env.action_space.n),
             nn.LogSoftmax(dim=-1)
         )
@@ -116,15 +111,12 @@ class StateAPINavPolicy(nn.Module):
         desired_pos = torch.as_tensor(desired_state['agent_pos']).float().to(DEVICE)
         current_dir = torch.as_tensor(current_state['direction']).long().to(DEVICE)
 
-        #h = torch.cat((current_state, desired_state), dim=0)
         bias = desired_pos - current_pos
         bias_norm = torch.norm(bias)
         assert bias_norm.item() != 0, f'delta norm equals 0: {bias_norm.item()}'
         assert current_dir.item() in [0, 1, 2, 3], f'unknown curent dir {current_dir.item()}'
         bias = bias/bias_norm
-
         current_dir = self.emb(current_dir).view(-1)
-
         h = torch.cat((bias, current_dir), dim=0)
 
         ap = self.fc(h)

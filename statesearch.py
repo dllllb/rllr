@@ -52,7 +52,7 @@ class TrajectoryExplorer:
                 if done:
                     break
                 
-                if ssim_dist_abs(initial_state, state) > 10 and step > 0.5*self.n_steps:
+                if ssim_l1_dist(initial_state, state) > 10 and step > 0.5*self.n_steps:
                     warnings.warn('hard coded break exploration for test in TrajectoryExplorer')
                     break 
 
@@ -80,15 +80,10 @@ def generate_train_trajectories(trajectory_explorer: TrajectoryExplorer, n_initi
 def ssim_dist(state, target):
     return (compare_ssim(state, target, multichannel=True)+1)/2
 
-def ssim_dist_euclidian(state, target):
-    p0, p1 = state['agent_pos'], target['agent_pos']
-    return math.exp(-math.sqrt((p0[0] - p1[0])**2 + (p0[1] - p1[1])**2))
-
-def ssim_dist_abs(state, target):
+def ssim_l1_dist(state, target):
     srs, dst = state['agent_pos'], target['agent_pos']
     delta = abs(srs[0] - dst[0]) + abs(srs[1] - dst[1])
     return delta
-    #return math.exp(-delta)
 
 def mse_dist(state, target):
     return ((state - target)**2).mean()
@@ -118,12 +113,10 @@ class NavigationTrainer:
     def render(self):
         if self.visualize:
             self.env.render()
-            #time.sleep(1.0/12)
 
     def plt_show(self, states, names):
         if self.show_task and self.visualize:
             fig=plt.figure(figsize=(4, 4))
-            #fig=plt.figure()
             for i, state in enumerate(states):
                 fig.add_subplot(1, len(states), i+1)
                 plt.imshow(state['image'])
@@ -135,85 +128,71 @@ class NavigationTrainer:
 
     def __call__(self, tasks, epoch):
         running_reward = list()
-        for i, (initial_trajectory, known_trajectory, desired_state) in enumerate(tasks):
-            print('\n...........................................................')
-            print(f'NEW TASK {i}/{len(tasks)} EPOSH {epoch}:')
+        with tqdm.tqdm(total=len(tasks), desc=f'epoch {epoch}') as pbar:
+            for i, (initial_trajectory, known_trajectory, desired_state) in enumerate(tasks):
 
-            for _ in range(self.n_trials_per_task):
-                print(f'    trial {_+1}/{self.n_trials_per_task}:')
-                task_actions_distribution = defaultdict(int)
+                for j in range(self.n_trials_per_task):
 
-                state = self.env.reset()
-                if initial_trajectory is not None:
-                    for a in initial_trajectory:
+                    state = self.env.reset()
+                    if initial_trajectory is not None:
+                        for a in initial_trajectory:
+                            self.render()
+                            state, reward, done, _ = self.env.step(a)
+
+                    initial_dist = min_dist = self.state_dist(state, desired_state)
+                    if initial_dist == 0:
+                        continue
+
+                    no_reward_actions = 0
+                    positive_reward = 0
+                    initial_state = state
+
+                    trajectory_rewards = ''
+                    for _ in range(len(known_trajectory)*100):
+                        action, context = self.navigation_policy((state, desired_state))
+
                         self.render()
-                        state, reward, done, _ = self.env.step(a)
 
-                initial_dist = min_dist = self.state_dist(state, desired_state)
-                if initial_dist == 0:
-                    print(f'    trivial task trial')
-                    continue
+                        next_state, _, done, _ = self.env.step(action)
 
-                no_reward_actions = 0
-                positive_reward = 0
-                initial_state = state
-
-                trajectory_rewards = ''
-                for j in range(len(known_trajectory)*100):
-                    action, context = self.navigation_policy((state, desired_state))
-
-                    task_actions_distribution[action] += 1
-                    self.render()
-
-                    next_state, _, done, _ = self.env.step(action)
-
-                    sim = self.state_dist(next_state, desired_state)
-                    if sim < min_dist:
-                        min_dist = sim
-                        no_reward_actions = max(no_reward_actions - 1, 0) #0
-                        positive_reward += 1
-                        self.navigation_policy.update(context, (state, desired_state), 1)
-                        trajectory_rewards += '+'
-                        state = next_state
-                        if min_dist == 0:
-                            break
-                    elif done:
-                        self.navigation_policy.update(context, (state, desired_state), -1)
-                        state = next_state
-                        break
-                    else:
-                        trajectory_rewards += '-'
-                        no_reward_actions += 1
-                        if no_reward_actions > self.n_actions_without_reward:
+                        curent_dist = self.state_dist(next_state, desired_state)
+                        if curent_dist < min_dist:
+                            min_dist = curent_dist
+                            no_reward_actions = max(no_reward_actions - 1, 0)
+                            positive_reward += 1
+                            self.navigation_policy.update(context, (state, desired_state), 1)
+                            trajectory_rewards += '+'
+                            state = next_state
+                            if min_dist == 0:
+                                break
+                        elif done:
                             self.navigation_policy.update(context, (state, desired_state), -1)
                             state = next_state
                             break
                         else:
-                            self.navigation_policy.update(context, (state, desired_state), 0)
-                            state = next_state
+                            trajectory_rewards += '-'
+                            no_reward_actions += 1
+                            if no_reward_actions > self.n_actions_without_reward:
+                                self.navigation_policy.update(context, (state, desired_state), -1)
+                                state = next_state
+                                break
+                            else:
+                                self.navigation_policy.update(context, (state, desired_state), 0)
+                                state = next_state
 
+                    running_reward.append(positive_reward)
 
-                running_reward.append(positive_reward)
+                    self.navigation_policy.end_episode()
+                    self.n_steps += 1
+                    if self.n_steps % self.n_steps_per_episode == self.n_steps_per_episode - 1:
+                        self.navigation_policy.end()
+                        torch.save(self.navigation_policy.model, f'./saved_models/pretrained_navigation_model_{self.env.spec.id}.pkl')
+                        pbar.set_postfix({'mean reward': np.array(running_reward).mean(),
+                                          'trajectory': trajectory_rewards
+                                          })
+                    self.plt_show([initial_state, state, desired_state], ['initial state', 'state', 'desired state'])
 
-                self.navigation_policy.end_episode()
-                self.n_steps += 1
-                if self.n_steps % self.n_steps_per_episode == self.n_steps_per_episode - 1:
-                    self.navigation_policy.end()
-                    
-
-                # show extion distibutions
-                #task_actions_distribution = [task_actions_distribution[k] for k in sorted(list(task_actions_distribution.keys()))]
-                #print(f'        trial action distribution: {task_actions_distribution}')
-
-                print(f'        {trajectory_rewards}')
-                prefix = ''
-                if min_dist == 0: prefix += ' ***COMPLETED***'
-                print(f'        END{prefix}: trial reward {positive_reward}, init_sim/best_sim/sim {initial_dist}/{min_dist}/{sim}')
-                self.plt_show([initial_state, state, desired_state], ['initial state', 'state', 'desired state'])
-
-            if i % 10 == 0:
-                torch.save(self.navigation_policy.model, f'./saved_models/pretrained_navigation_model_{self.env.spec.id}.pkl')
-                #print(f'tasks processed: {i}, mean reward: {np.array(running_reward).mean()}')
+                pbar.update()
 
 
 def test_train_navigation_policy_ssim():

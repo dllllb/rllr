@@ -18,14 +18,13 @@ class PGUpdater(Updater):
             rewards.insert(0, R)
 
         rewards = torch.FloatTensor(rewards)
-        #if rewards.size(0) > 1: # or we get nan values
-        #    rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
+        if rewards.size(0) > 1:
+            rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
 
         loss = []
         for log_prob, reward in zip(context_hist, rewards):
             loss.append((-log_prob * reward).view(1))
-        loss = torch.cat(loss).sum()
-        print(f'        LOSS: {round(loss.item()/ len(rewards), 2)}')     
+        loss = torch.cat(loss).sum()   
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -46,8 +45,6 @@ class PGUMultyEpisodesUpdater(MultyEpisodesUpdater):
             rewards.insert(0, R)
 
         rewards = torch.FloatTensor(rewards)
-        #if rewards.size(0) > 1: # or we get nan values
-        #    rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
 
         loss = []
         for log_prob, reward in zip(context_hist, rewards):
