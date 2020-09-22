@@ -187,9 +187,10 @@ class NavigationTrainer:
                     if self.n_steps % self.n_steps_per_episode == self.n_steps_per_episode - 1:
                         self.navigation_policy.end()
                         torch.save(self.navigation_policy.model, f'./saved_models/pretrained_navigation_model_{self.env.spec.id}.pkl')
-                        pbar.set_postfix({'mean reward': np.array(running_reward).mean(),
-                                          'trajectory': trajectory_rewards
-                                          })
+                        pbar.set_postfix({
+                            'trajectory': trajectory_rewards,
+                            'mean reward': np.array(running_reward).mean()
+                            })
                     self.plt_show([initial_state, state, desired_state], ['initial state', 'state', 'desired state'])
 
                 pbar.update()
