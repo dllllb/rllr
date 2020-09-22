@@ -29,12 +29,14 @@ def train_loop(env, policy, n_episodes, episode_len=1000, render=False, seed=1):
     @trainer.on(Events.EPOCH_COMPLETED)
     def update_model(engine):
         policy.end_episode()
+        torch.save(policy.model, f'./saved_models/goal_model_{env.spec.id}.pkl')
         print(f'session reward: {engine.state.total_reward}')
 
     if render:
         @trainer.on(Events.ITERATION_COMPLETED)
         def render(_):
             env.render()
+            
 
     pbar = ProgressBar(persist=True)
     pbar.attach(trainer)

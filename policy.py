@@ -2,6 +2,8 @@ from torch.distributions import Categorical
 
 from learner import Learner, Updater, BufferedLearner
 import torch.nn as nn
+import torch
+from constants import *
 
 
 class Policy(Learner):
@@ -20,6 +22,13 @@ class RandomActionPolicy(Policy):
     def __call__(self, _):
         return self.actions.sample(), None
 
+class CategoricalActionPolicy(Policy):
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def __call__(self, _):
+        return self.sampler.sample().item(), None
+
 
 class NNPolicy(BufferedLearner, Policy):
     def __init__(self, model: nn.Module, updater: Updater):
@@ -28,7 +37,7 @@ class NNPolicy(BufferedLearner, Policy):
 
     def __call__(self, state):
         take_probs = self.model(state)
-        c = Categorical(take_probs)
+        c = Categorical(logits=take_probs)
         action = c.sample()
         return action.item(), c.log_prob(action).view(1)
 
