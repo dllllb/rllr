@@ -2,7 +2,7 @@ import gym
 import torch
 
 from navigation_models import ConvNavPolicy, StateAPINavPolicy
-from pgrad import PGUpdater
+from pgrad import PGUpdater, PGUMultyEpisodesUpdater
 from policy import RandomActionPolicy, NNPolicy, CategoricalActionPolicy
 from statesearch import TrajectoryExplorer, generate_train_trajectories, NavigationTrainer, ssim_dist, ssim_dist_euclidian, ssim_dist_abs
 from constants import *
@@ -49,22 +49,22 @@ else:
 #nav_nn = ConvNavPolicy(env)
 nav_nn = StateAPINavPolicy(env)
 nav_nn.to(DEVICE)
-np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)#lr=3e-4)
+np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=0.01)# lr=3e-4)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(np_optimizer, 
-                                               step_size=1, 
+                                               step_size=150, 
                                                gamma=0.9)
-np_updater = PGUpdater(np_optimizer, gamma=.99)
+np_updater = PGUMultyEpisodesUpdater(np_optimizer, gamma=.99)
 policy = NNPolicy(nav_nn, np_updater)
 
-nt = NavigationTrainer(env, policy, n_steps_per_episode=3, 
-                                    n_trials_per_task=3, 
-                                    n_actions_without_reward=15,
+nt = NavigationTrainer(env, policy, n_steps_per_episode=50, 
+                                    n_trials_per_task=1, 
+                                    n_actions_without_reward=10,
                                     state_dist=ssim_dist_abs,#ssim_dist, 
                                     render=False, 
                                     show_task=False)
 
-EPOCHS = 50
+EPOCHS = 4000
 for epoch in range(EPOCHS):
     print(f'================================= EPOCH {epoch+1}/{EPOCHS} =================================')
-    nt(tasks)
+    nt(tasks, epoch)
     lr_scheduler.step()

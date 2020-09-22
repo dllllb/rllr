@@ -113,6 +113,7 @@ class NavigationTrainer:
         self.state_dist = state_dist
         self.visualize = render
         self.show_task = show_task
+        self.n_steps = 0
 
     def render(self):
         if self.visualize:
@@ -132,18 +133,15 @@ class NavigationTrainer:
             input('\npress any key to start new task ...\n')
             plt.close()
 
-    def __call__(self, tasks):
-        n_steps = 0
+    def __call__(self, tasks, epoch):
         running_reward = list()
         for i, (initial_trajectory, known_trajectory, desired_state) in enumerate(tasks):
             print('\n...........................................................')
-            print(f'NEW TASK {i}/{len(tasks)}:')
+            print(f'NEW TASK {i}/{len(tasks)} EPOSH {epoch}:')
 
             for _ in range(self.n_trials_per_task):
                 print(f'    trial {_+1}/{self.n_trials_per_task}:')
                 task_actions_distribution = defaultdict(int)
-
-                n_steps += 1
 
                 state = self.env.reset()
                 if initial_trajectory is not None:
@@ -186,18 +184,22 @@ class NavigationTrainer:
                     else:
                         trajectory_rewards += '-'
                         no_reward_actions += 1
-                        self.navigation_policy.update(context, (state, desired_state), -0.3)
-                        state = next_state
                         if no_reward_actions > self.n_actions_without_reward:
+                            self.navigation_policy.update(context, (state, desired_state), -1)
+                            state = next_state
                             break
-                    #min_dist = sim # reward every time when moves in right direction
+                        else:
+                            self.navigation_policy.update(context, (state, desired_state), 0)
+                            state = next_state
 
 
                 running_reward.append(positive_reward)
 
-                if True:
-                #if n_steps % self.n_steps_per_episode == self.n_steps_per_episode - 1:
-                    self.navigation_policy.end_episode()
+                self.navigation_policy.end_episode()
+                self.n_steps += 1
+                if self.n_steps % self.n_steps_per_episode == self.n_steps_per_episode - 1:
+                    self.navigation_policy.end()
+                    
 
                 # show extion distibutions
                 #task_actions_distribution = [task_actions_distribution[k] for k in sorted(list(task_actions_distribution.keys()))]
