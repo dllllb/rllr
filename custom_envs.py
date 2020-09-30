@@ -52,6 +52,37 @@ class MyEmptyRandomPosEnv(MyEmptyEnv):
         agent_start_pos = None#(random.randint(1, size-1), random.randint(1, size-1))
         super().__init__(size, agent_start_pos, agent_start_dir)
 
+class MyEmptyRandomPosMetaActionEnv(MyEmptyRandomPosEnv):
+
+
+    def __init__(self,
+                 size=20,
+                 agent_start_dir=0):
+        super().__init__(size, agent_start_dir)
+
+
+    '''
+        meta action: 0, 1, 2, 3 - moving right, down, left, up
+    '''
+    def step(self, action):
+        ''' agent dirs
+            0: '>',
+            1: 'V',
+            2: '<',
+            3: '^'
+        '''
+        # actual actions: 0, 1, 2 - left, right, forward
+        if (self.agent_dir - action) % 4 < (action - self.agent_dir) % 4:
+            direction = 1
+        else: 
+            direction = 0
+
+        while self.agent_dir != action:
+            super().step(direction)
+
+        return super().step(action=2) # step forward
+
+
 
 
 register(
@@ -62,4 +93,9 @@ register(
 register(
     id='MiniGrid-MyEmptyRandomPos-8x8-v0',
     entry_point='custom_envs:MyEmptyRandomPosEnv'
+)
+
+register(
+    id='MiniGrid-MyEmptyRandomPosMetaAction-8x8-v0',
+    entry_point='custom_envs:MyEmptyRandomPosMetaActionEnv'
 )

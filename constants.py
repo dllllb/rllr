@@ -35,3 +35,4 @@ class Hook():
         self.hook.remove()
 
 DEVICE = torch.device('cuda:3')
+ENTROPY_WEIGHT = 0#0.01

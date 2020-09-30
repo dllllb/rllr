@@ -109,6 +109,7 @@ class NavigationTrainer:
         self.visualize = render
         self.show_task = show_task
         self.n_steps = 0
+        self.completed_tasks = 0
 
     def render(self):
         if self.visualize:
@@ -148,22 +149,28 @@ class NavigationTrainer:
                     initial_state = state
 
                     trajectory_rewards = ''
+                    prev_dist = None
                     for _ in range(len(known_trajectory)*100):
                         action, context = self.navigation_policy((state, desired_state))
-
                         self.render()
-
                         next_state, _, done, _ = self.env.step(action)
 
                         curent_dist = self.state_dist(next_state, desired_state)
-                        if curent_dist < min_dist:
-                            min_dist = curent_dist
+                        if prev_dist == None: prev_dist = curent_dist
+
+                        if curent_dist < min_dist:# or curent_dist < prev_dist:
+                            min_dist = min(curent_dist, min_dist)
                             no_reward_actions = max(no_reward_actions - 1, 0)
                             positive_reward += 1
-                            self.navigation_policy.update(context, (state, desired_state), 1)
+
+                            #price = random.random() if random.random() > 0.7 else 0 # stohastic semisparce rewards
+                            price = 0 if min_dist > 0 else 1 # sparce mode
+                            #price = 1 # dense mode
+                            self.navigation_policy.update(context, (state, desired_state), price)
                             trajectory_rewards += '+'
                             state = next_state
                             if min_dist == 0:
+                                self.completed_tasks += 1
                                 break
                         elif done:
                             self.navigation_policy.update(context, (state, desired_state), -1)
@@ -179,19 +186,23 @@ class NavigationTrainer:
                             else:
                                 self.navigation_policy.update(context, (state, desired_state), 0)
                                 state = next_state
+                        prev_dist = curent_dist
 
                     running_reward.append(positive_reward)
 
                     self.navigation_policy.end_episode()
                     self.n_steps += 1
                     if self.n_steps % self.n_steps_per_episode == self.n_steps_per_episode - 1:
+                        #completed_accuracy = round(float(self.completed_tasks)/self.n_steps_per_episode, 2)
                         self.navigation_policy.end()
                         torch.save(self.navigation_policy.model, f'./saved_models/pretrained_navigation_model_{self.env.spec.id}.pkl')
                         pbar.set_postfix({
                             'trajectory': trajectory_rewards,
+                            'completed': f'{self.completed_tasks}/{self.n_steps_per_episode}',
                             'mean reward': np.array(running_reward).mean()
                             })
                     self.plt_show([initial_state, state, desired_state], ['initial state', 'state', 'desired state'])
+                    self.completed_tasks = 0
 
                 pbar.update()
 

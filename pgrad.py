@@ -47,8 +47,8 @@ class PGUMultyEpisodesUpdater(MultyEpisodesUpdater):
         rewards = torch.FloatTensor(rewards)
 
         loss = []
-        for log_prob, reward in zip(context_hist, rewards):
-            loss.append((-log_prob * reward).view(1))
+        for (log_prob, entropy), reward in zip(context_hist, rewards):
+            loss.append((-log_prob * reward - entropy*ENTROPY_WEIGHT/len(rewards)).view(1))
         loss = torch.cat(loss).sum()
 
         return loss
