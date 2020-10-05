@@ -128,6 +128,7 @@ class NavigationTrainer:
             plt.close()
 
     def __call__(self, tasks, epoch):
+        actions_description = {0: "r", 1: "d", 2: "l", 3: "u"}
         running_reward = list()
         with tqdm.tqdm(total=len(tasks), desc=f'epoch {epoch}') as pbar:
             for i, (initial_trajectory, known_trajectory, desired_state) in enumerate(tasks):
@@ -141,7 +142,9 @@ class NavigationTrainer:
                             state, reward, done, _ = self.env.step(a)
 
                     initial_dist = min_dist = self.state_dist(state, desired_state)
-                    if initial_dist == 0:
+                    if initial_dist == 0 or \
+                       state['agent_pos'][0] == desired_state['agent_pos'][0] or\
+                       state['agent_pos'][1] == desired_state['agent_pos'][1]:
                         continue
 
                     no_reward_actions = 0
@@ -150,8 +153,15 @@ class NavigationTrainer:
 
                     trajectory_rewards = ''
                     prev_dist = None
+                    make_actions = [('|', '')]
                     for _ in range(len(known_trajectory)*100):
                         action, context = self.navigation_policy((state, desired_state))
+                        # track action distributions
+                        if make_actions[-1][0] == actions_description[action]:
+                            make_actions[-1] = (make_actions[-1][0], make_actions[-1][1]+1)
+                        else:
+                            make_actions.append((actions_description[action], 1))
+
                         self.render()
                         next_state, _, done, _ = self.env.step(action)
 
@@ -163,8 +173,8 @@ class NavigationTrainer:
                             no_reward_actions = max(no_reward_actions - 1, 0)
                             positive_reward += 1
 
-                            #price = random.random() if random.random() > 0.7 else 0 # stohastic semisparce rewards
-                            price = 0 if min_dist > 0 else 1 # sparce mode
+                            price = random.random() if random.random() > 0.7 else 0 # stohastic semisparce rewards
+                            #price = 0 if min_dist > 0 else 1 # sparce mode
                             #price = 1 # dense mode
                             self.navigation_policy.update(context, (state, desired_state), price)
                             trajectory_rewards += '+'
@@ -195,9 +205,11 @@ class NavigationTrainer:
                     if self.n_steps % self.n_steps_per_episode == self.n_steps_per_episode - 1:
                         #completed_accuracy = round(float(self.completed_tasks)/self.n_steps_per_episode, 2)
                         self.navigation_policy.end()
-                        torch.save(self.navigation_policy.model, f'./saved_models/pretrained_navigation_model_{self.env.spec.id}.pkl')
+                        #torch.save(self.navigation_policy.model, f'./saved_models/pretrained_navigation_model_{self.env.spec.id}.pkl')
+                        actions_str = ' '.join([f'{act}{num}' for act, num in make_actions]) + '|'
                         pbar.set_postfix({
-                            'trajectory': trajectory_rewards,
+                            'trajectory': trajectory_rewards + ' '* max(30 - len(trajectory_rewards), 1) + '-',
+                            'made actions': actions_str + ' '* max(40 - len(actions_str), 1) + '-',
                             'completed': f'{self.completed_tasks}/{self.n_steps_per_episode}',
                             'mean reward': np.array(running_reward).mean()
                             })

@@ -46,7 +46,7 @@ class ConvBody(nn.Module):
             x = F.relu(norm(conv(x)))
         return x
 
-def state_embed_block(img_channels):
+def state_embed_block__(img_channels):
     return nn.Sequential(
         nn.Conv2d(img_channels, 32, kernel_size=8, stride=4),
         nn.ReLU(),
@@ -58,14 +58,14 @@ def state_embed_block(img_channels):
         nn.ReLU()
     )
 
-def state_embed_block__(img_channels):
+def state_embed_block(img_channels):
     return nn.Sequential(
-        nn.Conv2d(img_channels, 32, kernel_size=3, stride=1),
+        nn.Conv2d(img_channels, 32, kernel_size=8, stride=4),
+        nn.MaxPool2d(kernel_size=4, stride=4),
         nn.ReLU(),
-        nn.MaxPool2d(kernel_size=2, stride=2),
 
-        nn.Conv2d(32, 1, kernel_size=3, stride=1),
-        nn.MaxPool2d(kernel_size=2, stride=2),
+        nn.Conv2d(32, 1, kernel_size=3, stride=1, padding=1),
+        nn.MaxPool2d(kernel_size=4, stride=2),
         nn.ReLU()
     )
 
