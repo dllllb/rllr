@@ -52,7 +52,6 @@ nt = NavigationTrainer(env, policy, n_steps_per_episode=50,
                                     render=False, 
                                     show_task=False)
 
-EPOCHS = 1000
 for epoch in range(EPOCHS):
     nt(tasks, epoch)
     lr_scheduler.step()

@@ -36,6 +36,7 @@ class PGUMultyEpisodesUpdater(MultyEpisodesUpdater):
         self.optimizer = optimizer
         self.gamma = gamma
 
+
     def calc_episode(self, context_hist, state_hist, reward_hist):
         R = 0
         rewards = []
@@ -48,7 +49,7 @@ class PGUMultyEpisodesUpdater(MultyEpisodesUpdater):
 
         loss = []
         for (log_prob, entropy), reward in zip(context_hist, rewards):
-            loss.append((-log_prob * reward - entropy*ENTROPY_WEIGHT/len(rewards)).view(1))
+            loss.append((-log_prob * reward - entropy*ENTROPY_WEIGHT()/len(rewards)).view(1))
         loss = torch.cat(loss).sum()
 
         return loss
