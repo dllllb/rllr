@@ -76,7 +76,6 @@ class NNExplorationPolicy(BufferedLearner, Policy):
         else:
             return action.item(), (c.log_prob(action).view(1), c.entropy(), value)
 
-
 class NNPolicyAV(BufferedLearner, Policy):
     def __init__(self, model: nn.Module, updater: Updater):
         super().__init__(updater)

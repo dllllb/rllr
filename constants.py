@@ -38,18 +38,21 @@ class Hook():
 class ExponentialWeighter:
 
     def __init__(self, val, steps_per_epoch):
-        self.step = 0
+        self.iter = 0
         self.val = val
         self.steps_per_epoch = steps_per_epoch
 
     def __call__(self):
-        temperature = math.exp(-1*self.step/(EPOCHS*self.steps_per_epoch))
-        self.step += 1
+        temperature = math.exp(-1*self.iter/(EPOCHS*self.steps_per_epoch))
         return self.val * temperature
 
-#DEVICE = torch.device('cuda:2')
-DEVICE = torch.device('cpu')
+    def step(self):
+        self.iter += 1
+
+DEVICE = torch.device('cuda:3')
+#DEVICE = torch.device('cpu')
 EPOCHS = 1000
-ENTROPY_WEIGHT =  ExponentialWeighter(0.75, steps_per_epoch=30)# 0.75# 0.65  
+BATCH_SIZE = 50
+ENTROPY_WEIGHT =  ExponentialWeighter(0.85, steps_per_epoch=BATCH_SIZE)# 0.75# 0.65  
 
 
