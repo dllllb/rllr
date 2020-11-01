@@ -2,6 +2,8 @@ from gym_minigrid.minigrid import *
 from gym_minigrid.register import register
 import random
 
+# /mnt2/molchanov/.venv/lib/python3.8/site-packages/gym_minigrid/minigrid.py
+# /mnt2/molchanov/miniconda3_copy/lib/python3.8/site-packages/gym_minigrid/minigrid.py
 class MyEmptyEnv(MiniGridEnv):
     """
     Empty grid environment, no obstacles, sparse reward

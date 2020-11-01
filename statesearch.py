@@ -18,6 +18,7 @@ from collections import defaultdict
 import cv2
 import warnings
 import tqdm
+from constants import *
 
 
 class TrajectoryExplorer:
@@ -211,6 +212,7 @@ class NavigationTrainer:
                             'trajectory': trajectory_rewards + ' '* max(30 - len(trajectory_rewards), 1) + '-',
                             'made actions': actions_str + ' '* max(40 - len(actions_str), 1) + '-',
                             'completed': f'{self.completed_tasks}/{self.n_steps_per_episode}',
+                            'H': round(ENTROPY_WEIGHT(), 2),
                             'mean reward': np.array(running_reward).mean()
                             })
                     self.plt_show([initial_state, state, desired_state], ['initial state', 'state', 'desired state'])

@@ -37,9 +37,9 @@ nav_nn = ConvNavPolicy(env)
 #nav_nn = StateAPINavPolicy(env)
 #nav_nn = ConvNavPolicyAV(env)
 nav_nn.to(DEVICE)
-np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=1e-3)#1e-4)
+np_optimizer = torch.optim.Adam(nav_nn.parameters(), lr=L_RATE)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(np_optimizer, 
-                                               step_size=1, 
+                                               step_size=10, 
                                                gamma=0.975)#0.9)
 np_updater = PGUMultyEpisodesUpdater(np_optimizer, gamma=.99)
 #np_updater = ACMultyEpisodesUpdater(np_optimizer, gamma=0.99)

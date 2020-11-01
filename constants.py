@@ -53,6 +53,8 @@ DEVICE = torch.device('cuda:3')
 #DEVICE = torch.device('cpu')
 EPOCHS = 1000
 BATCH_SIZE = 50
-ENTROPY_WEIGHT =  ExponentialWeighter(0.85, steps_per_epoch=BATCH_SIZE)# 0.75# 0.65  
+L_RATE = 10e-3
+ENTROPY = 5
+ENTROPY_WEIGHT =  ExponentialWeighter(ENTROPY, steps_per_epoch=BATCH_SIZE)# 0.75# 0.65  
 
 
