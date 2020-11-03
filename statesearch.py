@@ -215,8 +215,8 @@ class NavigationTrainer:
                             'H': round(ENTROPY_WEIGHT(), 2),
                             'mean reward': np.array(running_reward).mean()
                             })
+                        self.completed_tasks = 0
                     self.plt_show([initial_state, state, desired_state], ['initial state', 'state', 'desired state'])
-                    self.completed_tasks = 0
 
                 pbar.update()
 
