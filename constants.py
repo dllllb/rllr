@@ -45,7 +45,7 @@ class ExponentialWeighter:
     def __call__(self):
         #temperature = math.exp(-1*self.iter/(EPOCHS*self.steps_per_epoch))
         temperature = math.exp(-1*self.iter*50/(EPOCHS*self.steps_per_epoch))
-        return max(self.val * temperature, 0.05)
+        return max(self.val * temperature, 0.0005)
 
     def step(self):
         self.iter += 1
@@ -54,7 +54,7 @@ DEVICE = torch.device('cuda:3')
 #DEVICE = torch.device('cpu')
 EPOCHS = 1000
 BATCH_SIZE = 50
-L_RATE = 1e-1# 1e-3
+L_RATE = 1e-3# 1e-3
 ENTROPY = 0.9# start 0.9 mean possible entropy bp 0.05 multiplier 50
 '''
 rather good values
@@ -62,5 +62,7 @@ L_RATE = 1e-3
 ENTROPY = 0.9# start 0.9 mean possible entropy bp 0.05 multiplier 50
 '''
 ENTROPY_WEIGHT =  ExponentialWeighter(ENTROPY, steps_per_epoch=BATCH_SIZE)# 0.75# 0.65  
+TASKS_FILE = 'tasks.pkl'
+CIRCULUM_LEARNING = True
 
 

@@ -32,10 +32,11 @@ class TrajectoryExplorer:
         self.exploration_policy = exploration_policy
         self.n_steps = n_steps
         self.n_episodes = n_episodes
-
+    
     def __call__(self, initial_trajectory=None):
         log = []
         for i in tqdm.tqdm(range(self.n_episodes), desc='tragectories generation...'):
+
             state = self.env.reset()
             if initial_trajectory is not None:
                 for a in initial_trajectory:
@@ -86,6 +87,11 @@ def ssim_l1_dist(state, target):
     delta = abs(srs[0] - dst[0]) + abs(srs[1] - dst[1])
     return delta
 
+def ssim_l1_sparce_dist(state, target):
+    srs, dst = state['agent_pos'], target['agent_pos']
+    delta = abs(srs[0] - dst[0]) + abs(srs[1] - dst[1])
+    return 1 if delta > 0 else 0
+
 def mse_dist(state, target):
     return ((state - target)**2).mean()
 
@@ -112,6 +118,7 @@ class NavigationTrainer:
         self.n_steps = 0
         self.completed_tasks = 0
 
+
     def render(self):
         if self.visualize:
             self.env.render()
@@ -128,6 +135,47 @@ class NavigationTrainer:
             input('\npress any key to start new task ...\n')
             plt.close()
 
+    def generate_circulum_task(self, epoch):
+        # for circulum learning
+        height = self.env.env.grid.height-1
+        width = self.env.env.grid.width-1
+        env_size = height + width
+
+        circular_epochs = 100
+        val = (max(0, circular_epochs-epoch)**1.4)/circular_epochs
+        temperature = math.exp(-val)
+
+        while True:
+            n_steps = max(int(temperature*env_size), random.randint(2, 5))
+            
+            # start position
+            (x0, y0) = (random.randint(2, width-1), random.randint(2, height-1))
+
+            # generate x anywhere between [x0-n_steps, x0+n_steps]
+            steps = int(random.random()*n_steps)
+            x1 = int(random.randint(x0-steps, x0+steps))
+            n_steps = n_steps - abs(x0-x1)
+
+            # generate y like x
+            steps = int(random.random()*n_steps)
+            y1 = int(random.randint(y0-steps, y0+steps))
+
+            # desired position
+            x1, y1 = min(max(2, x1), width-1), min(max(2, y1), height-1)
+
+            if x1!= x0 or y1!=y0:
+                break
+
+        # desired state
+        self.env.env.agent_start_pos = (x1, y1)
+        desired_state = self.env.reset()
+
+        # start state
+        self.env.env.agent_start_pos = (x0, y0)
+        initial_state = self.env.reset()
+
+        return initial_state, desired_state, abs(x1-x0) + abs(y1-y0)
+
     def __call__(self, tasks, epoch):
         actions_description = {0: "r", 1: "d", 2: "l", 3: "u"}
         running_reward = list()
@@ -135,18 +183,26 @@ class NavigationTrainer:
             for i, (initial_trajectory, known_trajectory, desired_state) in enumerate(tasks):
 
                 for j in range(self.n_trials_per_task):
-
-                    state = self.env.reset()
-                    if initial_trajectory is not None:
-                        for a in initial_trajectory:
-                            self.render()
-                            state, reward, done, _ = self.env.step(a)
+                    
+                    if not CIRCULUM_LEARNING:
+                        state = self.env.reset()
+                        if initial_trajectory is not None:
+                            for a in initial_trajectory:
+                                self.render()
+                                state, reward, done, _ = self.env.step(a)
+                        known_tragectory_len = len(known_trajectory)
+                    else:
+                        state, desired_state, known_tragectory_len = self.generate_circulum_task(epoch)
 
                     initial_dist = min_dist = self.state_dist(state, desired_state)
+                    if initial_dist == 0:
+                        continue
+                    '''
                     if initial_dist == 0 or \
-                       state['agent_pos'][0] == desired_state['agent_pos'][0] or\
+                       state['agent_pos'][0] == desired_state['agent_pos'][0] or\ why ?
                        state['agent_pos'][1] == desired_state['agent_pos'][1]:
                         continue
+                    '''
 
                     no_reward_actions = 0
                     positive_reward = 0
@@ -155,7 +211,7 @@ class NavigationTrainer:
                     trajectory_rewards = ''
                     prev_dist = None
                     make_actions = [('|', '')]
-                    for _ in range(len(known_trajectory)*100):
+                    for _ in range(known_tragectory_len*100):
                         action, context = self.navigation_policy((state, desired_state))
                         # track action distributions
                         if make_actions[-1][0] == actions_description[action]:

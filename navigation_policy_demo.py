@@ -4,7 +4,7 @@ import torch
 from navigation_models import ConvNavPolicy, StateAPINavPolicy, ConvNavPolicyAV
 from pgrad import PGUpdater, PGUMultyEpisodesUpdater
 from policy import RandomActionPolicy, NNPolicy, CategoricalActionPolicy, NNExplorationPolicy
-from statesearch import TrajectoryExplorer, generate_train_trajectories, NavigationTrainer, ssim_dist, ssim_l1_dist
+from statesearch import TrajectoryExplorer, generate_train_trajectories, NavigationTrainer, ssim_dist, ssim_l1_dist, ssim_l1_sparce_dist
 from constants import *
 from actor_critic import ACMultyEpisodesUpdater
 
@@ -15,20 +15,21 @@ from torch.distributions import Categorical
 import pickle
 import os
 import warnings
+from constants import *
 
 #env = gym.make('MiniGrid-MyEmptyRandomPos-8x8-v0')
 env = gym.make('MiniGrid-MyEmptyRandomPosMetaAction-8x8-v0')
 env = RGBImgAndStateObsWrapper(env)
 
-if not os.path.exists('./tasks.pkl'):
+if not os.path.exists(f'./{TASKS_FILE}'):
     explore_policy = CategoricalActionPolicy(sampler=Categorical(probs=torch.tensor([0.2, 0.2, 0.6])))
 
     te = TrajectoryExplorer(env, explore_policy, n_steps=150, n_episodes=1000)
     tasks = generate_train_trajectories(te, n_initial_points=3, take_prob=.5)
-    with open('./tasks.pkl', 'wb') as wfs:
+    with open(f'./{TASKS_FILE}', 'wb') as wfs:
         pickle.dump(tasks, wfs)
 else:
-    with open('./tasks.pkl', 'rb') as rfs:
+    with open(f'./{TASKS_FILE}', 'rb') as rfs:
         tasks = pickle.load(rfs)
     warnings.warn('using casched dataset for navigation policy task')
     
