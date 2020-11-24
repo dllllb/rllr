@@ -55,6 +55,17 @@ def state_embed_block__(img_channels):
         nn.Conv2d(64, 64, kernel_size=2, stride=2),
         nn.ReLU(),
         nn.Conv2d(64, 1, kernel_size=1, stride=1),
+        nn.ReLU(),
+        nn.AvgPool2d(kernel_size=5, stride=5, padding=1)
+    )
+
+def state_embed_block___(img_channels):
+    return nn.Sequential(
+        nn.Conv2d(img_channels, 32, kernel_size=8, stride=4),
+        nn.ReLU(),
+        nn.Conv2d(32, 64, kernel_size=4, stride=2),
+        nn.ReLU(),
+        nn.Conv2d(64, 64, kernel_size=3, stride=1),
         nn.ReLU()
     )
 
@@ -86,20 +97,18 @@ class ConvNavPolicy(nn.Module):
 
         img_height, img_width, img_channels = env.observation_space.shape
 
-        self.conv = state_embed_block(img_channels)
+        self.conv = state_embed_block__(img_channels)
 
-        self.conv_target = state_embed_block(img_channels)
+        self.conv_target = state_embed_block__(img_channels)
 
         o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
         conv_out_size = int(np.prod(o.size()))
 
         self.fc = nn.Sequential(
-            nn.Linear(conv_out_size, 128),
-            #nn.LayerNorm([128]),
-            nn.ReLU(),
-            #nn.Tanh(),
-            #nn.Dropout(p=0.5),
-            nn.Linear(128, 4),#3),#env.action_space.n),
+            nn.Linear(conv_out_size, 2),
+            nn.Tanh(),
+            #nn.ReLU(),
+            nn.Linear(2, 4),#3),#env.action_space.n),
             nn.LogSoftmax(dim=-1)
         )
    
@@ -108,12 +117,99 @@ class ConvNavPolicy(nn.Module):
         current_state = prepare_state(current_state['image'])
         desired_state = prepare_state(desired_state['image'])
 
+        h = self.conv(desired_state - current_state).contiguous().view(-1)
+        '''
         conv_out = self.conv(current_state).view(current_state.size(0), -1)
         conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
         #h = torch.cat((conv_out, conv_target_out), dim=1)
         h = conv_target_out - conv_out
+        '''
 
         ap = self.fc(h)
+        return ap
+
+class ConvNavPolicy2(nn.Module):
+    def __init__(self, env: gym.Env):
+        super().__init__()
+
+        img_height, img_width, img_channels = env.observation_space.shape
+
+        self.conv = state_embed_block__(img_channels)
+
+        self.conv_target = state_embed_block__(img_channels)
+
+        self.pool = nn.AvgPool2d(kernel_size=5, stride=5, padding=1)
+
+        o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
+        conv_out_size = int(np.prod(o.size()))
+
+        self.fc = nn.Sequential(
+            nn.Linear(conv_out_size, 2),
+            nn.Tanh()
+        )
+
+        self.action_head = nn.Sequential(
+            nn.Linear(2, 4),#3),#env.action_space.n),
+            nn.LogSoftmax(dim=-1)
+        )
+
+        self.mu = None
+        self.sigma = None
+
+   
+    def forward(self, state):
+        current_state, desired_state = state
+        current_state = prepare_state(current_state['image'])
+        desired_state = prepare_state(desired_state['image'])
+
+        if not self.mu:
+            self.mu = current_state.mean().item()
+            self.sigma = current_state.std().item()
+
+        current_state = (current_state - self.mu)/(self.sigma)
+        desired_state = (desired_state - self.mu)/(self.sigma)
+
+        conv_out = self.conv(current_state).view(current_state.size(0), -1)
+        conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
+        h = self.fc(conv_target_out) - self.fc(conv_out)
+
+        return self.action_head(h)
+
+class ConvNavPolicyGRU(nn.Module):
+    def __init__(self, env: gym.Env):
+        super().__init__()
+
+        img_height, img_width, img_channels = env.observation_space.shape
+
+        self.conv = state_embed_block___(img_channels)
+        self.conv_target = state_embed_block___(img_channels)
+
+        o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
+        conv_out_size = int(np.prod(o.size()))
+
+        self.rnn_cell = nn.GRUCell(conv_out_size, 64)
+        self.hidden = None
+
+        self.fc = nn.Sequential(
+            nn.Linear(64, 512),
+            nn.ReLU(),
+            nn.Linear(512, 4),#3),#env.action_space.n),
+            nn.LogSoftmax(dim=-1)
+        )
+
+
+    def reset_hidden(self, device):
+        self.hidden = torch.randn(1, 64).to(device)
+   
+    def forward(self, state):
+        current_state, desired_state = state
+        current_state = prepare_state(current_state['image'])
+        desired_state = prepare_state(desired_state['image'])
+
+        inp = self.conv(desired_state - current_state).contiguous().view(1, -1)
+        self.hidden = self.rnn_cell(inp, self.hidden)
+
+        ap = self.fc(self.hidden).view(-1)
         return ap
 
 class ConvNavPolicyAV(nn.Module):

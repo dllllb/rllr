@@ -86,7 +86,6 @@ class MyEmptyRandomPosMetaActionEnv(MyEmptyRandomPosEnv):
 
 
 
-
 register(
     id='MiniGrid-MyEmpty-8x8-v0',
     entry_point='custom_envs:MyEmptyEnv'

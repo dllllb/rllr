@@ -147,7 +147,7 @@ class NavigationTrainer:
 
         while True:
             n_steps = max(int(temperature*env_size), random.randint(2, 5))
-            
+
             # start position
             (x0, y0) = (random.randint(2, width-1), random.randint(2, height-1))
 
@@ -197,12 +197,6 @@ class NavigationTrainer:
                     initial_dist = min_dist = self.state_dist(state, desired_state)
                     if initial_dist == 0:
                         continue
-                    '''
-                    if initial_dist == 0 or \
-                       state['agent_pos'][0] == desired_state['agent_pos'][0] or\ why ?
-                       state['agent_pos'][1] == desired_state['agent_pos'][1]:
-                        continue
-                    '''
 
                     no_reward_actions = 0
                     positive_reward = 0
@@ -211,8 +205,12 @@ class NavigationTrainer:
                     trajectory_rewards = ''
                     prev_dist = None
                     make_actions = [('|', '')]
+                    if hasattr(self.navigation_policy.model, 'reset_hidden'):
+                        self.navigation_policy.model.reset_hidden(DEVICE)
+
                     for _ in range(known_tragectory_len*100):
                         action, context = self.navigation_policy((state, desired_state))
+                        context = (action, context)
                         # track action distributions
                         if make_actions[-1][0] == actions_description[action]:
                             make_actions[-1] = (make_actions[-1][0], make_actions[-1][1]+1)
@@ -225,14 +223,14 @@ class NavigationTrainer:
                         curent_dist = self.state_dist(next_state, desired_state)
                         if prev_dist == None: prev_dist = curent_dist
 
-                        if curent_dist < min_dist:# or curent_dist < prev_dist:
+                        if curent_dist < min_dist:
                             min_dist = min(curent_dist, min_dist)
                             no_reward_actions = max(no_reward_actions - 1, 0)
                             positive_reward += 1
 
-                            price = random.random() if random.random() > 0.7 else 0 # stohastic semisparce rewards
+                            #price = random.random() if random.random() > 0.7 else 0 # stohastic semisparce rewards
                             #price = 0 if min_dist > 0 else 1 # sparce mode
-                            #price = 1 # dense mode
+                            price = 1 # dense mode
                             self.navigation_policy.update(context, (state, desired_state), price)
                             trajectory_rewards += '+'
                             state = next_state
@@ -246,13 +244,10 @@ class NavigationTrainer:
                         else:
                             trajectory_rewards += '-'
                             no_reward_actions += 1
-                            if no_reward_actions > self.n_actions_without_reward:
-                                self.navigation_policy.update(context, (state, desired_state), -1)
-                                state = next_state
+                            self.navigation_policy.update(context, (state, desired_state), 0)
+                            state = next_state
+                            if no_reward_actions >= self.n_actions_without_reward:
                                 break
-                            else:
-                                self.navigation_policy.update(context, (state, desired_state), 0)
-                                state = next_state
                         prev_dist = curent_dist
 
                     running_reward.append(positive_reward)
@@ -264,6 +259,7 @@ class NavigationTrainer:
                         self.navigation_policy.end()
                         #torch.save(self.navigation_policy.model, f'./saved_models/pretrained_navigation_model_{self.env.spec.id}.pkl')
                         actions_str = ' '.join([f'{act}{num}' for act, num in make_actions]) + '|'
+                        actions_str = actions_str[:15]
                         pbar.set_postfix({
                             'trajectory': trajectory_rewards + ' '* max(30 - len(trajectory_rewards), 1) + '-',
                             'made actions': actions_str + ' '* max(40 - len(actions_str), 1) + '-',
