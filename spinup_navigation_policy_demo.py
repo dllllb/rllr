@@ -1,7 +1,6 @@
 from constants import *
 from custom_envs import *
 from custom_wrappers import *
-
 from spinup import ppo_pytorch, vpg_pytorch
 import gym
 from gym import spaces
@@ -10,19 +9,9 @@ import torch.nn as nn
 from torch.distributions.categorical import Categorical
 import numpy as np
 import spinup.algos.pytorch.ppo.core as core
-
 from copy import copy
-
-from navigation_models import ConvNavPolicy2, state_embed_block__
 import torchvision.models as zoo_models
 import random
-
-# ------------------ ENV ---------------------- #
-
-env = gym.make('MiniGrid-MyEmptyRandomPosMetaAction-8x8-v0')
-env = RGBImgAndStateObsWrapper(env)
-
-env2 = gym.make('Pong-v0')
 
 def ssim_l1_dist(srs, dst):
     delta = abs(srs[0] - dst[0]) + abs(srs[1] - dst[1])
@@ -31,6 +20,21 @@ def ssim_l1_dist(srs, dst):
 def ssim_l1_sparce_dist(srs, dst):
     delta = abs(srs[0] - dst[0]) + abs(srs[1] - dst[1])
     return 1 if delta > 0 else 0
+
+def prepare_state(state):
+    if isinstance(state, np.ndarray):
+        state = torch.from_numpy(state).float()# / 255
+    if len(state.shape) == 3:
+        state = state.view(1, *state.shape)
+        state = state.permute(0, 3, 1, 2)
+    elif len(state.shape) == 2:
+        state = state.view(1, 1, *state.shape)
+    elif len(state.shape) == 4:
+        state = state.transpose(2, 3).transpose(1, 2)
+    return state
+    return state.to(DEVICE)
+
+# ------------------ ENV ------------------------ #
 
 class EnvWrapper:
 
@@ -168,26 +172,7 @@ class EnvWrapper:
         self.completed_tasks = 0
         self.succesfully_completed_tasks = 0
 
-env_func = lambda : EnvWrapper(env, ssim_l1_dist, allowed_actions_without_reward=20)
-env_func2 = lambda: env2
-# ----------------------------------------------- #
-
-ac_kwargs = dict(hidden_sizes=[64,64], activation=nn.Tanh)
-
 # ------------------ MODEL ---------------------- #
-
-def prepare_state(state):
-    if isinstance(state, np.ndarray):
-        state = torch.from_numpy(state).float()# / 255
-    if len(state.shape) == 3:
-        state = state.view(1, *state.shape)
-        state = state.permute(0, 3, 1, 2)
-    elif len(state.shape) == 2:
-        state = state.view(1, 1, *state.shape)
-    elif len(state.shape) == 4:
-        state = state.transpose(2, 3).transpose(1, 2)
-    return state
-    return state.to(DEVICE)
 
 def nn_mlp_block(input_shape):
     d_in = np.prod(input_shape)
@@ -241,13 +226,12 @@ class BaseModelMLP(nn.Module):
         #desired_state = prepare_state(desired_state)
         return self.model(current_state)
 
-class BaseModelCONV(nn.Module):
-    def __init__(self, env: gym.Env):
+'''use in minigrid env for navigation learning'''
+class BaseNavModelCONV(nn.Module):
+    def __init__(self, env):
         super().__init__()
 
         with torch.no_grad():
-            self.mu = None
-            self.sigma = None
             img_height, img_width, img_channels = env.observation_space.shape
             img_channels = 3
 
@@ -256,33 +240,38 @@ class BaseModelCONV(nn.Module):
             o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
             self.out_size = 2*int(np.prod(o.size()))
 
-            #self.fc = nn.Sequential(
-            #    nn.Linear(self.out_size, 2),
-            #    nn.Tanh()
-            #)
-
     def forward(self, state):
         current_state, desired_state = torch.chunk(state, chunks=2, dim=-1)
         current_state = prepare_state(current_state).contiguous()
         desired_state = prepare_state(desired_state).contiguous()
 
-        '''
-        if not self.mu:
-            self.mu = current_state.mean().item()
-            self.sigma = current_state.std().item()
-
-        current_state = (current_state - self.mu)/(self.sigma)
-        desired_state = (desired_state - self.mu)/(self.sigma)
-        '''
+        conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
+        conv_out = self.conv(current_state).view(current_state.size(0), -1)
+        h = torch.cat((conv_target_out, conv_out), dim=-1)
+        return h
 
         #conv_out = self.conv(current_state).view(current_state.size(0), -1)
         #out = conv_out.flatten(start_dim=1)
         #return out
 
-        conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
+'''use for most atary games'''
+class BaseModelCONV(nn.Module):
+    def __init__(self, env):
+        super().__init__()
+
+        with torch.no_grad():
+            img_height, img_width, img_channels = env.observation_space.shape
+            img_channels = 3
+
+            self.conv = nn_conv_block(img_channels)
+            self.conv_target = nn_conv_block(img_channels)
+            o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
+            self.out_size = int(np.prod(o.size()))
+
+    def forward(self, state):
+        current_state = prepare_state(state).contiguous()
         conv_out = self.conv(current_state).view(current_state.size(0), -1)
-        h = torch.cat((conv_target_out, conv_out), dim=-1)
-        return h
+        return conv_out
 
 class CategoricalActor(nn.Module):
     
@@ -292,7 +281,8 @@ class CategoricalActor(nn.Module):
 
     def _distribution(self, obs):
         logits = self.logits_net(obs)
-        return Categorical(logits=logits)
+        return Categorical(probs=logits)
+        #return Categorical(logits=logits)
 
     def _log_prob_from_distribution(self, pi, act):
         return pi.log_prob(act)
@@ -308,32 +298,29 @@ class CategoricalActor(nn.Module):
         return pi, logp_a
 
 class ActorCritic(nn.Module):
-    def __init__(self, env: gym.Env):
+    def __init__(self, env, base_model_type='minigrid_nav'):
         super().__init__()
 
-        self.body_pi = BaseModelCONV(env)
-        self.body_v = BaseModelCONV(env)
+        if base_model_type == 'minigrid_nav':
+            self.body_pi = BaseNavModelCONV(env)
+            self.body_v = BaseNavModelCONV(env)
+        else:
+            self.body_pi = BaseModelCONV(env)
+            self.body_v = BaseModelCONV(env)
+
         h_dim = 64
 
         self.action_head = nn.Sequential(
             nn.Linear(self.body_pi.out_size, h_dim),
             nn.ReLU(),
-            nn.Linear(h_dim, 4),#3),#env.action_space.n),
-            #nn.LogSoftmax(dim=-1)
+            nn.Linear(h_dim, env.action_space.n),
+            nn.Softmax(dim=-1)
         )
 
-        '''
-        self.value_head = nn.Sequential(
-            nn.Linear(2, 512),#3),#env.action_space.n),
-            nn.ReLU(),
-            nn.Linear(512, 1),#3),#env.action_space.n),
-            nn.Tanh(),
-        )
-        '''
         self.value_head = nn.Sequential(
             nn.Linear(self.body_v.out_size, h_dim),
             nn.ReLU(),
-            nn.Linear(h_dim, 1),#3),#env.action_space.n),
+            nn.Linear(h_dim, 1)
         )
 
         self.pi_model = nn.Sequential(
@@ -358,30 +345,49 @@ class ActorCritic(nn.Module):
     def act(self, obs):
         return self.step(obs)[0]
 
-def actor_critic(observation_space, action_space, hidden_sizes, activation):
-    #obs_space = np.prod(observation_space.shape)
-    #obs_space = np.zeros(obs_space)
-    #return core.MLPActorCritic(obs_space, action_space, hidden_sizes, activation).to(DEVICE)
-    return ActorCritic(env).to(DEVICE)
-
 # ----------------------------------------------- #
 
 if __name__ == '__main__':
-    
-    ppo_pytorch(env_fn=env_func, 
-                actor_critic=actor_critic, 
-                ac_kwargs=ac_kwargs, 
-                steps_per_epoch=1000,#5000, 
-                epochs=1000,
-                device=DEVICE)
-    
+    # 
+    env_name = 'minigrid'
+    env_name = 'pong'
+    if env_name == 'minigrid':
+        env = gym.make('MiniGrid-MyEmptyRandomPosMetaAction-8x8-v0')
+        env = RGBImgAndStateObsWrapper(env)
+        env = EnvWrapper(env, ssim_l1_dist, allowed_actions_without_reward=20)
+    elif env_name == 'pong':
+        env = gym.make('Pong-v0')
+    else:
+        raise NotImplementedError(f'unknown environment: {env_name}')
+    env_func = lambda : env
 
-    '''
-    vpg_pytorch(env_fn=env_func, 
-                actor_critic=actor_critic, 
-                ac_kwargs=ac_kwargs, 
-                train_v_iters=1,
-                steps_per_epoch=500,#5000, 
-                epochs=150,
-                device=DEVICE)
-    '''
+    #
+    base_model_type = 'minigrid_nav' if env_name == 'minigrid' else 'atary'
+    ac_kwargs = dict(hidden_sizes=[64,64], activation=nn.Tanh)
+    def actor_critic(observation_space, action_space, hidden_sizes, activation):
+        return ActorCritic(env, base_model_type).to(DEVICE)
+
+    #
+    method = 'ppo'
+    if method == 'ppo':
+        ppo_pytorch(env_fn=env_func, 
+                    actor_critic=actor_critic, 
+                    ac_kwargs=ac_kwargs, 
+                    steps_per_epoch=1000,
+                    train_pi_iters=10,
+                    train_v_iters=10,
+                    epochs=100000,
+                    pi_lr=3e-4,
+                    vf_lr=1e-3,
+                    device=DEVICE)
+    elif method == 'vpg':
+        vpg_pytorch(env_fn=env_func, 
+                    actor_critic=actor_critic, 
+                    ac_kwargs=ac_kwargs, 
+                    train_v_iters=1,
+                    steps_per_epoch=1000,
+                    epochs=100000,
+                    device=DEVICE)
+    else:
+        print(f'unknown train method: {method}')
+    
