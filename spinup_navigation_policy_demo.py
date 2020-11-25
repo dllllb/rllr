@@ -36,6 +36,39 @@ def prepare_state(state):
 
 # ------------------ ENV ------------------------ #
 
+class EnvStackObservationsWrapper:
+
+    def __init__(self, env, stack_size=5):
+
+        self.env = env
+        self.stack_size = stack_size
+
+        self.obs_space = copy(self.env.observation_space)
+        self.obs_space.shape = (self.env.observation_space.shape[0], 
+                                self.env.observation_space.shape[1], 
+                                self.env.observation_space.shape[2]*stack_size) 
+
+        self.stacked_observations = np.zeros(self.obs_space.shape)
+
+    @property
+    def observation_space(self):
+        return self.obs_space
+
+    @property
+    def action_space(self):
+        return self.env.action_space
+
+    def reset(self, **kwargs):
+        observation = self.env.reset()
+        self.stacked_observations = observation.repeat(self.stack_size, axis=-1)
+        return self.stacked_observations
+
+    def step(self, action):  
+        observation, reward, done, info = self.env.step(action)
+        self.stacked_observations[:, :, :3*(self.stack_size-1)] = self.stacked_observations[:, :, 3:3*self.stack_size]
+        self.stacked_observations[:, :, -3:] = observation
+        return self.stacked_observations, reward, done, info
+
 class EnvWrapper:
 
     def __init__(self, env, 
@@ -191,7 +224,7 @@ def nn_conv_block(img_channels):
         param.requires_grad = False
     return model.to(torch.device('cpu'))
 
-def nn_conv_block__(img_channels):
+def nn_conv_block_raw(img_channels):
     return nn.Sequential(
         nn.Conv2d(img_channels, 32, kernel_size=8, stride=4),
         nn.ReLU(),
@@ -261,10 +294,8 @@ class BaseModelCONV(nn.Module):
 
         with torch.no_grad():
             img_height, img_width, img_channels = env.observation_space.shape
-            img_channels = 3
-
-            self.conv = nn_conv_block(img_channels)
-            self.conv_target = nn_conv_block(img_channels)
+            self.conv = nn_conv_block_raw(img_channels)
+            self.conv_target = nn_conv_block_raw(img_channels)
             o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
             self.out_size = int(np.prod(o.size()))
 
@@ -348,7 +379,7 @@ class ActorCritic(nn.Module):
 # ----------------------------------------------- #
 
 if __name__ == '__main__':
-    # 
+    # create environment
     env_name = 'minigrid'
     env_name = 'pong'
     if env_name == 'minigrid':
@@ -357,18 +388,20 @@ if __name__ == '__main__':
         env = EnvWrapper(env, ssim_l1_dist, allowed_actions_without_reward=20)
     elif env_name == 'pong':
         env = gym.make('Pong-v0')
+        env = EnvStackObservationsWrapper(env, stack_size=5)
     else:
         raise NotImplementedError(f'unknown environment: {env_name}')
     env_func = lambda : env
 
-    #
+    # create nn model
     base_model_type = 'minigrid_nav' if env_name == 'minigrid' else 'atary'
     ac_kwargs = dict(hidden_sizes=[64,64], activation=nn.Tanh)
     def actor_critic(observation_space, action_space, hidden_sizes, activation):
         return ActorCritic(env, base_model_type).to(DEVICE)
 
-    #
-    method = 'ppo'
+    # run
+    device = torch.device('cuda:3')
+    method = 'vpg'
     if method == 'ppo':
         ppo_pytorch(env_fn=env_func, 
                     actor_critic=actor_critic, 
@@ -379,7 +412,7 @@ if __name__ == '__main__':
                     epochs=100000,
                     pi_lr=3e-4,
                     vf_lr=1e-3,
-                    device=DEVICE)
+                    device=device)
     elif method == 'vpg':
         vpg_pytorch(env_fn=env_func, 
                     actor_critic=actor_critic, 
@@ -387,7 +420,7 @@ if __name__ == '__main__':
                     train_v_iters=1,
                     steps_per_epoch=1000,
                     epochs=100000,
-                    device=DEVICE)
+                    device=device)
     else:
         print(f'unknown train method: {method}')
     
