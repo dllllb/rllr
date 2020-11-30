@@ -53,7 +53,7 @@ class ExponentialWeighter:
     def step(self):
         self.iter += 1
 
-DEVICE = torch.device('cuda:1')
+DEVICE = torch.device('cuda:3')
 #DEVICE = torch.device('cpu')
 EPOCHS = 1000
 BATCH_SIZE = 50#300#50

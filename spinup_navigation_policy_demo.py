@@ -107,6 +107,8 @@ class EnvWrapper:
         self.overide_action_space = overide_action_space
         self.overide_observation_space = overide_observation_space
 
+        self.episodes_actions_buffer = []
+
     @property
     def observation_space(self):
         if self.overide_observation_space:
@@ -125,6 +127,18 @@ class EnvWrapper:
     def saccesful_tasks_ratio(self):
         #return self.succesfully_completed_tasks
         return 0 if self.completed_tasks == 0 else round(float(self.succesfully_completed_tasks)/self.completed_tasks, 2)
+
+    @property
+    def actions_statistics(self):
+        acts = torch.Tensor(self.episodes_actions_buffer)
+        acts, acts_cnt = acts.unique(return_counts=True)
+        cnt, idx = acts_cnt.sort(descending=True)
+        cnt = cnt/cnt.sum()*100
+        cnt = cnt.long()
+        out = ''
+        for e in cnt:
+            out += str(e.item()) + ' '
+        return out[:-1]
 
     def generate_new_task(self):
         height = self.env.env.grid.height-1
@@ -199,11 +213,13 @@ class EnvWrapper:
 
         observation = np.concatenate((self.agent_curent_image, self.agent_goal_image), axis=-1)
         #observation = self.agent_curent_image
+        self.episodes_actions_buffer.append(action.item())
         return observation, reward, done, info
 
     def refresh(self):
         self.completed_tasks = 0
         self.succesfully_completed_tasks = 0
+        self.episodes_actions_buffer = []
 
 # ------------------ MODEL ---------------------- #
 
@@ -331,6 +347,7 @@ class CategoricalActor(nn.Module):
 class ActorCritic(nn.Module):
     def __init__(self, env, base_model_type='minigrid_nav'):
         super().__init__()
+        self.steps = 0
 
         if base_model_type == 'minigrid_nav':
             self.body_pi = BaseNavModelCONV(env)
@@ -339,7 +356,7 @@ class ActorCritic(nn.Module):
             self.body_pi = BaseModelCONV(env)
             self.body_v = BaseModelCONV(env)
 
-        h_dim = 64
+        h_dim = 256
 
         self.action_head = nn.Sequential(
             nn.Linear(self.body_pi.out_size, h_dim),
@@ -371,48 +388,56 @@ class ActorCritic(nn.Module):
             a = pi.sample()
             logp_a = self.pi._log_prob_from_distribution(pi, a)
             v = self.v(obs)
+
+            self.unfreeze()
         return a.detach().cpu().numpy(), v.detach().cpu().numpy(), logp_a.detach().cpu().numpy()
 
     def act(self, obs):
         return self.step(obs)[0]
 
+    def unfreeze(self):
+        self.steps += 1
+        if self.steps == 2e5:
+            for param in self.parameters():
+                param.requires_grad = True
 # ----------------------------------------------- #
 
 if __name__ == '__main__':
     # create environment
     env_name = 'minigrid'
-    env_name = 'pong'
+    #env_name = 'pong'
     if env_name == 'minigrid':
         env = gym.make('MiniGrid-MyEmptyRandomPosMetaAction-8x8-v0')
         env = RGBImgAndStateObsWrapper(env)
-        env = EnvWrapper(env, ssim_l1_dist, allowed_actions_without_reward=20)
+        env = EnvWrapper(env, ssim_l1_dist, allowed_actions_without_reward=10)
     elif env_name == 'pong':
         env = gym.make('Pong-v0')
-        env = EnvStackObservationsWrapper(env, stack_size=5)
+        env = EnvStackObservationsWrapper(env, stack_size=3)
     else:
         raise NotImplementedError(f'unknown environment: {env_name}')
     env_func = lambda : env
 
     # create nn model
+    device = torch.device('cuda:1')
     base_model_type = 'minigrid_nav' if env_name == 'minigrid' else 'atary'
     ac_kwargs = dict(hidden_sizes=[64,64], activation=nn.Tanh)
     def actor_critic(observation_space, action_space, hidden_sizes, activation):
-        return ActorCritic(env, base_model_type).to(DEVICE)
+        return ActorCritic(env, base_model_type).to(device)
 
     # run
-    device = torch.device('cuda:3')
-    method = 'vpg'
+    method = 'ppo'
     if method == 'ppo':
         ppo_pytorch(env_fn=env_func, 
                     actor_critic=actor_critic, 
                     ac_kwargs=ac_kwargs, 
                     steps_per_epoch=1000,
-                    train_pi_iters=10,
-                    train_v_iters=10,
+                    train_pi_iters=200,
+                    train_v_iters=80,
                     epochs=100000,
-                    pi_lr=3e-4,
-                    vf_lr=1e-3,
-                    device=device)
+                    pi_lr=1e-4,
+                    vf_lr=1e-4,
+                    device=device,
+                    target_kl=0.01)
     elif method == 'vpg':
         vpg_pytorch(env_fn=env_func, 
                     actor_critic=actor_critic, 
