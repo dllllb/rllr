@@ -44,6 +44,12 @@ class MyEmptyEnv(MiniGridEnv):
             self.place_agent()
 
         self.mission = "get to the green goal square"
+    
+    def step(self, action):
+        obs, reward, done, _ = super().step(action)
+        if 'agent_pos' not in obs:
+            obs['agent_pos'] = self.agent_pos
+        return obs, reward, done, _
 
 class MyEmptyRandomPosEnv(MyEmptyEnv):
 
@@ -53,6 +59,7 @@ class MyEmptyRandomPosEnv(MyEmptyEnv):
                  agent_start_dir=0):
         agent_start_pos = None#(random.randint(1, size-1), random.randint(1, size-1))
         super().__init__(size, agent_start_pos, agent_start_dir)
+
 
 class MyEmptyRandomPosMetaActionEnv(MyEmptyRandomPosEnv):
 
