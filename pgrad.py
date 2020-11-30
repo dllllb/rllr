@@ -55,8 +55,6 @@ class PGUMultyEpisodesUpdater(MultyEpisodesUpdater):
         return loss
         
     def __call__(self, episodes):
-        #self.optimizer.zero_grad()
-
         episode_losses = []
         for episode in episodes:
             episode_losses.append(self.calc_episode(episode.context_buffer, episode.state_buffer, episode.reward_buffer).view(1, -1))
@@ -64,7 +62,6 @@ class PGUMultyEpisodesUpdater(MultyEpisodesUpdater):
         loss = torch.cat(episode_losses, 0).mean()
         ENTROPY_WEIGHT.step()
 
-        #self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()

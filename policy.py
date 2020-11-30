@@ -53,28 +53,10 @@ class NNExplorationPolicy(BufferedLearner, Policy):
 
     def __call__(self, state):
         take_probs = self.model(state)
-        value = None
-        if isinstance(take_probs, tuple):
-            take_probs, value = take_probs[0], take_probs[1]
         c = Categorical(logits=take_probs)
+        action = c.sample()
+        return action.item(), (c.log_prob(action).view(1), c.entropy())
 
-        assert not torch.isnan(take_probs).any(), f'\nnan in log_prob {take_probs}\n++++++++++++++++'
-        #assert not torch.isnan(v), f'\nnan in value {v}\n+++++++++++++++++++'
-
-        #temperature = math.exp(-1*self.step/(self.steps_per_epoch*self.epochs)) # exponential decay
-        #temperature = abs(math.sin(self.step/self.steps_per_epoch)) # oscilation
-        temperature = -1
-
-        if random.random() > 0.5 * temperature:
-            action = c.sample()
-        else:
-            action = torch.randint(0, take_probs.size(-1), (1,)).to(take_probs.device)
-
-        self.step += 1
-        if value is None:
-            return action.item(), (c.log_prob(action).view(1), c.entropy())
-        else:
-            return action.item(), (c.log_prob(action).view(1), c.entropy(), value)
 
 class NNPolicyAV(BufferedLearner, Policy):
     def __init__(self, model: nn.Module, updater: Updater):

@@ -23,7 +23,7 @@ def ssim_l1_sparce_dist(srs, dst):
 
 def prepare_state(state):
     if isinstance(state, np.ndarray):
-        state = torch.from_numpy(state).float()# / 255
+        state = torch.from_numpy(state).float()
     if len(state.shape) == 3:
         state = state.view(1, *state.shape)
         state = state.permute(0, 3, 1, 2)
@@ -149,11 +149,7 @@ class EnvWrapper:
             (x0, y0) = (random.randint(2, width-1), random.randint(2, height-1))
 
             # end position
-            if True or self.x1 is None:
-                (x1, y1) = (random.randint(2, width-1), random.randint(2, height-1))
-                self.x1, self.y1 = x1, y1
-            else:
-                x1, y1 = self.x1, self.y1
+            (x1, y1) = (random.randint(2, width-1), random.randint(2, height-1))
 
             if x1!= x0 or y1!=y0:
                 break
@@ -176,16 +172,10 @@ class EnvWrapper:
         self.generate_new_task()
 
         observation = np.concatenate((self.agent_curent_image, self.agent_goal_image), axis=-1)
-        #observation = self.agent_curent_image
         self.curent_distance = self.dist_func(self.agent_curent_position, self.agent_goal_position)
         self.min_distance = self.curent_distance
 
         return observation
-        '''
-        observation = self.env.reset(**kwargs)
-        observation = self.observation(observation)
-        return observation
-        '''
 
     def step(self, action):
         observation, reward, done, info = self.env.step(action)
@@ -251,7 +241,7 @@ def nn_conv_block_raw(img_channels):
         nn.Conv2d(64, 1, kernel_size=1, stride=1)
     )
 
-def nn_conv_block_(img_channels):
+def nn_conv_block_vgg(img_channels):
     # get pretrained body
     model = zoo_models.vgg11(pretrained=True, progress=True)
     sub_model =  list(list(model.children())[0].children())
@@ -319,6 +309,23 @@ class BaseModelCONV(nn.Module):
         current_state = prepare_state(state).contiguous()
         conv_out = self.conv(current_state).view(current_state.size(0), -1)
         return conv_out
+
+'''gru cell + conv navigation model'''
+class BaseNavModelConvGRU(nn.Module):
+    def __init__(self, env, hidden_dim=64):
+        super().__init__()
+        self.conv_model = BaseNavModelCONV(env)
+        self.h_dim = hidden_dim
+        self.rnn_cell = nn.GRUCell(self.conv_model.out_size, self.h_dim)
+        self.hidden = None
+
+    def reset_hidden(self, device):
+        self.hidden = torch.randn(1, self.h_dim).to(device)
+   
+    def forward(self, state):
+        inp = self.conv_model(state)
+        self.hidden = self.rnn_cell(inp, self.hidden)
+        return self.hidden
 
 class CategoricalActor(nn.Module):
     
@@ -449,3 +456,48 @@ if __name__ == '__main__':
     else:
         print(f'unknown train method: {method}')
     
+
+'''
+
+def generate_circulum_task(self, epoch):
+        # for circulum learning
+        height = self.env.env.grid.height-1
+        width = self.env.env.grid.width-1
+        env_size = height + width
+
+        circular_epochs = 100
+        val = (max(0, circular_epochs-epoch)**1.4)/circular_epochs
+        temperature = math.exp(-val)
+
+        while True:
+            n_steps = max(int(temperature*env_size), random.randint(2, 5))
+
+            # start position
+            (x0, y0) = (random.randint(2, width-1), random.randint(2, height-1))
+
+            # generate x anywhere between [x0-n_steps, x0+n_steps]
+            steps = int(random.random()*n_steps)
+            x1 = int(random.randint(x0-steps, x0+steps))
+            n_steps = n_steps - abs(x0-x1)
+
+            # generate y like x
+            steps = int(random.random()*n_steps)
+            y1 = int(random.randint(y0-steps, y0+steps))
+
+            # desired position
+            x1, y1 = min(max(2, x1), width-1), min(max(2, y1), height-1)
+
+            if x1!= x0 or y1!=y0:
+                break
+
+        # desired state
+        self.env.env.agent_start_pos = (x1, y1)
+        desired_state = self.env.reset()
+
+        # start state
+        self.env.env.agent_start_pos = (x0, y0)
+        initial_state = self.env.reset()
+
+        return initial_state, desired_state, abs(x1-x0) + abs(y1-y0)
+
+'''
