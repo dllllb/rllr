@@ -86,6 +86,7 @@ class EnvWrapper:
         self.agent_goal_image = None
         self.actions_without_reward = 0
         self.allowed_actions_without_reward = allowed_actions_without_reward
+        self.steps = 0
 
         self.curent_distance = -1
         self.min_distance = -1
@@ -210,6 +211,12 @@ class EnvWrapper:
         self.completed_tasks = 0
         self.succesfully_completed_tasks = 0
         self.episodes_actions_buffer = []
+        self.steps += 1
+        if self.steps > 600:
+            dx = self.steps - 600
+            val = (1 - self.allowed_actions_without_reward)/400 * dx + self.actions_without_reward
+            val = max(val, 1)
+            self.actions_without_reward = val
 
 # ------------------ MODEL ---------------------- #
 
