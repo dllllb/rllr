@@ -141,6 +141,10 @@ class EnvWrapper:
             out += str(e.item()) + ' '
         return out[:-1]
 
+    @property
+    def allowed_actions(self):
+        return self.allowed_actions_without_reward
+
     def generate_new_task(self):
         height = self.env.env.grid.height-1
         width = self.env.env.grid.width-1
@@ -212,11 +216,11 @@ class EnvWrapper:
         self.succesfully_completed_tasks = 0
         self.episodes_actions_buffer = []
         self.steps += 1
-        if self.steps > 600:
-            dx = self.steps - 600
-            val = (1 - self.allowed_actions_without_reward)/400 * dx + self.actions_without_reward
+        if self.steps > 150:
+            dx = self.steps - 150
+            val = (1 - self.allowed_actions_without_reward)/200 * dx + self.allowed_actions_without_reward
             val = max(val, 1)
-            self.actions_without_reward = val
+            self.allowed_actions_without_reward = val
 
 # ------------------ MODEL ---------------------- #
 
