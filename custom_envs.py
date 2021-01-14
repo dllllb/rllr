@@ -2,6 +2,8 @@ from gym_minigrid.minigrid import *
 from gym_minigrid.register import register
 import random
 
+# /mnt2/molchanov/.venv/lib/python3.8/site-packages/gym_minigrid/minigrid.py
+# /mnt2/molchanov/miniconda3_copy/lib/python3.8/site-packages/gym_minigrid/minigrid.py
 class MyEmptyEnv(MiniGridEnv):
     """
     Empty grid environment, no obstacles, sparse reward
@@ -42,6 +44,12 @@ class MyEmptyEnv(MiniGridEnv):
             self.place_agent()
 
         self.mission = "get to the green goal square"
+    
+    def step(self, action):
+        obs, reward, done, _ = super().step(action)
+        if 'agent_pos' not in obs:
+            obs['agent_pos'] = self.agent_pos
+        return obs, reward, done, _
 
 class MyEmptyRandomPosEnv(MyEmptyEnv):
 
@@ -53,6 +61,37 @@ class MyEmptyRandomPosEnv(MyEmptyEnv):
         super().__init__(size, agent_start_pos, agent_start_dir)
 
 
+class MyEmptyRandomPosMetaActionEnv(MyEmptyRandomPosEnv):
+
+
+    def __init__(self,
+                 size=20,
+                 agent_start_dir=0):
+        super().__init__(size, agent_start_dir)
+
+
+    '''
+        meta action: 0, 1, 2, 3 - moving right, down, left, up
+    '''
+    def step(self, action):
+        ''' agent dirs
+            0: '>',
+            1: 'V',
+            2: '<',
+            3: '^'
+        '''
+        # actual actions: 0, 1, 2 - left, right, forward
+        if (self.agent_dir - action) % 4 < (action - self.agent_dir) % 4:
+            direction = 1
+        else: 
+            direction = 0
+
+        while self.agent_dir != action:
+            super().step(direction)
+
+        return super().step(action=2) # step forward
+
+
 
 register(
     id='MiniGrid-MyEmpty-8x8-v0',
@@ -62,4 +101,9 @@ register(
 register(
     id='MiniGrid-MyEmptyRandomPos-8x8-v0',
     entry_point='custom_envs:MyEmptyRandomPosEnv'
+)
+
+register(
+    id='MiniGrid-MyEmptyRandomPosMetaAction-8x8-v0',
+    entry_point='custom_envs:MyEmptyRandomPosMetaActionEnv'
 )

@@ -4,6 +4,8 @@ from learner import Learner, Updater, BufferedLearner
 import torch.nn as nn
 import torch
 from constants import *
+import random
+import math
 
 
 class Policy(Learner):
@@ -29,7 +31,6 @@ class CategoricalActionPolicy(Policy):
     def __call__(self, _):
         return self.sampler.sample().item(), None
 
-
 class NNPolicy(BufferedLearner, Policy):
     def __init__(self, model: nn.Module, updater: Updater):
         super().__init__(updater)
@@ -40,6 +41,21 @@ class NNPolicy(BufferedLearner, Policy):
         c = Categorical(logits=take_probs)
         action = c.sample()
         return action.item(), c.log_prob(action).view(1)
+
+class NNExplorationPolicy(BufferedLearner, Policy):
+    def __init__(self, model: nn.Module, updater: Updater):
+        super().__init__(updater)
+        self.model = model
+
+        self.epochs = 1000
+        self.steps_per_epoch = 1000.0
+        self.step = 0
+
+    def __call__(self, state):
+        take_probs = self.model(state)
+        c = Categorical(logits=take_probs)
+        action = c.sample()
+        return action.item(), (c.log_prob(action).view(1), c.entropy())
 
 
 class NNPolicyAV(BufferedLearner, Policy):

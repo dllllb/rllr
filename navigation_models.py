@@ -9,42 +9,13 @@ import cv2
 
 def prepare_state(state):
     if isinstance(state, np.ndarray):
-        state = torch.from_numpy(state).float() / 256
+        state = torch.from_numpy(state).float()
     if len(state.shape) == 3:
         state = state.view(1, *state.shape)
         state = state.permute(0, 3, 1, 2)
     elif len(state.shape) == 2:
         state = state.view(1, 1, *state.shape)
     return state.to(DEVICE)
-
-class ConvBody(nn.Module):
-
-    def __init__(self, env):
-        super().__init__()
-        img_height, img_width, img_channels = env.observation_space.shape
-
-        self.convs = nn.ModuleList([
-            nn.Conv2d(img_channels, 32, kernel_size=8, stride=4),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2),
-            nn.Conv2d(64, 64, kernel_size=2, stride=2),
-            nn.Conv2d(64, 1, kernel_size=1, stride=1),
-        ])
-
-        with torch.no_grad():
-            self.norms = []
-            x = torch.randn(1, img_channels, img_height, img_width)
-            for conv in self.convs:
-                x = conv(x)
-                self.norms.append(nn.LayerNorm(normalized_shape=x.size()[1:]))
-            self.norm = nn.ModuleList(self.norms)
-
-        #HooksF = [Hook(conv, f'conv_{i+1}') for i, conv in enumerate(self.convs)]
-        #HooksB = [Hook(conv, f'conv_{i+1}', backward=True) for i, conv in enumerate(self.convs)]
-
-    def forward(self, x):
-        for i, conv, norm in zip(range(len(self.convs)), self.convs, self.norms):
-            x = F.relu(norm(conv(x)))
-        return x
 
 def state_embed_block(img_channels):
     return nn.Sequential(
@@ -61,6 +32,34 @@ def state_embed_block(img_channels):
 class ConvNavPolicy(nn.Module):
     def __init__(self, env: gym.Env):
         super().__init__()
+        img_height, img_width, img_channels = env.observation_space.shape
+
+        self.conv = state_embed_block(img_channels)
+        self.conv_target = state_embed_block(img_channels)
+        o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
+        conv_out_size = int(np.prod(o.size()))
+
+        self.fc = nn.Sequential(
+            nn.Linear(2*conv_out_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, env.action_space.n),
+            nn.LogSoftmax(dim=-1)
+        )
+   
+    def forward(self, state):
+        current_state, desired_state = state
+        current_state = prepare_state(current_state['image'])
+        desired_state = prepare_state(desired_state['image'])
+
+        conv_out = self.conv(current_state).view(current_state.size(0), -1)
+        conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
+        h = torch.cat((conv_out, conv_target_out), dim=1)
+        ap = self.fc(h)
+        return ap
+
+class ConvNavPolicyAV(nn.Module):
+    def __init__(self, env: gym.Env):
+        super().__init__()
 
         img_height, img_width, img_channels = env.observation_space.shape
 
@@ -68,29 +67,41 @@ class ConvNavPolicy(nn.Module):
 
         self.conv_target = state_embed_block(img_channels)
 
+        self.conv_value = state_embed_block(img_channels)
+
         o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
         conv_out_size = int(np.prod(o.size()))
 
-        self.fc = nn.Sequential(
-            nn.Linear(conv_out_size*2, 128),
-            nn.LayerNorm([128]),
+        self.action_head = nn.Sequential(
+            nn.Linear(conv_out_size, 128),
             nn.ReLU(),
-            nn.Linear(128, env.action_space.n),
+            #nn.Dropout(p=0.5),
+            nn.Linear(128, 3),#env.action_space.n),
             nn.LogSoftmax(dim=-1)
         )
 
-        
+        self.value_head = nn.Sequential(
+            nn.Linear(conv_out_size, 1),
+            nn.ReLU(),
+            #nn.Softmax(dim=-1)
+        )
+   
     def forward(self, state):
-        current_state_, desired_state_ = state
-        current_state = prepare_state(current_state_['image'])
-        desired_state = prepare_state(desired_state_['image'])
+        current_state, desired_state = state
+        current_state = prepare_state(current_state['image'])
+        desired_state = prepare_state(desired_state['image'])
 
         conv_out = self.conv(current_state).view(current_state.size(0), -1)
         conv_target_out = self.conv_target(desired_state).view(desired_state.size(0), -1)
-        h = torch.cat((conv_out, conv_target_out), dim=1)
+        #h = torch.cat((conv_out, conv_target_out), dim=1)
+        h = conv_target_out - conv_out
 
-        ap = self.fc(h)
-        return ap
+        ap = self.action_head(h)
+
+        v = self.conv_value(current_state).view(current_state.size(0), -1)
+        v = self.value_head(v)
+        #v = self.value_head(conv_out.detach())
+        return ap, v.view(-1)
 
 class StateAPINavPolicy(nn.Module):
     def __init__(self, env: gym.Env):
