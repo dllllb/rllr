@@ -9,3 +9,4 @@ env/UnitySDK.log
 saved_models
 *.pkl
 *.jpg
+outputs/
