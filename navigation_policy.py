@@ -4,7 +4,7 @@ import os
 from functools import partial
 
 from gym_minigrid_navigation import environments as minigrid_envs
-from gym_minigrid_navigation import models as minigrid_models
+from gym_minigrid_navigation import encoders as minigrid_encoders
 from dqn import get_dqn_agent
 from models import get_master_worker_net
 from rewards import get_reward_function
@@ -42,18 +42,19 @@ def run_episodes(env, agent, n_episodes=1_000, verbose=False):
     """
     Runs a series of episode and collect statistics
     """
-    score_sum = 0
-    scores = []
-    steps = []
+    score_sum, step_sum = 0, 0
+    scores, steps = [], []
     for episode in range(1, n_episodes + 1):
         score, step = run_episode(env, agent, train_mode=True)
         score_sum += score
+        step_sum += step
         scores.append(score)
         steps.append(step)
         if verbose and episode % int(verbose) == 0:
             avg_score = score_sum / int(verbose)
-            logger.info("Episode: {}. Average score: {}".format(episode, avg_score))
-            score_sum = 0
+            avg_steps = step_sum / int(verbose)
+            logger.info("Episode: {}. Average score: {}. Average steps: {}".format(episode, avg_score, avg_steps))
+            score_sum, step_sum = 0, 0
 
     return scores, steps
 
@@ -68,7 +69,7 @@ def gen_env(conf, reward_functions, verbose=False):
 
 def get_encoders(conf):
     if conf['env.env_type'] == 'gym_minigrid':
-        state_encoder, goal_state_encoder = minigrid_models.get_encoders(conf)
+        state_encoder, goal_state_encoder = minigrid_encoders.get_encoders(conf)
         return state_encoder, goal_state_encoder
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")

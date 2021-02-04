@@ -2,18 +2,6 @@ import torch
 from torch import nn
 
 
-class CatLayer(nn.Module):
-    def __init__(self, left_tail, right_tail):
-        super().__init__()
-        self.left_tail = left_tail
-        self.right_tail = right_tail
-
-    def forward(self, x):
-        l, r = x
-        t = torch.cat(tensors=[self.left_tail(l), self.right_tail(r)], dim=1)
-        return t
-
-
 class WorkerNetwork(nn.Module):
     def __init__(self, state_encoder, emb_size, action_size, config):
         super().__init__()

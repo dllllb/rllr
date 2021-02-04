@@ -6,12 +6,12 @@ from torch import nn
 
 class MLP(nn.Module):
     """Multi Layer Perceptron"""
-    def __init__(self, input_size, hidden_layers_sizes=(64, 64)):
+    def __init__(self, input_size, conf):
         super().__init__()
         self.input_size = input_size
 
         layers = []
-        layers_size = [input_size] + list(hidden_layers_sizes)
+        layers_size = [input_size] + list(conf['hidden_layers_sizes'])
         for size_in, size_out in zip(layers_size[:-1], layers_size[1:]):
             layers.append(nn.Linear(size_in, size_out))
             layers.append(nn.ReLU())
@@ -52,17 +52,21 @@ class Permute(nn.Module):
 
 
 class SimpleCNN(nn.Module):
-    def __init__(self, grid_size, n_channels1=6, n_channels2=16):
+    def __init__(self, grid_size, conf):
         super().__init__()
-        conv_layers = [
-            (Permute(0, 3, 1, 2), lambda x: x),  # channels first
-            (nn.Conv2d(3, n_channels1, 3), lambda x: x - 2),
-            (nn.MaxPool2d(2, 2), lambda x: x // 2),
-            (nn.Conv2d(n_channels1, n_channels2, 3), lambda x: x - 2)
-        ]
-        self.conv_net = nn.Sequential(*[x[0] for x in conv_layers])
-        cnn_output_size = compose(*[x[1] for x in conv_layers])(grid_size)
-        self.output_size = n_channels2 * cnn_output_size ** 2
+        conv_layers = [Permute(0, 3, 1, 2)]
+        cnn_output_size = grid_size
+        cur_channels = 3
+        for n_channels, kernel_size, max_pool in zip(conf['n_channels'], conf['kernel_sizes'], conf['max_pools']):
+            conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size))
+            cnn_output_size -= kernel_size - 1
+            cur_channels = n_channels
+            if max_pool > 1:
+                conv_layers.append(nn.MaxPool2d(max_pool, max_pool))
+                cnn_output_size //= cnn_output_size
+
+        self.conv_net = nn.Sequential(*conv_layers)
+        self.output_size = cur_channels * cnn_output_size ** 2
 
     def forward(self, x):
         return self.conv_net(x).reshape(x.shape[0], -1)
@@ -93,14 +97,14 @@ class ResNet(nn.Module):
 
 
 def get_encoders(config):
-    grid_size = config['env.grid_size']
+    grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
 
     # master
     if config['master.state_encoder_type'] == 'simple_mlp':
         state_size = 3 * (grid_size - 2) ** 2
-        goal_state_encoder = Flattener(MLP(state_size))
+        goal_state_encoder = Flattener(MLP(state_size, config['master']))
     elif config['master.state_encoder_type'] == 'simple_cnn':
-        goal_state_encoder = SimpleCNN(grid_size=grid_size)
+        goal_state_encoder = SimpleCNN(grid_size, config['master'])
     elif config['master.state_encoder_type'] == 'resnet':
         goal_state_encoder = ResNet(config['master'])
     else:
@@ -109,9 +113,9 @@ def get_encoders(config):
     # worker
     if config['worker.state_encoder_type'] == 'simple_mlp':
         state_size = 3 * (grid_size - 2) ** 2
-        state_encoder = Flattener(MLP(state_size))
+        state_encoder = Flattener(MLP(state_size, config['worker']))
     elif config['worker.state_encoder_type'] == 'simple_cnn':
-        state_encoder = SimpleCNN(grid_size=grid_size)
+        state_encoder = SimpleCNN(grid_size, config['worker'])
     elif config['worker.state_encoder_type'] == 'resnet':
         state_encoder = ResNet(config['worker'])
     else:

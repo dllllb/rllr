@@ -3,7 +3,6 @@ import logging
 import numpy as np
 
 from gym.wrappers import Monitor
-from gym_minigrid.minigrid import OBJECT_TO_IDX, COLORS
 from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper
 
 logger = logging.getLogger(__name__)
@@ -31,10 +30,16 @@ class ImgObsWrapper(gym.Wrapper):
 class RandomPosAndGoalWrapper(gym.Wrapper):
     def __init__(self, env, reward_function, conf, verbose=False):
         self.goal_state = None
+        self.goal_pos = None
         self.grid_size = env.unwrapped.grid.encode().shape[0]
-        self.reward_function = reward_function
-        self.rgb_image = conf.get('rgb_image', False)
+        if conf.get('rgb_image', False):
+            self.rgb_image = True
+            self.tile_size = conf['tile_size']
+        else:
+            self.rgb_image = False
         self.verbose = verbose
+        self.reward_function = reward_function
+        self.pos_reward = True  # TODO
         super().__init__(env)
 
     def reset(self):
@@ -42,6 +47,7 @@ class RandomPosAndGoalWrapper(gym.Wrapper):
         goal_pos = np.random.randint(1, self.grid_size - 2, 2)
         self.env.unwrapped.agent_pos = goal_pos
         self.goal_state = self.env.observation(self.env.unwrapped.gen_obs())
+        self.goal_pos = goal_pos
 
         # Set initial state
         self.env.reset()
@@ -58,29 +64,23 @@ class RandomPosAndGoalWrapper(gym.Wrapper):
         return self.env.observation(self.env.unwrapped.gen_obs())
 
     def step(self, action):
+        cur_pos = self.env.unwrapped.agent_pos
         state = self.env.observation(self.env.unwrapped.gen_obs())
-        next_state, reward, done, info = self.env.step(action)
-        cur_pos, next_pos, goal_pos = self.agent_pos_coords(state), self.agent_pos_coords(next_state), self.agent_pos_coords(self.goal_state)
 
-        reward = self.reward_function(cur_pos, next_pos, goal_pos)
+        next_state, _, done, info = self.env.step(action)
+        next_pos = self.env.unwrapped.agent_pos
 
-        if (next_pos == goal_pos).all() or (self.step_count >= self.max_steps):
+        if self.pos_reward:
+            reward = self.reward_function(cur_pos, next_pos, self.goal_pos)
+        else:
+            reward = self.reward_function(state, next_state, self.goal_state)
+
+        if (next_pos == self.goal_pos).all() or (self.step_count >= self.max_steps):
             done = True
         else:
             done = False
 
         return next_state, reward, done, info
-
-    def agent_pos_coords(self, state):
-        if not self.rgb_image:
-            obj_pos = (state[:, :, 0].T == OBJECT_TO_IDX['agent']).nonzero()
-            return np.array(next(zip(*obj_pos)))
-        else:
-            # TODO: agent != red colour
-            color = COLORS['red']  # agent = red colour
-
-            obj_pos = (state == color).all(axis=2).nonzero()
-            return np.array(next(zip(*obj_pos))) // 8
 
 
 def gen_wrapped_env(conf, reward_function, verbose=False):
@@ -94,7 +94,7 @@ def gen_wrapped_env(conf, reward_function, verbose=False):
     if not conf.get('rgb_image', False):
         env = ImgObsWrapper(FullyObsWrapper(env))  # Fully observable gridworld using a compact grid encoding
     else:
-        env = ImgObsWrapper(RGBImgObsWrapper(env))  # Fully observed RGB image
+        env = ImgObsWrapper(RGBImgObsWrapper(env, tile_size=conf['tile_size']))  # Fully observed RGB image
 
     env = RandomPosAndGoalWrapper(env, reward_function, conf, verbose=verbose)
 

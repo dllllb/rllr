@@ -4,23 +4,20 @@
     env_task: MiniGrid-Empty,
     grid_size: 8,
     action_size: 3,
-    rgb_image: true,
     video_path: outputs/video/
   },
 
   worker: {
-    state_encoder_type: resnet,
-    layers_amount: 18,
-    pretrained: false,
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [64, 64],
     head: {
         hidden_size: 64
     }
   },
 
   master: {
-    state_encoder_type: resnet,
-    layers_amount: 18,
-    pretrained: false,
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [64, 64],
   }
 
   agent: {
@@ -39,7 +36,7 @@
 
   training: {
     reward: explicit_pos_reward
-    n_episodes: 1000,
+    n_episodes: 5000,
     verbose: 100
   },
 
@@ -47,6 +44,6 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_resnet.p,
+    path: outputs/models/dqn_simple_mlp.p,
   }
 }
