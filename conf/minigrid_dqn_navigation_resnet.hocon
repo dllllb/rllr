@@ -39,7 +39,11 @@
   },
 
   training: {
-    reward: explicit_pos_reward
+    reward: image_net_similarity,
+    reward_params: {
+        pretrained: True,
+        device: "cuda:0"
+    },
     n_episodes: 1000,
     verbose: 100
   },
