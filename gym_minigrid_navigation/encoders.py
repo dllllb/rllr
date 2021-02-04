@@ -34,14 +34,6 @@ class Flattener(nn.Module):
         return self.model(x)
 
 
-def compose(*fs):
-    """Functions composition"""
-    def _compose2(f, g):
-        return lambda *a, **kw: f(g(*a, **kw))
-
-    return reduce(_compose2, fs)
-
-
 class Permute(nn.Module):
     def __init__(self, *args):
         super().__init__()
@@ -63,7 +55,7 @@ class SimpleCNN(nn.Module):
             cur_channels = n_channels
             if max_pool > 1:
                 conv_layers.append(nn.MaxPool2d(max_pool, max_pool))
-                cnn_output_size //= cnn_output_size
+                cnn_output_size //= max_pool
 
         self.conv_net = nn.Sequential(*conv_layers)
         self.output_size = cur_channels * cnn_output_size ** 2
