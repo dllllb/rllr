@@ -1,95 +1,57 @@
-import gym
 import torch
-import numpy as np
 from torch import nn
-from torch.distributions import Categorical
 
 
-class MLPPolicy(nn.Module):
-    def __init__(self, env: gym.Env):
+class CatLayer(nn.Module):
+    def __init__(self, left_tail, right_tail):
         super().__init__()
-        state_space = env.observation_space.shape[0]
-        action_space = env.action_space.n
+        self.left_tail = left_tail
+        self.right_tail = right_tail
 
-        self.model = nn.Sequential(
-            nn.Linear(state_space, 128, bias=False),
-            nn.Dropout(p=0.6),
-            nn.ReLU(),
-            nn.Linear(128, action_space, bias=False),
-            nn.Softmax(dim=-1)
-        )
-
-    def forward(self, state):
-        state = torch.from_numpy(state).type(torch.FloatTensor)
-        ap = self.model(state)
-        return ap
+    def forward(self, x):
+        l, r = x
+        t = torch.cat(tensors=[self.left_tail(l), self.right_tail(r)], dim=1)
+        return t
 
 
-class MLPPolicyAV(nn.Module):
-    def __init__(self, env: gym.Env):
+class WorkerNetwork(nn.Module):
+    def __init__(self, state_encoder, emb_size, action_size, config):
         super().__init__()
-        state_space = env.observation_space.shape[0]
-        action_space = env.action_space.n
+        self.state_encoder = state_encoder
+        hidden_size = config['head.hidden_size']
+        fc_layers = [
+            nn.Linear(state_encoder.output_size + emb_size, hidden_size),
+            nn.ReLU(inplace=False),
+            nn.Linear(hidden_size, action_size)
+        ]
+        self.fc = nn.Sequential(*fc_layers)
+        self.output_size = action_size
 
-        self.basenet = nn.Sequential(
-            nn.Linear(state_space, 128, bias=False),
-            nn.Dropout(p=0.6),
-            nn.ReLU(),
-        )
-
-        self.action_head = nn.Sequential(
-            nn.Linear(128, action_space, bias=False),
-            nn.Softmax(dim=-1)
-        )
-
-        self.value_head = nn.Sequential(
-            nn.Linear(128, 1, bias=False),
-            nn.Softmax(dim=-1)
-        )
-
-    def forward(self, state):
-        state = torch.from_numpy(state).type(torch.FloatTensor)
-        state_embed = self.basenet(state)
-        ap = self.action_head(state_embed)
-        v = self.value_head(state_embed)
-        return ap, v
+    def forward(self, states, goal_states_emb):
+        states_emb = self.state_encoder(states)
+        x = torch.cat((goal_states_emb, states_emb), 1)
+        return self.fc(x)
 
 
-class ConvPolicy(nn.Module):
-    def __init__(self, env: gym.Env):
-        super().__init__()
+class MasterWorkerNetwork(nn.Module):
+    """
+    Master-Worker model
+    """
+    def __init__(self, master, worker):
+        super(MasterWorkerNetwork, self).__init__()
+        self.master = master
+        self.worker = worker
 
-        img_height, img_width, img_channels = env.observation_space.shape
+    def forward(self, states, goal_states):
+        goal_states_emb = self.master(goal_states)
+        return self.worker(states, goal_states_emb)
 
-        self.conv = nn.Sequential(
-            nn.Conv2d(img_channels, 32, kernel_size=8, stride=4),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=2, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(64, 1, kernel_size=1, stride=1),
-            nn.ReLU()
-        )
 
-        o = self.conv(torch.zeros(1, img_channels, img_height, img_width))
-        conv_out_size = int(np.prod(o.size()))
-
-        self.fc = nn.Sequential(
-            nn.Linear(conv_out_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, env.action_space.n),
-            nn.Softmax(dim=-1)
-        )
-
-    def forward(self, state):
-        state = torch.from_numpy(state).float() / 256
-        if len(state.shape) == 3:
-            state = state.view(1, *state.shape)
-            state = state.permute(0, 3, 1, 2)
-        elif len(state.shape) == 2:
-            state = state.view(1, 1, *state.shape)
-
-        conv_out = self.conv(state).view(state.size(0), -1)
-        ap = self.fc(conv_out)
-        return ap
+def get_master_worker_net(state_encoder, goal_state_encoder, action_size, config):
+    worker = WorkerNetwork(
+        state_encoder=state_encoder,
+        emb_size=goal_state_encoder.output_size,
+        action_size=action_size,
+        config=config['worker']
+    )
+    return MasterWorkerNetwork(master=goal_state_encoder, worker=worker)
