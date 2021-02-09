@@ -39,7 +39,7 @@ class RandomPosAndGoalWrapper(gym.Wrapper):
             self.rgb_image = False
         self.verbose = verbose
         self.reward_function = reward_function
-        self.pos_reward = False  # TODO
+        self.pos_reward = hasattr(reward_function, 'is_pos_reward') and reward_function.is_pos_reward
         super().__init__(env)
 
     def reset(self):

@@ -4,16 +4,16 @@
     env_task: MiniGrid-Empty,
     grid_size: 8,
     action_size: 3,
-    rgb_image: f,
-    tile_size: 8,
+    rgb_image: true,
+    tile_size: 4,
     video_path: outputs/video/
   },
 
   worker: {
     state_encoder_type: simple_cnn,
     n_channels: [6, 16],
-    kernel_sizes: [8, 3],
-    max_pools: [8, 1],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
     head: {
         hidden_size: 64
     }
@@ -22,8 +22,8 @@
   master: {
     state_encoder_type: simple_cnn,
     n_channels: [6, 16],
-    kernel_sizes: [8, 3],
-    max_pools: [8, 1],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
   }
 
   agent: {
@@ -41,8 +41,8 @@
   },
 
   training: {
-    reward: explicit_pos_reward
-    n_episodes: 1000,
+    reward: sparse_state_reward,
+    n_episodes: 3000,
     verbose: 100
   },
 
@@ -50,6 +50,6 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_rgb_simple_cnn.p,
+    path: outputs/models/dqn_rgb_rgb_cnn.p,
   }
 }
