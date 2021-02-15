@@ -41,7 +41,16 @@
   },
 
   training: {
-    reward: sparse_state_reward,
+    reward: expected_steps_amount,
+    reward_params: {
+        device: "cuda:0",
+        head: {
+            hidden_size: 64
+        }
+        batch_size: 100,
+        buffer_size: 10,
+        learning_rate: 0.01,
+    }
     n_episodes: 3000,
     verbose: 100
   },

@@ -8,10 +8,10 @@
   },
 
   worker: {
-    state_encoder_type: simple_cnn,
     n_channels: [6, 16],
     kernel_sizes: [3, 3],
     max_pools: [2, 1],
+    state_encoder_type: simple_cnn,
     head: {
         hidden_size: 64
     }
@@ -27,9 +27,9 @@
   agent: {
     algorithm: DQN,
     device: "cuda:0",
-    batch_size: 128,
+    batch_size: 100,
     update_step: 4,
-    buffer_size: 100000,
+    buffer_size: 1000,
     learning_rate: 0.001,
     gamma: 0.9,
     eps_start: 1,
@@ -42,12 +42,18 @@
     reward: expected_steps_amount,
     reward_params: {
         device: "cuda:0",
-        head: {
-            hidden_size: 64
+        model: {
+            n_channels: [6, 16],
+            kernel_sizes: [3, 3],
+            max_pools: [2, 1],
+            head: {
+                hidden_size: 64
+            }
         }
-        batch_size: 64,
-        buffer_size: 1000,
-        learning_rate: 0.001,
+        batch_size: 100,
+        epochs: 10,
+        buffer_size: 500,
+        learning_rate: 0.005
     }
     n_episodes: 3000,
     verbose: 100
@@ -57,6 +63,6 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_simple_cnn.p,
+    path: outputs/models/dqn_draft.p,
   }
 }
