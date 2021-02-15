@@ -7,10 +7,10 @@ class ExplicitPosReward:
         self.is_pos_reward = True
 
     def __call__(self, cur_pos, next_pos, goal_pos):
-        dist1 = np.linalg.norm(cur_pos - goal_pos)
-        dist2 = np.linalg.norm(next_pos - goal_pos)
+        cur_dist = np.linalg.norm(cur_pos - goal_pos)
+        next_dist = np.linalg.norm(next_pos - goal_pos)
 
-        reward = (dist1 - dist2)
+        reward = cur_dist - next_dist
         reward = 1 - np.sqrt(2) if reward == 0 else reward
         return reward
 
@@ -41,15 +41,15 @@ class ExplicitStepsAmount:
 
     def __call__(self, cur_pos, next_pos, goal_pos):
         with torch.no_grad():
-            dist1 = np.abs(cur_pos - goal_pos).sum()
-            dist2 = np.abs(next_pos - goal_pos).sum()
+            cur_dist = np.abs(cur_pos - goal_pos).sum()
+            next_dist = np.abs(next_pos - goal_pos).sum()
 
-        reward = dist1 - dist2
+        reward = cur_dist - next_dist
         reward = -0.1 if reward == 0 else reward
         return reward
 
 
-class ExpectedStepsAmount:
+class ExpectedStepsAmountReward:
     def __init__(self, model):
         self.model = model
         self.device = self.model.device
@@ -61,14 +61,14 @@ class ExpectedStepsAmount:
     def __call__(self, state, next_state, goal_state):
         self.model.eval()
         with torch.no_grad():
-            dist1 = self.model(self._to_torch(state), self._to_torch(goal_state)).cpu().item()
-            dist2 = self.model(self._to_torch(next_state), self._to_torch(goal_state)).cpu().item()
+            cur_dist = self.model(self._to_torch(state), self._to_torch(goal_state))
+            next_dist = self.model(self._to_torch(next_state), self._to_torch(goal_state))
 
-        reward = dist1 - dist2
-        return reward
+        reward = cur_dist - next_dist
+        return reward.cpu().item()
 
 
-def get_reward_function(conf, model=None):
+def get_reward_function(conf):
     if conf['training.reward'] == 'explicit_pos_reward':
         return ExplicitPosReward()
     elif conf['training.reward'] == 'explicit_steps_amount':
@@ -77,7 +77,6 @@ def get_reward_function(conf, model=None):
         return SparsePosReward()
     elif conf['training.reward'] == 'sparse_state_reward':
         return SparseStateReward()
-    elif conf['training.reward'] == 'expected_steps_amount':
-        return ExpectedStepsAmount(model)
+
     else:
         raise AttributeError(f"unknown reward type '{conf['training.reward']}'")

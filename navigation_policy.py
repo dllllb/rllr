@@ -3,11 +3,12 @@ import os
 
 from functools import partial
 
+from expected_steps import ExpectedStepsAmountLeaner
 from gym_minigrid_navigation import environments as minigrid_envs
 from gym_minigrid_navigation import encoders as minigrid_encoders
 from dqn import get_dqn_agent
 from models import get_master_worker_net
-from rewards import get_reward_function
+from rewards import get_reward_function, ExpectedStepsAmountReward
 from utils import get_conf, init_logger, switch_reproducibility_on
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ def run_episodes(env, agent, n_episodes=1_000, verbose=False):
         if verbose and episode % int(verbose) == 0:
             avg_score = score_sum / int(verbose)
             avg_steps = step_sum / int(verbose)
-            logger.info("Episode: {}. Average score: {}. Average steps: {}".format(episode, avg_score, avg_steps))
+            logger.info(f"Episode: {episode}. Average score: {avg_score:.2f}. Average steps: {avg_steps:.2f}")
             score_sum, step_sum = 0, 0
 
     return scores, steps
@@ -94,10 +95,22 @@ def main(args=None):
     config = get_conf(args)
     switch_reproducibility_on(config['seed'])
 
-    reward_function = get_reward_function(config)
-    env = gen_env(config['env'], reward_function)
     agent = get_agent(config)
 
+    if config['training.reward'] != 'expected_steps_amount':
+        reward_function = get_reward_function(config)
+
+    else:
+        # steps amount model trainings
+        expected_steps_learner = ExpectedStepsAmountLeaner(config['expected_steps_params'])
+        env = gen_env(config['env'], reward_function=lambda *args: 0)
+
+        expected_steps_learner.collect_episodes(env, agent)
+        expected_steps_learner.learn(verbose=True)
+
+        reward_function = ExpectedStepsAmountReward(expected_steps_learner.model)
+
+    env = gen_env(config['env'], reward_function)
     run_episodes(env, agent, n_episodes=config['training.n_episodes'], verbose=config['training.verbose'])
 
     if config.get('outputs', False):

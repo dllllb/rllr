@@ -67,6 +67,6 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_draft.p,
+    path: outputs/models/dqn_expected_steps.p,
   }
 }

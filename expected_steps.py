@@ -11,33 +11,9 @@ from models import ExpectedStepsAmountRegressor
 logger = logging.getLogger(__name__)
 
 
-def _collect_episode(env, agent, explore=True):
-    """
-    A helper function for collect single episode
-    """
-    buffer = []
-    state = env.reset()
-    agent.explore = explore
-
-    buffer.append(deepcopy(state))
-
-    steps, done = 0, 0
-    while not done:
-        steps += 1
-        action = agent.act(state, env.goal_state)
-        state, _, done, _ = env.step(action)
-        buffer.append(deepcopy(state))
-
-    agent.reset_episode()
-    env.close()
-
-    buffer = [(x, state, steps - i) for i, x in enumerate(buffer)]
-    return buffer
-
-
-class ExpectedStepsAmountLearner:
-    def __init__(self, grid_size, conf):
-        self.model = ExpectedStepsAmountRegressor(grid_size, conf['model'])
+class ExpectedStepsAmountLeaner:
+    def __init__(self, conf):
+        self.model = ExpectedStepsAmountRegressor(conf['model'])
         self.device = torch.device(conf['device'])
         self.model.to(self.device)
         self.model.device = self.device
@@ -45,10 +21,37 @@ class ExpectedStepsAmountLearner:
         self.buffer_size = conf['buffer_size']
         self.buffer = []
         self.epochs = conf['epochs']
+        self.verbose = conf['verbose']
+        self.max_steps = conf['max_steps']
+        # self.model.fc[-1].bias.data.fill_(conf['max_steps'] / 2.)
+
+    def _collect_episode(self, env, agent, explore=True):
+        """
+        A helper function for collect single episode
+        """
+        buffer = []
+        state = env.reset()
+        agent.explore = explore
+
+        buffer.append(deepcopy(state))
+
+        steps, done = 0, 0
+        while not done and steps <= self.max_steps:
+            steps += 1
+            action = agent.act(state, env.goal_state)
+            state, _, done, _ = env.step(action)
+            buffer.append(deepcopy(state))
+
+        env.close()
+
+        buffer = [(x, state, steps - i) for i, x in enumerate(buffer)]
+        return buffer
 
     def collect_episodes(self, env, agent):
-        for _ in range(self.buffer_size):
-            self.buffer.extend(_collect_episode(env, agent))
+        for i in range(self.buffer_size):
+            if self.verbose and not i % self.verbose:
+                logger.info(f"Collecting episodes:  {i}")
+            self.buffer.extend(self._collect_episode(env, agent))
 
     def learn(self, verbose=False):
         def _vstack(arr):

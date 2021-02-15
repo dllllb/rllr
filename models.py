@@ -39,9 +39,9 @@ class ExpectedStepsAmountRegressor(nn.Module):
     """
     Expected Steps Amount Regressor
     """
-    def __init__(self, grid_size, conf):
+    def __init__(self, conf):
         super().__init__()
-        cnn_output_size = grid_size
+        cnn_output_size = conf['input_grid_size']
         cur_channels = 6
         conv_layers = []
         for n_channels, kernel_size, max_pool in zip(conf['n_channels'], conf['kernel_sizes'], conf['max_pools']):
