@@ -4,24 +4,26 @@
     env_task: MiniGrid-Empty,
     grid_size: 8,
     action_size: 3,
+    rgb_image: true,
+    tile_size: 4,
     video_path: outputs/video/
   },
 
   worker: {
-    n_channels: [6, 16],
-    kernel_sizes: [3, 3],
-    max_pools: [2, 1],
     state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
     head: {
         hidden_size: 64
     }
   },
 
   master: {
-    n_channels: [6, 16],
-    kernel_sizes: [3, 3],
-    max_pools: [2, 1],
     state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
   }
 
   agent: {
@@ -34,39 +36,20 @@
     gamma: 0.9,
     eps_start: 1,
     eps_end: 0.1,
-    eps_decay: 0.999,
+    eps_decay: 0.995,
     tau: 0.001
   },
 
   training: {
-    reward: expected_steps_amount,
+    reward: explicit_pos_reward,
     n_episodes: 3000,
     verbose: 100
   },
-
-  expected_steps_params: {
-    device: "cuda:0",
-    model: {
-      input_grid_size: 8,
-      n_channels: [6, 16],
-      kernel_sizes: [3, 3],
-      max_pools: [2, 1],
-      head: {
-        hidden_size: 64
-      }
-    }
-    batch_size: 100,
-    epochs: 10,
-    buffer_size: 8000,
-    learning_rate: 0.005,
-    verbose: 1000,
-    max_steps: 40,
-  }
 
   seed: 42,
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_draft.p,
+    path: outputs/models/dqn_rgb_rgb_cnn.p,
   }
 }
