@@ -50,10 +50,11 @@ class ExplicitStepsAmount:
 
 
 class ExpectedStepsAmountReward:
-    def __init__(self, model):
+    def __init__(self, model, max_value=None):
         self.model = model
         self.device = self.model.device
         self.is_pos_reward = False
+        self.max_value = max_value
 
     def _to_torch(self, x):
         return torch.from_numpy(x).float().unsqueeze(0).to(self.device)
@@ -63,6 +64,10 @@ class ExpectedStepsAmountReward:
         with torch.no_grad():
             cur_dist = self.model(self._to_torch(state), self._to_torch(goal_state))
             next_dist = self.model(self._to_torch(next_state), self._to_torch(goal_state))
+
+        if self.max_value is not None:
+            cur_dist = torch.clamp(cur_dist, max=self.max_value)
+            next_dist = torch.clamp(next_dist, max=self.max_value)
 
         reward = cur_dist - next_dist
         return reward.cpu().item()
