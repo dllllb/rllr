@@ -36,7 +36,7 @@
 
   training: {
     reward: explicit_pos_reward
-    n_episodes: 5000,
+    n_episodes: 3000,
     verbose: 100
   },
 

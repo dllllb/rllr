@@ -29,7 +29,8 @@ class DQNAgentGoal:
 
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=config['learning_rate'])
         self.action_size = action_size
-        self.buffer = deque(maxlen=config['buffer_size'])
+        self.buffer_size = config['buffer_size']
+        self.buffer = deque(maxlen=self.buffer_size)
         self.step = 0
         self.eps = config['eps_start']
         self.explore = True
@@ -100,14 +101,13 @@ class DQNAgentGoal:
         """
         self.step += 1
 
-        self.qnetwork_local.eval()
-        with torch.no_grad():
-            action_values = self.qnetwork_local(self._vstack([state]), self._vstack([goal_state]))
-        self.qnetwork_local.train()
-
         if self.explore and random.random() < self.eps:
             return random.choice(np.arange(self.action_size))
         else:
+            self.qnetwork_local.eval()
+            with torch.no_grad():
+                action_values = self.qnetwork_local(self._vstack([state]), self._vstack([goal_state]))
+            self.qnetwork_local.train()
             return np.argmax(action_values.cpu().data.numpy())
 
     def sample_batch(self):
@@ -120,6 +120,9 @@ class DQNAgentGoal:
 
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         return states, next_states, goal_states, actions, rewards, dones
+
+    def reset_buffer(self):
+        self.buffer = deque(maxlen=self.buffer_size)
 
     def save_model(self, file):
         torch.save(self.qnetwork_target, file)

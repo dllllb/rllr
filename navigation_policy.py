@@ -3,11 +3,12 @@ import os
 
 from functools import partial
 
+from expected_steps import ExpectedStepsAmountLeaner
 from gym_minigrid_navigation import environments as minigrid_envs
 from gym_minigrid_navigation import encoders as minigrid_encoders
 from dqn import get_dqn_agent
 from models import get_master_worker_net
-from rewards import get_reward_function
+from rewards import get_reward_function, ExpectedStepsAmountReward
 from utils import get_conf, init_logger, switch_reproducibility_on
 
 logger = logging.getLogger(__name__)
@@ -19,8 +20,7 @@ def run_episode(env, agent, train_mode=True):
     """
 
     state = env.reset()
-    if not train_mode:
-        agent.explore = False
+    agent.explore = train_mode
 
     score, steps, done = 0, 0, False
     while not done:
@@ -53,15 +53,15 @@ def run_episodes(env, agent, n_episodes=1_000, verbose=False):
         if verbose and episode % int(verbose) == 0:
             avg_score = score_sum / int(verbose)
             avg_steps = step_sum / int(verbose)
-            logger.info("Episode: {}. Average score: {}. Average steps: {}".format(episode, avg_score, avg_steps))
+            logger.info(f"Episode: {episode}. Average score: {avg_score:.2f}. Average steps: {avg_steps:.2f}")
             score_sum, step_sum = 0, 0
 
     return scores, steps
 
 
-def gen_env(conf, reward_functions, verbose=False):
+def gen_env(conf, reward_function, verbose=False):
     if conf['env_type'] == 'gym_minigrid':
-        env = minigrid_envs.gen_wrapped_env(conf, reward_functions, verbose=verbose)
+        env = minigrid_envs.gen_wrapped_env(conf, reward_function, verbose=verbose)
         return env
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
@@ -75,17 +75,17 @@ def get_encoders(conf):
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
 
-def get_agent(env, conf):
+def get_agent(conf):
     if conf['agent.algorithm'] == 'DQN':
         state_encoder, goal_state_encoder = get_encoders(conf)
         get_net_function = partial(
             get_master_worker_net,
             state_encoder=state_encoder,
             goal_state_encoder=goal_state_encoder,
-            action_size=env.action_size,
+            action_size=conf['env.action_size'],
             config=conf
         )
-        agent = get_dqn_agent(conf['agent'], get_net_function, env.action_size)
+        agent = get_dqn_agent(conf['agent'], get_net_function, conf['env.action_size'])
         return agent
     else:
         raise AttributeError(f"unknown algorithm '{conf['agent.algorithm']}'")
@@ -95,15 +95,27 @@ def main(args=None):
     config = get_conf(args)
     switch_reproducibility_on(config['seed'])
 
-    reward_functions = get_reward_function(config)
-    env = gen_env(config['env'], reward_functions)
-    agent = get_agent(env, config)
+    agent = get_agent(config)
 
+    if config['training.reward'] != 'expected_steps_amount':
+        reward_function = get_reward_function(config)
+
+    else:
+        # steps amount model trainings
+        expected_steps_learner = ExpectedStepsAmountLeaner(config['expected_steps_params'])
+        env = gen_env(config['env'], reward_function=lambda *args: 0)
+
+        expected_steps_learner.collect_episodes(env, agent)
+        expected_steps_learner.learn(verbose=True)
+
+        reward_function = ExpectedStepsAmountReward(expected_steps_learner.model)
+
+    env = gen_env(config['env'], reward_function)
     run_episodes(env, agent, n_episodes=config['training.n_episodes'], verbose=config['training.verbose'])
 
     if config.get('outputs', False):
         if config['outputs.save_example']:
-            env = gen_env(config['env'], reward_functions, verbose=True)
+            env = gen_env(config['env'], reward_function, verbose=True)
             logger.info(f"test episode: {run_episode(env, agent, train_mode=False)}")
             logger.info(f"episode's video saved")
 
@@ -119,5 +131,6 @@ def main(args=None):
 if __name__ == '__main__':
     init_logger(__name__)
     init_logger('dqn')
+    init_logger('expected_steps')
     init_logger('gym_minigrid_navigation.environments')
     main()

@@ -27,41 +27,65 @@ class ImgObsWrapper(gym.Wrapper):
         return next_state['image'], reward, done, info
 
 
-class RandomPosAndGoalWrapper(gym.Wrapper):
-    def __init__(self, env, reward_function, conf, verbose=False):
-        self.goal_state = None
+class NavigationGoalWrapper(gym.Wrapper):
+    def __init__(self, env):
         self.goal_pos = None
+        self.goal_state = None
+        super().__init__(env)
+
+    def observation(self, observation):
+        return self.env.observation(observation)
+
+    def step(self, action):
+        next_state, _, _, info = self.env.step(action)
+        next_pos = self.env.unwrapped.agent_pos
+
+        done = (next_pos == self.goal_pos).all() or (self.step_count >= self.max_steps)
+
+        return next_state, 0, done, info
+
+
+class RandomPosAndGoalWrapper(NavigationGoalWrapper):
+    def __init__(self, env, verbose=False):
         self.grid_size = env.unwrapped.grid.encode().shape[0]
-        if conf.get('rgb_image', False):
-            self.rgb_image = True
-            self.tile_size = conf['tile_size']
-        else:
-            self.rgb_image = False
         self.verbose = verbose
-        self.reward_function = reward_function
-        self.pos_reward = True  # TODO
         super().__init__(env)
 
     def reset(self):
-        # Generate goal state
-        goal_pos = np.random.randint(1, self.grid_size - 2, 2)
-        self.env.unwrapped.agent_pos = goal_pos
+        # Generate random goal state
+        self.goal_pos = np.random.randint(1, self.grid_size - 2, 2)
+        self.env.unwrapped.agent_pos = self.goal_pos
         self.goal_state = self.env.observation(self.env.unwrapped.gen_obs())
-        self.goal_pos = goal_pos
 
-        # Set initial state
+        # Set random initial state
         self.env.reset()
         init_pos = None
-        while init_pos is None or (init_pos == goal_pos).all():
+        while init_pos is None or (init_pos == self.goal_pos).all():
             init_pos = np.random.randint(1, self.grid_size - 2, 2)
-
         self.env.unwrapped.agent_pos = init_pos
 
         if self.verbose:
-            logger.info(f"From {init_pos} to {goal_pos}")
+            logger.info(f"From {init_pos} to {self.goal_pos}")
 
         # Return initial state
         return self.env.observation(self.env.unwrapped.gen_obs())
+
+
+class FromBufferGoalWrapper(NavigationGoalWrapper):
+    def __init__(self, env, verbose=False):
+        self.grid_size = env.unwrapped.grid.encode().shape[0]
+        self.verbose = verbose
+        super().__init__(env)
+
+    def reset(self):
+        pass  # TOBD
+
+
+class SetRewardWrapper(gym.Wrapper):
+    def __init__(self, env, reward_function):
+        self.reward_function = reward_function
+        self.pos_reward = hasattr(reward_function, 'is_pos_reward') and reward_function.is_pos_reward
+        super().__init__(env)
 
     def step(self, action):
         cur_pos = self.env.unwrapped.agent_pos
@@ -74,11 +98,6 @@ class RandomPosAndGoalWrapper(gym.Wrapper):
             reward = self.reward_function(cur_pos, next_pos, self.goal_pos)
         else:
             reward = self.reward_function(state, next_state, self.goal_state)
-
-        if (next_pos == self.goal_pos).all() or (self.step_count >= self.max_steps):
-            done = True
-        else:
-            done = False
 
         return next_state, reward, done, info
 
@@ -96,7 +115,15 @@ def gen_wrapped_env(conf, reward_function, verbose=False):
     else:
         env = ImgObsWrapper(RGBImgObsWrapper(env, tile_size=conf['tile_size']))  # Fully observed RGB image
 
-    env = RandomPosAndGoalWrapper(env, reward_function, conf, verbose=verbose)
+    goal_type = conf.get('goal_type', 'random')
+    if goal_type == 'random':
+        env = RandomPosAndGoalWrapper(env, verbose=verbose)  # env with random goal and init states
+    elif goal_type == 'buffer':
+        env = FromBufferGoalWrapper(env, verbose=verbose)  # env with goal and init states from buffer
+    else:
+        raise AttributeError(f"unknown goal_type '{conf['goal_type']}'")
+
+    env = SetRewardWrapper(env, reward_function)  # set reward function
 
     env = FullyRenderWrapper(env)  # removes the default visualization of the partially observable field of view.
     if conf.get('video_path', False):

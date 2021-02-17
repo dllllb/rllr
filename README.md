@@ -46,8 +46,5 @@ python -m ipykernel install --user --name rllr --display-name "Python 3.7 (rllr)
 python navigation_policy.py --conf conf/minigrid_dqn_navigation_mlp.hocon
 
 # simple cnn
-python navigation_policy.py --conf conf/minigrid_dqn_navigation_cnn.hocon
-
-# resnet on RGB picture
-python navigation_policy.py --conf conf/minigrid_dqn_navigation_resnet.hocon
+python navigation_policy.py --conf conf/minigrid_dqn_expected_steps.hocon
 ```
