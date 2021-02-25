@@ -31,7 +31,7 @@
     device: "cuda:0",
     batch_size: 128,
     update_step: 4,
-    buffer_size: 100000,
+    buffer_size: 10000,
     learning_rate: 0.001,
     gamma: 0.9,
     eps_start: 1,
@@ -58,17 +58,17 @@
       }
     }
     batch_size: 100,
-    epochs: 10,
-    buffer_size: 8000,
+    buffer_size: 10000,
+    warm_up: 8000,
+    warm_up_max_steps: 40,
     learning_rate: 0.005,
-    verbose: 1000,
-    max_steps: 40,
+    epochs: 4
   }
 
   seed: 42,
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_expected_steps.p,
+    path: outputs/models/dqn_draft.p,
   }
 }

@@ -6,7 +6,7 @@ class FastTensorDataLoader:
     A DataLoader-like object for a set of tensors that can be much faster than
     TensorDataset + DataLoader because dataloader grabs individual indices of
     the dataset and calls cat (slow).
-    Based on source: https://discuss.pytorch.org/t/dataloader-much-slower-than-manual-batching/27014/6
+    Source: https://discuss.pytorch.org/t/dataloader-much-slower-than-manual-batching/27014/6
     """
     def __init__(self, *tensors, batch_size=32, shuffle=False, post_process_func=None):
         """

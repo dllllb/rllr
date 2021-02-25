@@ -2,6 +2,8 @@ import gym
 import logging
 import numpy as np
 
+from collections import deque
+
 from gym.wrappers import Monitor
 from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper
 
@@ -15,32 +17,33 @@ class FullyRenderWrapper(gym.Wrapper):
         return self.unwrapped.render(*args, **kwargs)
 
 
-class ImgObsWrapper(gym.Wrapper):
+class PosObsWrapper(gym.Wrapper):
     """
-    Use the image as the only observation output, no language/mission.
+    Add agent pos to state dict
     """
     def observation(self, obs):
-        return self.env.observation(obs)['image']
+        obs = self.env.observation(obs)
+        obs['position'] = self.agent_pos
+        return obs
 
     def step(self, action):
         next_state, reward, done, info = self.env.step(action)
-        return next_state['image'], reward, done, info
+        next_state['position'] = self.unwrapped.agent_pos
+        return next_state, reward, done, info
 
 
 class NavigationGoalWrapper(gym.Wrapper):
     def __init__(self, env):
-        self.goal_pos = None
         self.goal_state = None
         super().__init__(env)
 
-    def observation(self, observation):
-        return self.env.observation(observation)
+    def _goal_achieved(self, state):
+        # TODO: it is unfair. we do not have position in general case
+        return (state['position'] == self.goal_state['position']).all()
 
     def step(self, action):
         next_state, _, _, info = self.env.step(action)
-        next_pos = self.env.unwrapped.agent_pos
-
-        done = (next_pos == self.goal_pos).all() or (self.step_count >= self.max_steps)
+        done = self.goal_state(next_state) or (self.step_count >= self.max_steps)
 
         return next_state, 0, done, info
 
@@ -53,32 +56,45 @@ class RandomPosAndGoalWrapper(NavigationGoalWrapper):
 
     def reset(self):
         # Generate random goal state
-        self.goal_pos = np.random.randint(1, self.grid_size - 2, 2)
-        self.env.unwrapped.agent_pos = self.goal_pos
-        self.goal_state = self.env.observation(self.env.unwrapped.gen_obs())
+        goal_pos = np.random.randint(1, self.grid_size - 2, 2)
+        self.unwrapped.agent_pos = goal_pos
+        self.goal_state = self.env.observation(self.unwrapped.gen_obs())
 
         # Set random initial state
         self.env.reset()
         init_pos = None
-        while init_pos is None or (init_pos == self.goal_pos).all():
+        while init_pos is None or (init_pos == goal_pos).all():
             init_pos = np.random.randint(1, self.grid_size - 2, 2)
-        self.env.unwrapped.agent_pos = init_pos
+        self.unwrapped.agent_pos = init_pos
 
         if self.verbose:
-            logger.info(f"From {init_pos} to {self.goal_pos}")
+            logger.info(f"From {init_pos} to {goal_pos}")
 
         # Return initial state
-        return self.env.observation(self.env.unwrapped.gen_obs())
+        return self.env.observation(self.unwrapped.gen_obs())
 
 
-class FromBufferGoalWrapper(NavigationGoalWrapper):
-    def __init__(self, env, verbose=False):
-        self.grid_size = env.unwrapped.grid.encode().shape[0]
-        self.verbose = verbose
-        super().__init__(env)
+class FromBufferGoalWrapper(RandomPosAndGoalWrapper):
+    def __init__(self, env, conf, verbose=False):
+        self.buffer_size = conf['buffer_size']
+        self.buffer = deque(maxlen=self.buffer_size)
+        super().__init__(env, verbose)
 
-    def reset(self):
-        pass  # TOBD
+    def reset(self, is_random=True):
+        if is_random:
+            super().reset()
+        else:
+            self.env.reset()
+
+            init_state, goal_state = self.buffer.popleft()
+            self.goal_state = goal_state
+
+            self.unwrapped.agent_pos = init_state['position']
+
+            if self.verbose:
+                logger.info(f"From {init_state['position']} to {goal_state['position']}")
+
+            return self.env.observation(self.unwrapped.gen_obs())
 
 
 class SetRewardWrapper(gym.Wrapper):
@@ -88,16 +104,14 @@ class SetRewardWrapper(gym.Wrapper):
         super().__init__(env)
 
     def step(self, action):
-        cur_pos = self.env.unwrapped.agent_pos
-        state = self.env.observation(self.env.unwrapped.gen_obs())
+        state = self.env.observation(self.unwrapped.gen_obs())
 
         next_state, _, done, info = self.env.step(action)
-        next_pos = self.env.unwrapped.agent_pos
 
         if self.pos_reward:
-            reward = self.reward_function(cur_pos, next_pos, self.goal_pos)
+            reward = self.reward_function(state['position'], next_state['position'], self.goal_state['position'])
         else:
-            reward = self.reward_function(state, next_state, self.goal_state)
+            reward = self.reward_function(state['image'], next_state['image'], self.goal_state['image'])
 
         return next_state, reward, done, info
 
@@ -111,15 +125,17 @@ def gen_wrapped_env(conf, reward_function, verbose=False):
 
     env = gym.make(env_name)
     if not conf.get('rgb_image', False):
-        env = ImgObsWrapper(FullyObsWrapper(env))  # Fully observable gridworld using a compact grid encoding
+        env = FullyObsWrapper(env)  # Fully observable gridworld using a compact grid encoding
     else:
-        env = ImgObsWrapper(RGBImgObsWrapper(env, tile_size=conf['tile_size']))  # Fully observed RGB image
+        env = RGBImgObsWrapper(env, tile_size=conf['tile_size'])  # Fully observed RGB image
+
+    env = PosObsWrapper(env)
 
     goal_type = conf.get('goal_type', 'random')
     if goal_type == 'random':
         env = RandomPosAndGoalWrapper(env, verbose=verbose)  # env with random goal and init states
-    elif goal_type == 'buffer':
-        env = FromBufferGoalWrapper(env, verbose=verbose)  # env with goal and init states from buffer
+    elif goal_type == 'from_buffer':
+        env = FromBufferGoalWrapper(env, conf, verbose=verbose)  # env with goal and init states from buffer
     else:
         raise AttributeError(f"unknown goal_type '{conf['goal_type']}'")
 
