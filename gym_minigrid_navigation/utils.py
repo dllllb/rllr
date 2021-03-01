@@ -3,11 +3,10 @@ import glob
 import io
 from IPython.display import HTML
 from IPython import display
-import numpy as np
 
 
-def show_video():
-    mp4list = glob.glob('video/*.mp4')
+def show_video(path='./video/'):
+    mp4list = glob.glob(f'{path}*.mp4')
     if len(mp4list) > 0:
         mp4 = mp4list[0]
         video = io.open(mp4, 'r+b').read()

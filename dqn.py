@@ -1,26 +1,19 @@
+import logging
 import numpy as np
+import random
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from collections import deque
-import random
 
-BATCH_SIZE = 128  # 128
-UPDATE_STEP = 4  # 4
-BUFFER_SIZE = 100_000  # 100_000
-LEARNING_RATE = 1e-3  # 5e-3
-GAMMA = 0.9  # 0.9
-EPS_START = 1  # 1
-EPS_END = 0.1  # 0.1
-EPS_DECAY = 0.995  # 0.995
-TAU = 1e-3  # 1e-3
+from collections import deque
+
+logger = logging.getLogger(__name__)
 
 
 class DQNAgentGoal:
     """ An agent implementing Deep Q-Network algorithm"""
 
-    def __init__(self, qnetwork_local, qnetwork_target, action_size, cuda=True):
+    def __init__(self, qnetwork_local, qnetwork_target, action_size, config):
         """Initializes an Agent.
 
         Params:
@@ -29,23 +22,25 @@ class DQNAgentGoal:
             action_size (int): dimension of each action
             seed (int): random seed
         """
-        self.device = torch.device("cuda:0" if cuda else "cpu")
-        print("Running on device: {}".format(self.device))
+        self.device = torch.device(config['device'])
+        logger.info("Running on device: {}".format(self.device))
         self.qnetwork_local = qnetwork_local.to(self.device)
         self.qnetwork_target = qnetwork_target.to(self.device)
 
-        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LEARNING_RATE)
+        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=config['learning_rate'])
         self.action_size = action_size
-        self.buffer = deque(maxlen=BUFFER_SIZE)
+        self.buffer_size = config['buffer_size']
+        self.buffer = deque(maxlen=self.buffer_size)
         self.step = 0
-        self.eps = EPS_START
+        self.eps = config['eps_start']
         self.explore = True
+        self.config = config
 
     def reset_episode(self):
         """
         Resets episode and update epsilon decay
         """
-        self.eps = max(EPS_END, EPS_DECAY * self.eps)
+        self.eps = max(self.config['eps_end'], self.config['eps_decay'] * self.eps)
 
     def learn(self):
         """
@@ -56,7 +51,7 @@ class DQNAgentGoal:
         states, next_states, goal_states, actions, rewards, dones = self.sample_batch()
 
         values = self.qnetwork_target.forward(next_states, goal_states).detach()
-        targets = rewards + GAMMA * values.max(1)[0].view(dones.size()) * (1 - dones)
+        targets = rewards + self.config['gamma'] * values.max(1)[0].view(dones.size()) * (1 - dones)
         outputs = self.qnetwork_local.forward(states, goal_states).gather(1, actions.long())
         self.optimizer.zero_grad()
         loss = F.mse_loss(outputs, targets)
@@ -77,9 +72,9 @@ class DQNAgentGoal:
         """
         self.buffer.append((state, next_state, goal_state, action, reward, float(done)))
 
-        self.step = (self.step + 1) % UPDATE_STEP
+        self.step = (self.step + 1) % self.config['update_step']
         if self.step == 0:
-            if len(self.buffer) > BATCH_SIZE:
+            if len(self.buffer) > self.config['batch_size']:
                 self.learn()
                 self.reset_target_network()
 
@@ -89,7 +84,7 @@ class DQNAgentGoal:
         """
         params = zip(self.qnetwork_target.parameters(), self.qnetwork_local.parameters())
         for target_param, local_param in params:
-            updated_params = TAU * local_param.data + (1 - TAU) * target_param.data
+            updated_params = self.config['tau'] * local_param.data + (1 - self.config['tau']) * target_param.data
             target_param.data.copy_(updated_params)
 
     def _vstack(self, arr):
@@ -106,23 +101,42 @@ class DQNAgentGoal:
         """
         self.step += 1
 
-        self.qnetwork_local.eval()
-        with torch.no_grad():
-            action_values = self.qnetwork_local(self._vstack([state]), self._vstack([goal_state]))
-        self.qnetwork_local.train()
-
-        if (random.random() > self.eps) and self.explore:
-            return np.argmax(action_values.cpu().data.numpy())
-        else:
+        if self.explore and random.random() < self.eps:
             return random.choice(np.arange(self.action_size))
+        else:
+            self.qnetwork_local.eval()
+            with torch.no_grad():
+                action_values = self.qnetwork_local(self._vstack([state]), self._vstack([goal_state]))
+            self.qnetwork_local.train()
+            return np.argmax(action_values.cpu().data.numpy())
 
     def sample_batch(self):
         """
         Samples a batch of experience from replay buffer random uniformily
         """
-        batch = random.sample(self.buffer, k=BATCH_SIZE)
+        batch = random.sample(self.buffer, k=self.config['batch_size'])
 
         states, next_states, goal_states, actions, rewards, dones = map(self._vstack, zip(*batch))
 
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         return states, next_states, goal_states, actions, rewards, dones
+
+    def reset_buffer(self):
+        self.buffer = deque(maxlen=self.buffer_size)
+
+    def save_model(self, file):
+        torch.save(self.qnetwork_target, file)
+
+
+def get_dqn_agent(config, get_net_function, action_size):
+    qnetwork_local = get_net_function()
+    qnetwork_target = get_net_function()
+    qnetwork_target.load_state_dict(qnetwork_local.state_dict())
+
+    agent = DQNAgentGoal(
+        qnetwork_local=qnetwork_local,
+        qnetwork_target=qnetwork_target,
+        action_size=action_size,
+        config=config
+    )
+    return agent
