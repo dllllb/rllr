@@ -33,68 +33,112 @@ class PosObsWrapper(gym.Wrapper):
 
 
 class NavigationGoalWrapper(gym.Wrapper):
+    """
+    Wrapper for navigation through environment to the goal
+    """
     def __init__(self, env):
+        self.grid_size = env.unwrapped.grid.encode().shape[0]
+        self.init_state = None
         self.goal_state = None
         super().__init__(env)
 
+    def set_state(self, state):
+        self.unwrapped.agent_pos = state['position']
+
+    def _set_init_state(self, init_pos):
+        self.unwrapped.agent_pos = init_pos
+        self.init_state = self.env.observation(self.unwrapped.gen_obs())
+
+    def reset(self):
+        # set random init state
+        self.env.reset()
+        init_pos = np.random.randint(1, self.grid_size - 2, 2)
+        self._set_init_state(init_pos)
+
     def _goal_achieved(self, state):
-        # TODO: it is unfair. we do not have position in general case
-        return (state['position'] == self.goal_state['position']).all()
+        if self.goal_state is not None:
+            # TODO: it is unfair. we do not have position in general case
+            return (state['position'] == self.goal_state['position']).all()
+        else:
+            return False
 
     def step(self, action):
         next_state, _, _, info = self.env.step(action)
-        done = self.goal_state(next_state) or (self.step_count >= self.max_steps)
+        is_goal_achieved = self._goal_achieved(next_state)
+        done = is_goal_achieved or (self.step_count >= self.max_steps)
+        reward = 1 if is_goal_achieved else -0.1
 
-        return next_state, 0, done, info
+        return next_state, reward, done, info
 
 
-class RandomPosAndGoalWrapper(NavigationGoalWrapper):
+class RandomGoalWrapper(NavigationGoalWrapper):
+    """
+    Wrapper for setting random goal
+    """
     def __init__(self, env, verbose=False):
-        self.grid_size = env.unwrapped.grid.encode().shape[0]
         self.verbose = verbose
         super().__init__(env)
 
-    def reset(self):
-        # Generate random goal state
-        goal_pos = np.random.randint(1, self.grid_size - 2, 2)
-        self.unwrapped.agent_pos = goal_pos
-        self.goal_state = self.env.observation(self.unwrapped.gen_obs())
+    def _generate_state_from_pos(self, pos):
+        cur_pos = self.unwrapped.agent_pos
+        self.unwrapped.agent_pos = pos
+        state = self.env.observation(self.unwrapped.gen_obs())
+        self.unwrapped.agent_pos = cur_pos
+        return state
 
-        # Set random initial state
-        self.env.reset()
-        init_pos = None
-        while init_pos is None or (init_pos == goal_pos).all():
-            init_pos = np.random.randint(1, self.grid_size - 2, 2)
-        self.unwrapped.agent_pos = init_pos
+    def reset(self):
+        super().reset()  # Set random initial state
+        init_pos = self.init_state['position']
+
+        # Generate random goal state
+        goal_pos = None
+        while goal_pos is None or (init_pos == goal_pos).all():
+            goal_pos = np.random.randint(1, self.grid_size - 2, 2)
+        self.goal_state = self._generate_state_from_pos(goal_pos)
 
         if self.verbose:
             logger.info(f"From {init_pos} to {goal_pos}")
 
         # Return initial state
-        return self.env.observation(self.unwrapped.gen_obs())
+        return self.init_state
 
 
-class FromBufferGoalWrapper(RandomPosAndGoalWrapper):
+class FromBufferGoalWrapper(NavigationGoalWrapper):
+    """
+    Wrapper for setting goal from buffer
+    """
     def __init__(self, env, conf, verbose=False):
         self.buffer_size = conf['buffer_size']
         self.buffer = deque(maxlen=self.buffer_size)
-        super().__init__(env, verbose)
+        self.verbose = verbose
+        super().__init__(env)
 
-    def reset(self, is_random=True):
-        if is_random:
+    def reset_buffer(self):
+        self.buffer = deque(maxlen=self.buffer_size)
+
+    def reset(self):
+        if not self.buffer:  # with out goal, only by max_steps episode completion
             super().reset()
+            return self.init_state
+
         else:
-            self.env.reset()
+            super().reset()
 
             init_state, goal_state = self.buffer.popleft()
+            self._set_init_state(init_state['position'])
             self.goal_state = goal_state
-
-            self.unwrapped.agent_pos = init_state['position']
 
             if self.verbose:
                 logger.info(f"From {init_state['position']} to {goal_state['position']}")
 
-            return self.env.observation(self.unwrapped.gen_obs())
+            return self.init_state
+
+    def step(self, action):
+        next_state, reward, done, info = super().step(action)
+        if not done:
+            self.buffer.append((self.init_state, next_state))
+
+        return next_state, reward, done, info
 
 
 class SetRewardWrapper(gym.Wrapper):
@@ -133,13 +177,14 @@ def gen_wrapped_env(conf, reward_function, verbose=False):
 
     goal_type = conf.get('goal_type', 'random')
     if goal_type == 'random':
-        env = RandomPosAndGoalWrapper(env, verbose=verbose)  # env with random goal and init states
+        env = RandomGoalWrapper(env, verbose=verbose)  # env with random goal and init states
     elif goal_type == 'from_buffer':
         env = FromBufferGoalWrapper(env, conf, verbose=verbose)  # env with goal and init states from buffer
     else:
         raise AttributeError(f"unknown goal_type '{conf['goal_type']}'")
 
-    env = SetRewardWrapper(env, reward_function)  # set reward function
+    if reward_function is not None:
+        env = SetRewardWrapper(env, reward_function)  # set reward function
 
     env = FullyRenderWrapper(env)  # removes the default visualization of the partially observable field of view.
     if conf.get('video_path', False):

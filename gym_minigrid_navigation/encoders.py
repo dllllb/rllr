@@ -1,6 +1,5 @@
 import torchvision.models as zoo_models
 
-from functools import reduce
 from torch import nn
 
 

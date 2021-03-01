@@ -41,9 +41,10 @@
   },
 
   training: {
-    reward: explicit_pos_reward,
+    reward: fair_goal_achievement,
     n_episodes: 3000,
-    verbose: 100
+    verbose: 100,
+    max_steps: 256,
   },
 
   seed: 42,

@@ -82,6 +82,7 @@ def get_reward_function(conf):
         return SparsePosReward()
     elif conf['training.reward'] == 'sparse_state_reward':
         return SparseStateReward()
-
+    elif conf['training.reward'] == 'fair_goal_achievement':
+        return None
     else:
         raise AttributeError(f"unknown reward type '{conf['training.reward']}'")
