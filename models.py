@@ -30,8 +30,8 @@ class MasterWorkerNetwork(nn.Module):
         self.master = master
         self.worker = worker
 
-    def forward(self, states, goal_states):
-        goal_states_emb = self.master(goal_states)
+    def forward(self, states, goal_states, goal_states_emb=None):
+        goal_states_emb = self.master(goal_states) if goal_states_emb is None else goal_states_emb
         return self.worker(states, goal_states_emb)
 
 

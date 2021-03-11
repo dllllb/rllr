@@ -2,6 +2,7 @@ import torchvision.models as zoo_models
 
 from functools import reduce
 from torch import nn
+import torch
 
 
 class MLP(nn.Module):
@@ -15,6 +16,7 @@ class MLP(nn.Module):
         for size_in, size_out in zip(layers_size[:-1], layers_size[1:]):
             layers.append(nn.Linear(size_in, size_out))
             layers.append(nn.ReLU())
+        layers.append(nn.Tanh())
         self.output_size = layers_size[-1]
         self.model = nn.Sequential(*layers)
 
@@ -23,6 +25,7 @@ class MLP(nn.Module):
 
 
 class Flattener(nn.Module):
+
     def __init__(self, model):
         super().__init__()
         self.model = model

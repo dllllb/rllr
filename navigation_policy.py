@@ -14,38 +14,46 @@ from utils import get_conf, init_logger, switch_reproducibility_on
 logger = logging.getLogger(__name__)
 
 
-def run_episode(env, agent, train_mode=True):
+def run_episode(env, worker_agent, master_agent=None, train_mode=True):
     """
     A helper function for running single episode
     """
 
     state = env.reset()
-    agent.explore = train_mode
+    worker_agent.explore = train_mode
 
     score, steps, done = 0, 0, False
     while not done:
         steps += 1
-        action = agent.act(state, env.goal_state)
-        next_state, reward, done, _ = env.step(action)
-        if train_mode:
-            agent.update(state, env.goal_state, action, reward, next_state, done)
-        score += reward
-        state = next_state
+        if master_agent is None:
+            action = worker_agent.act(state, env.goal_state)
+            next_state, reward, done, _ = env.step(action)
+            if train_mode:
+                worker_agent.update(state, env.goal_state, action, reward, next_state, done)
+            score += reward
+            state = next_state
+        else:
+            goal_emb = master_agent.sample_goal(state)
+            action = worker_agent.act(state, None, goal_emb)
+            next_state, reward, done, _ = env.step(action)
+            state = next_state
+            score += reward
+            master_agent.update(state, goal_emb, reward, next_state, done)
 
-    agent.reset_episode()
+    worker_agent.reset_episode()
     env.close()
 
     return score, steps
 
 
-def run_episodes(env, agent, n_episodes=1_000, verbose=False):
+def run_episodes(env, worker_agent, master_agent=None, n_episodes=1_000, verbose=False):
     """
     Runs a series of episode and collect statistics
     """
     score_sum, step_sum = 0, 0
     scores, steps = [], []
     for episode in range(1, n_episodes + 1):
-        score, step = run_episode(env, agent, train_mode=True)
+        score, step = run_episode(env, worker_agent, master_agent, train_mode=True)
         score_sum += score
         step_sum += step
         scores.append(score)
