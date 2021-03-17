@@ -26,6 +26,9 @@ class ImgObsWrapper(gym.Wrapper):
         next_state, reward, done, info = self.env.step(action)
         return next_state['image'], reward, done, info
 
+    def reset(self):
+        return self.env.reset()['image']
+
 
 class NavigationGoalWrapper(gym.Wrapper):
     def __init__(self, env):
