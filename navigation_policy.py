@@ -21,7 +21,7 @@ def run_episode(env, agent, train_mode=True, max_steps=1_000):
     state = env.reset()
     agent.explore = train_mode
     score, steps, done = 0, 0, False
-    while not done and steps <= max_steps:
+    while not done and steps < max_steps:
         steps += 1
         action = agent.act(state, env.goal_state)
         next_state, reward, done, _ = env.step(action)
@@ -31,30 +31,33 @@ def run_episode(env, agent, train_mode=True, max_steps=1_000):
         score += reward
         state = next_state
 
-    if train_mode:
+    if train_mode and env.goal_state is not None:
         agent.reset_episode()
     env.close()
 
-    return score, steps
+    return score, steps, steps < max_steps
 
 
-def run_episodes(env, agent, n_episodes=1_000, train_mode=True, verbose=False, max_steps=100_000):
+def run_episodes(env, agent, n_episodes=1_000, train_mode=True, verbose=False, max_steps=256):
     """
     Runs a series of episode and collect statistics
     """
-    score_sum, step_sum = 0, 0
+    score_sum, step_sum, goals_achieved_sum = 0, 0, 0
     scores, steps = [], []
     for episode in range(1, n_episodes + 1):
-        score, step = run_episode(env, agent, train_mode, max_steps)
+        score, step, goal_achieved = run_episode(env, agent, train_mode, max_steps)
         score_sum += score
         step_sum += step
+        goals_achieved_sum += goal_achieved
         scores.append(score)
         steps.append(step)
+
         if verbose and episode % int(verbose) == 0:
             avg_score = score_sum / int(verbose)
-            avg_steps = step_sum / int(verbose)
-            logger.info(f"Episode: {episode}. scores: {avg_score:.2f}, steps: {avg_steps:.2f}")
-            score_sum, step_sum, losses = 0, 0, []
+            avg_step = step_sum / int(verbose)
+            avg_goal = goals_achieved_sum / int(verbose)
+            logger.info(f"Episode: {episode}. scores: {avg_score:.2f}, steps: {avg_step:.2f}, achieved: {avg_goal:.2f}")
+            score_sum, step_sum, goals_achieved_sum, losses = 0, 0, 0, []
 
     return scores, steps
 
@@ -107,6 +110,18 @@ def main(args=None):
         verbose=config['training.verbose'],
         max_steps=config['training'].get('max_steps', 100_000),
     )
+
+    if config['env'].get('goal_type', None) == 'from_buffer':
+        # validation on random goal
+        config['env']['goal_type'] = 'random'
+        env = gen_env(config['env'], reward_function=reward_function)
+        run_episodes(
+            env=env,
+            agent=agent,
+            train_mode=True,
+            n_episodes=100,
+            verbose=config['training.verbose']
+        )
 
     if config.get('outputs', False):
         if config['outputs.save_example']:

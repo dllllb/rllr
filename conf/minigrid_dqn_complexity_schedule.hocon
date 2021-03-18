@@ -23,7 +23,7 @@
     max_pools: [4],
     strides: [4]
     head: {
-        hidden_size: 64
+        hidden_size: [200, 64]
     }
   },
 
@@ -60,6 +60,6 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_draft.p,
+    path: outputs/models/dqn_cnn_complexity.p,
   }
 }

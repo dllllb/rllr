@@ -1,3 +1,4 @@
+import torch
 import torchvision.models as zoo_models
 
 from torch import nn
@@ -48,9 +49,16 @@ class SimpleCNN(nn.Module):
         conv_layers = [Permute(0, 3, 1, 2)]
         cnn_output_size = grid_size
         cur_channels = 3
-        for n_channels, kernel_size, max_pool in zip(conf['n_channels'], conf['kernel_sizes'], conf['max_pools']):
-            conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size))
-            cnn_output_size -= kernel_size - 1
+        conv_params = zip(
+            conf['n_channels'],
+            conf['kernel_sizes'],
+            conf['max_pools'] if conf.get('max_pools', False) else [1] * len(conf['n_channels']),
+            conf['strides'] if conf.get('strides', False) else [1] * len(conf['n_channels'])
+        )
+        for n_channels, kernel_size, max_pool, stride in conv_params:
+            conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size, stride))
+            cnn_output_size += -1 * kernel_size + stride
+            cnn_output_size //= stride
             cur_channels = n_channels
             if max_pool > 1:
                 conv_layers.append(nn.MaxPool2d(max_pool, max_pool))
@@ -61,6 +69,43 @@ class SimpleCNN(nn.Module):
 
     def forward(self, x):
         return self.conv_net(x).reshape(x.shape[0], -1)
+
+
+class CNNAllLayers(nn.Module):
+    def __init__(self, grid_size, conf):
+        super().__init__()
+        self.transform = Permute(0, 3, 1, 2)
+        self.conv_layers = []
+        cnn_output_size = grid_size
+        cur_channels = 3
+        conv_params = zip(
+            conf['n_channels'],
+            conf['kernel_sizes'],
+            conf['max_pools'] if conf.get('max_pools', False) else [1] * len(conf['n_channels']),
+            conf['strides'] if conf.get('strides', False) else [1] * len(conf['n_channels'])
+        )
+        self.output_size = 0
+        for n_channels, kernel_size, max_pool, stride in conv_params:
+            layer = nn.Conv2d(cur_channels, n_channels, kernel_size, stride)
+            cnn_output_size += -1 * kernel_size + stride
+            cnn_output_size //= stride
+            cur_channels = n_channels
+            if max_pool > 1:
+                layer = nn.Sequential(layer, nn.MaxPool2d(max_pool, max_pool))
+                cnn_output_size //= max_pool
+
+            self.conv_layers.append(layer)
+            self.output_size += cur_channels * cnn_output_size ** 2
+        self.nn = nn.Sequential(*self.conv_layers)
+
+    def forward(self, x):
+        x = self.transform(x)
+        result = []
+        for layer in self.conv_layers:
+            x = layer(x)
+            result.append(x.reshape(x.shape[0], -1))
+
+        return torch.cat(result, dim=1)
 
 
 class ResNet(nn.Module):
@@ -96,6 +141,8 @@ def get_encoders(config):
         goal_state_encoder = Flattener(MLP(state_size, config['master']))
     elif config['master.state_encoder_type'] == 'simple_cnn':
         goal_state_encoder = SimpleCNN(grid_size, config['master'])
+    elif config['master.state_encoder_type'] == 'cnn_all_layers':
+        goal_state_encoder = CNNAllLayers(grid_size, config['master'])
     elif config['master.state_encoder_type'] == 'resnet':
         goal_state_encoder = ResNet(config['master'])
     else:
@@ -107,6 +154,8 @@ def get_encoders(config):
         state_encoder = Flattener(MLP(state_size, config['worker']))
     elif config['worker.state_encoder_type'] == 'simple_cnn':
         state_encoder = SimpleCNN(grid_size, config['worker'])
+    elif config['worker.state_encoder_type'] == 'cnn_all_layers':
+        state_encoder = CNNAllLayers(grid_size, config['worker'])
     elif config['worker.state_encoder_type'] == 'resnet':
         state_encoder = ResNet(config['worker'])
     else:

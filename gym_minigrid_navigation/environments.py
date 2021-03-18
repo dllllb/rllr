@@ -1,8 +1,10 @@
 import gym
 import logging
+import random
 import numpy as np
 
-from collections import deque
+from collections import deque, defaultdict
+from functools import partial
 
 from gym.wrappers import Monitor
 from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper
@@ -109,36 +111,57 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
     """
     def __init__(self, env, conf, verbose=False):
         self.buffer_size = conf['buffer_size']
-        self.buffer = deque(maxlen=self.buffer_size)
+        self.buffer = defaultdict(partial(deque, maxlen=self.buffer_size))
         self.verbose = verbose
+        self.complexity = conf['init_complexity']
+        self.complexity_step = conf['complexity_step']
+        self.threshold = conf['threshold']
+        self.update_period = conf['update_period']
+        self.max_complexity = conf['max_complexity']
+        self.episode_count = 0
+        self.done_count = 0
         super().__init__(env)
 
     def reset_buffer(self):
-        self.buffer = deque(maxlen=self.buffer_size)
+        self.buffer = defaultdict(partial(deque, maxlen=self.buffer_size))
 
     def reset(self):
-        if not self.buffer:  # with out goal, only by max_steps episode completion
+        if self.episode_count % self.update_period == 0:
+            self.update_complexity()
+        self.episode_count += 1
+
+        complexity = np.random.randint(*self.complexity)
+        if len(self.buffer[complexity]) < 100:  # with out goal, only by max_steps episode completion
             super().reset()
             return self.init_state
 
         else:
             super().reset()
-
-            init_state, goal_state = self.buffer.popleft()
-            self._set_init_state(init_state['position'])
-            self.goal_state = goal_state
+            init_state, goal_state = random.choice(self.buffer[complexity])
 
             if self.verbose:
                 logger.info(f"From {init_state['position']} to {goal_state['position']}")
 
+            self._set_init_state(init_state['position'])
+            self.goal_state = goal_state
             return self.init_state
 
     def step(self, action):
         next_state, reward, done, info = super().step(action)
         if not done:
-            self.buffer.append((self.init_state, next_state))
-
+            self.buffer[self.step_count].append((self.init_state, next_state))
+        else:
+            self.done_count += 1
         return next_state, reward, done, info
+
+    def update_complexity(self):
+        avg_achieved_goals = self.done_count / self.update_period
+        self.done_count = 0
+
+        if avg_achieved_goals >= self.threshold and self.complexity[1] + self.complexity_step <= self.max_complexity:
+            # self.complexity[0] += self.complexity_step
+            self.complexity[1] += self.complexity_step
+            logger.info(f"new complexity range: {self.complexity}")
 
 
 class SetRewardWrapper(gym.Wrapper):
