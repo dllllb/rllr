@@ -93,7 +93,7 @@ class DQNAgentGoal:
         arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
         return torch.from_numpy(arr).float().to(self.device)
 
-    def act(self, state, goal_state):
+    def act(self, state, goal_state, goal_emb=None):
         """
         Selects action from state if epsilon-greedy way
 
@@ -108,7 +108,10 @@ class DQNAgentGoal:
         else:
             self.qnetwork_local.eval()
             with torch.no_grad():
-                action_values = self.qnetwork_local(self._convert_to_torch([state]), self._convert_to_torch([goal_state]))
+                goal_embs = goal_emb if goal_emb is None else self._convert_to_torch([goal_emb])
+                goal_states = goal_state if goal_state is None else self._convert_to_torch([goal_state])
+                action_values = self.qnetwork_local(self._convert_to_torch([state]), goal_states, goal_embs)
+
             self.qnetwork_local.train()
             return np.argmax(action_values.cpu().data.numpy())
 

@@ -13,39 +13,47 @@ from utils import get_conf, init_logger, switch_reproducibility_on
 logger = logging.getLogger(__name__)
 
 
-def run_episode(env, agent, train_mode=True, max_steps=1_000):
+def run_episode(env, worker_agent, master_agent=None, train_mode=True, max_steps=1_000):
     """
     A helper function for running single episode
     """
 
     state = env.reset()
-    agent.explore = train_mode
+    worker_agent.explore = train_mode
+
     score, steps, done = 0, 0, False
     while not done and steps < max_steps:
         steps += 1
-        action = agent.act(state, env.goal_state)
-        next_state, reward, done, _ = env.step(action)
-        if train_mode and env.goal_state is not None:
-            agent.update(state, env.goal_state, action, reward, next_state, done)
-
-        score += reward
-        state = next_state
+        if master_agent is None:
+            action = worker_agent.act(state, env.goal_state)
+            next_state, reward, done, _ = env.step(action)
+            if train_mode and env.goal_state is not None:
+                worker_agent.update(state, env.goal_state, action, reward, next_state, done)
+            score += reward
+            state = next_state
+        else:
+            goal_emb = master_agent.sample_goal(state)
+            action = worker_agent.act(state, None, goal_emb)
+            next_state, reward, done, _ = env.step(action)
+            state = next_state
+            score += reward
+            master_agent.update(state, goal_emb, reward, next_state, done)
 
     if train_mode and env.goal_state is not None:
-        agent.reset_episode()
+        worker_agent.reset_episode()    
     env.close()
 
     return score, steps, steps < max_steps
 
 
-def run_episodes(env, agent, n_episodes=1_000, train_mode=True, verbose=False, max_steps=256):
+def run_episodes(env, worker_agent, master_agent=None, n_episodes=1_000, verbose=False, train_mode=True, max_steps=256):
     """
     Runs a series of episode and collect statistics
     """
     score_sum, step_sum, goals_achieved_sum = 0, 0, 0
     scores, steps = [], []
     for episode in range(1, n_episodes + 1):
-        score, step, goal_achieved = run_episode(env, agent, train_mode, max_steps)
+        score, step, goal_achieved = run_episode(env, worker_agent, master_agent, train_mode, max_steps)
         score_sum += score
         step_sum += step
         goals_achieved_sum += goal_achieved

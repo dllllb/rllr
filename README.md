@@ -1,11 +1,6 @@
-# PathRL pre-training algorithm
+# Getting Started
 
-https://www.overleaf.com/read/snttfkctdvbd
-
-
-## Getting Started
-
-### Variant 1: pipenv installation
+## Variant 1: pipenv installation
 ```
 sudo apt install python3.8 python3-venv
 pip3 install pipenv
@@ -15,9 +10,9 @@ pipenv install --dev
 pipenv shell
 ```
 
-### Variant 2: Conda Installation
+## Variant 2: Conda Installation
 
-#### To install project environment
+### To install project environment
 
 1. Create (and activate) a new environment with Python 3.6.
  

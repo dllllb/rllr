@@ -33,6 +33,9 @@ class PosObsWrapper(gym.Wrapper):
         next_state['position'] = self.unwrapped.agent_pos
         return next_state, reward, done, info
 
+    def reset(self):
+        return self.env.reset()['image']
+
 
 class NavigationGoalWrapper(gym.Wrapper):
     """
