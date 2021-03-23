@@ -2,28 +2,28 @@
   env: {
     env_type: gym_minigrid,
     env_task: MiniGrid-Empty,
-    grid_size: 8,
+    grid_size: 16,
     action_size: 3,
-    rgb_image: true,
-    tile_size: 4,
+    rgb_image: false,
+    tile_size: 1,
     video_path: outputs/video/
   },
 
   worker: {
-    state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
-    kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    state_encoder_type: cnn_all_layers,
+    n_channels: [1, 16],
+    kernel_sizes: [1, 4],
+    max_pools: [1, 4],
     head: {
-        hidden_size: 64
+        hidden_size: [200, 64]
     }
   },
 
   master: {
-    state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
-    kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    state_encoder_type: cnn_all_layers,
+    n_channels: [1, 16],
+    kernel_sizes: [1, 4],
+    max_pools: [1, 4],
   }
 
   agent: {
@@ -41,9 +41,10 @@
   },
 
   training: {
-    reward: explicit_pos_reward,
+    reward: fair_goal_achievement,
     n_episodes: 3000,
-    verbose: 100
+    verbose: 100,
+    max_steps: 256,
   },
 
   seed: 42,

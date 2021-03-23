@@ -87,7 +87,9 @@ class DQNAgentGoal:
             updated_params = self.config['tau'] * local_param.data + (1 - self.config['tau']) * target_param.data
             target_param.data.copy_(updated_params)
 
-    def _vstack(self, arr):
+    def _convert_to_torch(self, arr):
+        if arr and isinstance(arr[0], dict):
+            arr = [x['image'] for x in arr]
         arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
         return torch.from_numpy(arr).float().to(self.device)
 
@@ -106,9 +108,10 @@ class DQNAgentGoal:
         else:
             self.qnetwork_local.eval()
             with torch.no_grad():
-                goal_embs = goal_emb if goal_emb is None else self._vstack([goal_emb])
-                goal_states = goal_state if goal_state is None else self._vstack([goal_state])
-                action_values = self.qnetwork_local(self._vstack([state]), goal_states, goal_embs)
+                goal_embs = goal_emb if goal_emb is None else self._convert_to_torch([goal_emb])
+                goal_states = goal_state if goal_state is None else self._convert_to_torch([goal_state])
+                action_values = self.qnetwork_local(self._convert_to_torch([state]), goal_states, goal_embs)
+
             self.qnetwork_local.train()
             return np.argmax(action_values.cpu().data.numpy())
 
@@ -118,7 +121,7 @@ class DQNAgentGoal:
         """
         batch = random.sample(self.buffer, k=self.config['batch_size'])
 
-        states, next_states, goal_states, actions, rewards, dones = map(self._vstack, zip(*batch))
+        states, next_states, goal_states, actions, rewards, dones = map(self._convert_to_torch, zip(*batch))
 
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         return states, next_states, goal_states, actions, rewards, dones

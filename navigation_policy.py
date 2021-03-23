@@ -3,18 +3,17 @@ import os
 
 from functools import partial
 
-from expected_steps import ExpectedStepsAmountLeaner
 from gym_minigrid_navigation import environments as minigrid_envs
 from gym_minigrid_navigation import encoders as minigrid_encoders
 from dqn import get_dqn_agent
 from models import get_master_worker_net
-from rewards import get_reward_function, ExpectedStepsAmountReward
+from rewards import get_reward_function
 from utils import get_conf, init_logger, switch_reproducibility_on
 
 logger = logging.getLogger(__name__)
 
 
-def run_episode(env, worker_agent, master_agent=None, train_mode=True):
+def run_episode(env, worker_agent, master_agent=None, train_mode=True, max_steps=1_000):
     """
     A helper function for running single episode
     """
@@ -23,12 +22,12 @@ def run_episode(env, worker_agent, master_agent=None, train_mode=True):
     worker_agent.explore = train_mode
 
     score, steps, done = 0, 0, False
-    while not done:
+    while not done and steps < max_steps:
         steps += 1
         if master_agent is None:
             action = worker_agent.act(state, env.goal_state)
             next_state, reward, done, _ = env.step(action)
-            if train_mode:
+            if train_mode and env.goal_state is not None:
                 worker_agent.update(state, env.goal_state, action, reward, next_state, done)
             score += reward
             state = next_state
@@ -40,29 +39,33 @@ def run_episode(env, worker_agent, master_agent=None, train_mode=True):
             score += reward
             master_agent.update(state, goal_emb, reward, next_state, done)
 
-    worker_agent.reset_episode()
+    if train_mode and env.goal_state is not None:
+        worker_agent.reset_episode()    
     env.close()
 
-    return score, steps
+    return score, steps, steps < max_steps
 
 
-def run_episodes(env, worker_agent, master_agent=None, n_episodes=1_000, verbose=False):
+def run_episodes(env, worker_agent, master_agent=None, n_episodes=1_000, verbose=False, train_mode=True, max_steps=256):
     """
     Runs a series of episode and collect statistics
     """
-    score_sum, step_sum = 0, 0
+    score_sum, step_sum, goals_achieved_sum = 0, 0, 0
     scores, steps = [], []
     for episode in range(1, n_episodes + 1):
-        score, step = run_episode(env, worker_agent, master_agent, train_mode=True)
+        score, step, goal_achieved = run_episode(env, worker_agent, master_agent, train_mode, max_steps)
         score_sum += score
         step_sum += step
+        goals_achieved_sum += goal_achieved
         scores.append(score)
         steps.append(step)
+
         if verbose and episode % int(verbose) == 0:
             avg_score = score_sum / int(verbose)
-            avg_steps = step_sum / int(verbose)
-            logger.info(f"Episode: {episode}. Average score: {avg_score:.2f}. Average steps: {avg_steps:.2f}")
-            score_sum, step_sum = 0, 0
+            avg_step = step_sum / int(verbose)
+            avg_goal = goals_achieved_sum / int(verbose)
+            logger.info(f"Episode: {episode}. scores: {avg_score:.2f}, steps: {avg_step:.2f}, achieved: {avg_goal:.2f}")
+            score_sum, step_sum, goals_achieved_sum, losses = 0, 0, 0, []
 
     return scores, steps
 
@@ -104,22 +107,29 @@ def main(args=None):
     switch_reproducibility_on(config['seed'])
 
     agent = get_agent(config)
+    reward_function = get_reward_function(config)
 
-    if config['training.reward'] != 'expected_steps_amount':
-        reward_function = get_reward_function(config)
-
-    else:
-        # steps amount model trainings
-        expected_steps_learner = ExpectedStepsAmountLeaner(config['expected_steps_params'])
-        env = gen_env(config['env'], reward_function=lambda *args: 0)
-
-        expected_steps_learner.collect_episodes(env, agent)
-        expected_steps_learner.learn(verbose=True)
-
-        reward_function = ExpectedStepsAmountReward(expected_steps_learner.model)
-
+    logger.info(f"Running agent training: {config['training.n_episodes']} episodes")
     env = gen_env(config['env'], reward_function)
-    run_episodes(env, agent, n_episodes=config['training.n_episodes'], verbose=config['training.verbose'])
+    run_episodes(
+        env=env,
+        agent=agent,
+        n_episodes=config['training.n_episodes'],
+        verbose=config['training.verbose'],
+        max_steps=config['training'].get('max_steps', 100_000),
+    )
+
+    if config['env'].get('goal_type', None) == 'from_buffer':
+        # validation on random goal
+        config['env']['goal_type'] = 'random'
+        env = gen_env(config['env'], reward_function=reward_function)
+        run_episodes(
+            env=env,
+            agent=agent,
+            train_mode=True,
+            n_episodes=100,
+            verbose=config['training.verbose']
+        )
 
     if config.get('outputs', False):
         if config['outputs.save_example']:
