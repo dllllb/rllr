@@ -49,30 +49,6 @@ class ExplicitStepsAmount:
         return reward
 
 
-class ExpectedStepsAmountReward:
-    def __init__(self, model, max_value=None):
-        self.model = model
-        self.device = self.model.device
-        self.is_pos_reward = False
-        self.max_value = max_value
-
-    def _to_torch(self, x):
-        return torch.from_numpy(x).float().unsqueeze(0).to(self.device)
-
-    def __call__(self, state, next_state, goal_state):
-        self.model.eval()
-        with torch.no_grad():
-            cur_dist = self.model(self._to_torch(state), self._to_torch(goal_state))
-            next_dist = self.model(self._to_torch(next_state), self._to_torch(goal_state))
-
-        if self.max_value is not None:
-            cur_dist = torch.clamp(cur_dist, max=self.max_value)
-            next_dist = torch.clamp(next_dist, max=self.max_value)
-
-        reward = cur_dist - next_dist
-        return reward.cpu().item()
-
-
 def get_reward_function(conf):
     if conf['training.reward'] == 'explicit_pos_reward':
         return ExplicitPosReward()

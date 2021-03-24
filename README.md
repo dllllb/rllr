@@ -36,7 +36,10 @@ python -m ipykernel install --user --name rllr --display-name "Python 3.7 (rllr)
 
 ## Master-Worker Step
 ```bash
-# example:
-python navigation_policy.py --conf conf/minigrid_dqn_navigation_mlp.hocon
+# simple example:
+python train_worker.py --conf conf/minigrid_dqn_navigation_mlp.hocon
 
+# the whole STEP 1 part:
+python train_state_distance_network.py --conf conf/minigrid_first_step.hocon
+python train_worker.py --conf conf/minigrid_first_step.hocon
 ```

@@ -4,6 +4,8 @@
     env_task: MiniGrid-Empty,
     grid_size: 8,
     action_size: 3,
+    goal_achieving_criterion: position,
+    goal_type: random,
     video_path: outputs/video/
   },
 

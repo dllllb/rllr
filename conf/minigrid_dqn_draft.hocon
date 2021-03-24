@@ -2,13 +2,14 @@
   env: {
     env_type: gym_minigrid,
     env_task: MiniGrid-Empty,
-    grid_size: 16,
+    grid_size: 8,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
+    goal_achieving_criterion: position,
     goal_type: from_buffer,
-    buffer_size: 1000,
-    init_complexity: [1, 6],
+    buffer_size: 10000,
+    init_complexity: 5,
     complexity_step: 5,
     threshold: 0.8,
     max_complexity: 40,
@@ -23,7 +24,7 @@
     max_pools: [4],
     strides: [4]
     head: {
-        hidden_size: 64
+        hidden_size: [200, 64]
     }
   },
 
@@ -51,7 +52,7 @@
 
   training: {
     reward: fair_goal_achievement,
-    n_episodes: 10000,
+    n_episodes: 5000,
     verbose: 100,
     max_steps: 40
   },
@@ -60,6 +61,6 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_draft.p,
+    path: outputs/models/dqn_cnn_complexity.p,
   }
 }
