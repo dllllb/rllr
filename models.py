@@ -47,42 +47,6 @@ class MasterWorkerNetwork(nn.Module):
         return self.worker(states, goal_states_emb)
 
 
-class ExpectedStepsAmountRegressor(nn.Module):
-    """
-    Expected Steps Amount Regressor
-    """
-    def __init__(self, conf):
-        super().__init__()
-        cnn_output_size = conf['input_grid_size']
-        cur_channels = 6
-        conv_layers = []
-        for n_channels, kernel_size, max_pool in zip(conf['n_channels'], conf['kernel_sizes'], conf['max_pools']):
-            conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size))
-            cnn_output_size -= kernel_size - 1
-            cur_channels = n_channels
-            if max_pool > 1:
-                conv_layers.append(nn.MaxPool2d(max_pool, max_pool))
-                cnn_output_size //= max_pool
-
-        self.conv_net = nn.Sequential(*conv_layers)
-        conv_output_size = cur_channels * cnn_output_size ** 2
-
-        hidden_size = conf['head.hidden_size']
-        fc_layers = [
-            # nn.BatchNorm1d(conv_output_size),
-            nn.Linear(conv_output_size, hidden_size),
-            nn.ReLU(inplace=False),
-            nn.Linear(hidden_size, 1)
-        ]
-        self.fc = nn.Sequential(*fc_layers)
-        self.output_size = 1
-
-    def forward(self,  states, goal_states):
-        x = torch.cat((states, goal_states), dim=3).permute(0, 3, 1, 2)
-        x = self.conv_net(x).reshape(x.shape[0], -1)
-        return self.fc(x).squeeze()
-
-
 def get_master_worker_net(state_encoder, goal_state_encoder, action_size, config):
     worker = WorkerNetwork(
         state_encoder=state_encoder,
@@ -91,3 +55,26 @@ def get_master_worker_net(state_encoder, goal_state_encoder, action_size, config
         config=config['worker']
     )
     return MasterWorkerNetwork(master=goal_state_encoder, worker=worker)
+
+
+class StateDistanceNetwork(nn.Module):
+    """
+    State-Embedding model
+    """
+    def __init__(self, encoder, action_size, config):
+        super().__init__()
+        self.encoder = encoder
+
+        self.fc = nn.Sequential(
+            nn.Linear(2 * encoder.output_size, config['hidden_size']),
+            nn.ReLU(inplace=False),
+            nn.Linear(config['hidden_size'], action_size),
+            nn.LogSoftmax(dim=-1)
+        )
+        self.output_size = action_size
+
+    def forward(self, state, next_state):
+        x = self.encoder(state)
+        y = self.encoder(next_state)
+
+        return self.fc(torch.cat((x, y), 1))

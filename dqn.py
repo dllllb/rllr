@@ -7,6 +7,8 @@ import torch.optim as optim
 
 from collections import deque
 
+from utils import convert_to_torch
+
 logger = logging.getLogger(__name__)
 
 
@@ -108,9 +110,9 @@ class DQNAgentGoal:
         else:
             self.qnetwork_local.eval()
             with torch.no_grad():
-                goal_embs = goal_emb if goal_emb is None else self._convert_to_torch([goal_emb])
-                goal_states = goal_state if goal_state is None else self._convert_to_torch([goal_state])
-                action_values = self.qnetwork_local(self._convert_to_torch([state]), goal_states, goal_embs)
+                goal_embs = goal_emb if goal_emb is None else convert_to_torch([goal_emb]).to(self.device)
+                goal_states = goal_state if goal_state is None else convert_to_torch([goal_state]).to(self.device)
+                action_values = self.qnetwork_local(convert_to_torch([state]).to(self.device), goal_states, goal_embs)
 
             self.qnetwork_local.train()
             return np.argmax(action_values.cpu().data.numpy())

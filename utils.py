@@ -2,6 +2,7 @@ import argparse
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 logger = logging.getLogger(__name__)
 
@@ -88,3 +89,10 @@ def switch_reproducibility_on(seed=42):
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+
+def convert_to_torch(arr):
+    if arr and isinstance(arr[0], dict):
+        arr = [x['image'] for x in arr]
+    arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
+    return torch.from_numpy(arr).float()

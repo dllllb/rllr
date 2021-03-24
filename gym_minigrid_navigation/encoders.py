@@ -60,18 +60,35 @@ class SimpleCNN(nn.Module):
         )
         for n_channels, kernel_size, max_pool, stride in conv_params:
             conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size, stride))
+            conv_layers.append(nn.ReLU(inplace=True))
             cnn_output_size += -1 * kernel_size + stride
             cnn_output_size //= stride
             cur_channels = n_channels
             if max_pool > 1:
                 conv_layers.append(nn.MaxPool2d(max_pool, max_pool))
                 cnn_output_size //= max_pool
-
         self.conv_net = nn.Sequential(*conv_layers)
-        self.output_size = cur_channels * cnn_output_size ** 2
+        output_size = cur_channels * cnn_output_size ** 2
+
+        hidden_layers_sizes = list(conf.get('hidden_layers_sizes', []))
+        if hidden_layers_sizes:
+            fc_layers = []
+            layers_size = [output_size] + hidden_layers_sizes
+            for size_in, size_out in zip(layers_size[:-1], layers_size[1:]):
+                fc_layers.append(nn.Linear(size_in, size_out))
+                fc_layers.append(nn.ReLU())
+            self.fc = nn.Sequential(*fc_layers)
+            output_size = layers_size[-1]
+        else:
+            self.fc = None
+
+        self.output_size = output_size
 
     def forward(self, x):
-        return self.conv_net(x).reshape(x.shape[0], -1)
+        res = self.conv_net(x).reshape(x.shape[0], -1)
+        if self.fc is not None:
+            res = self.fc(res)
+        return res
 
 
 class CNNAllLayers(nn.Module):
@@ -89,13 +106,15 @@ class CNNAllLayers(nn.Module):
         )
         self.output_size = 0
         for n_channels, kernel_size, max_pool, stride in conv_params:
-            layer = nn.Conv2d(cur_channels, n_channels, kernel_size, stride)
+            conv = nn.Conv2d(cur_channels, n_channels, kernel_size, stride)
             cnn_output_size += -1 * kernel_size + stride
             cnn_output_size //= stride
             cur_channels = n_channels
             if max_pool > 1:
-                layer = nn.Sequential(layer, nn.MaxPool2d(max_pool, max_pool))
+                layer = nn.Sequential(conv, nn.ReLU(inplace=True), nn.MaxPool2d(max_pool, max_pool))
                 cnn_output_size //= max_pool
+            else:
+                layer = nn.Sequential(conv, nn.ReLU(inplace=True))
 
             self.conv_layers.append(layer)
             self.output_size += cur_channels * cnn_output_size ** 2
@@ -135,33 +154,17 @@ class ResNet(nn.Module):
         return self.resnet(x).reshape(x.shape[0], -1)
 
 
-def get_encoders(config):
-    grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
-
-    # master
-    if config['master.state_encoder_type'] == 'simple_mlp':
+def get_encoder(grid_size, config):
+    if config['state_encoder_type'] == 'simple_mlp':
         state_size = 3 * (grid_size - 2) ** 2
-        goal_state_encoder = Flattener(MLP(state_size, config['master']))
-    elif config['master.state_encoder_type'] == 'simple_cnn':
-        goal_state_encoder = SimpleCNN(grid_size, config['master'])
-    elif config['master.state_encoder_type'] == 'cnn_all_layers':
-        goal_state_encoder = CNNAllLayers(grid_size, config['master'])
-    elif config['master.state_encoder_type'] == 'resnet':
-        goal_state_encoder = ResNet(config['master'])
+        state_encoder = Flattener(MLP(state_size, config))
+    elif config['state_encoder_type'] == 'simple_cnn':
+        state_encoder = SimpleCNN(grid_size, config)
+    elif config['state_encoder_type'] == 'cnn_all_layers':
+        state_encoder = CNNAllLayers(grid_size, config)
+    elif config['state_encoder_type'] == 'resnet':
+        state_encoder = ResNet(config)
     else:
-        raise AttributeError(f"unknown master nn_type '{config['master.state_encoder_type']}'")
+        raise AttributeError(f"unknown nn_type '{config['master.state_encoder_type']}'")
 
-    # worker
-    if config['worker.state_encoder_type'] == 'simple_mlp':
-        state_size = 3 * (grid_size - 2) ** 2
-        state_encoder = Flattener(MLP(state_size, config['worker']))
-    elif config['worker.state_encoder_type'] == 'simple_cnn':
-        state_encoder = SimpleCNN(grid_size, config['worker'])
-    elif config['worker.state_encoder_type'] == 'cnn_all_layers':
-        state_encoder = CNNAllLayers(grid_size, config['worker'])
-    elif config['worker.state_encoder_type'] == 'resnet':
-        state_encoder = ResNet(config['worker'])
-    else:
-        raise AttributeError(f"unknown worker nn_type '{config['worker.state_encoder_type']}'")
-
-    return state_encoder, goal_state_encoder
+    return state_encoder

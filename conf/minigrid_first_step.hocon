@@ -1,14 +1,33 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Empty,
+    env_task: MiniGrid-Dynamic-Obstacles,
     grid_size: 8,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
     goal_type: random,
-    goal_achieving_criterion: position,
+    goal_achieving_criterion: state_distance_network,
     video_path: outputs/video/
+  },
+
+  state_distance_encoder: {
+    state_encoder_type: simple_cnn,
+    n_channels: [32, 64, 64],
+    kernel_sizes: [4, 4, 3],
+    strides: [4, 2, 1],
+    hidden_layers_sizes: [32]
+  },
+
+  state_distance_network = {
+    hidden_size: 128
+  },
+
+  state_distance_training: {
+    device: "cuda:0"
+    n_episodes: 1000,
+    n_epochs: 5,
+    verbose: 100,
   },
 
   worker: {
@@ -53,6 +72,7 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_rgb_rgb_cnn.p,
+    state_distance_network_path: outputs/models/state_distance_encoder.p,
+    path: outputs/models/dqn_first_step.p,
   }
 }

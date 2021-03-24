@@ -27,6 +27,8 @@ class ReplayBuffer:
         batch = random.sample(self.buffer, k=self.batch_size)
 
         def _vstack(arr):
+            if arr and isinstance(arr[0], dict):
+                arr = [x['image'] for x in arr]
             arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
             return torch.from_numpy(arr).float().to(self.device)
 
@@ -148,6 +150,8 @@ class DDPGAgentMaster:
         self.min_noise = min_noise
 
     def _vstack(self, arr):
+        if arr and isinstance(arr[0], dict):
+            arr = [x['image'] for x in arr]
         arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
         return torch.from_numpy(arr).float().to(self.device)
 
