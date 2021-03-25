@@ -6,8 +6,16 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    goal_type: random,
+    goal_type: from_buffer,
+    buffer_size: 10000,
+    init_complexity: 5,
+    complexity_step: 5,
+    threshold: 0.8,
+    max_complexity: 40,
+    update_period: 100,
     goal_achieving_criterion: state_distance_network,
+    state_distance_network_path: outputs/models/state_distance_encoder.p,
+    device: "cuda:0",
     video_path: outputs/video/
   },
 
@@ -65,7 +73,7 @@
     reward: fair_goal_achievement,
     n_episodes: 3000,
     verbose: 100,
-    max_steps: 256,
+    max_steps: 40,
   },
 
   seed: 42,
