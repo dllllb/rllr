@@ -4,11 +4,11 @@ import torch
 
 from functools import partial
 
+import environments
 from gym_minigrid_navigation import environments as minigrid_envs
 from gym_minigrid_navigation import encoders as minigrid_encoders
 from dqn import get_dqn_agent
 from models import get_master_worker_net
-from rewards import get_reward_function
 from utils import get_conf, init_logger, switch_reproducibility_on, convert_to_torch
 
 logger = logging.getLogger(__name__)
@@ -71,13 +71,47 @@ def run_episodes(env, worker_agent, master_agent=None, n_episodes=1_000, verbose
     return scores, steps
 
 
-def gen_env(conf, goal_achieving_criterion, reward_function, verbose=False):
+class EncoderDistance:
+    def __init__(self, encoder, device, threshold=5):
+        self.encoder = encoder.to(device)
+        self.device = device
+        self.threshold = threshold
+
+    def __call__(self, state, goal_state):
+        with torch.no_grad():
+            embeds = self.encoder(convert_to_torch([state, goal_state]).to(self.device))
+        return torch.dist(embeds[0], embeds[1], 2).cpu().item() < self.threshold
+
+
+def get_goal_achieving_criterion(config):
+    if config['goal_achieving_criterion'] == 'position':
+        return lambda state, goal_state: (state['position'] == goal_state['position']).all()
+    elif config['goal_achieving_criterion'] == 'state_distance_network':
+        encoder = torch.load(config['state_distance_network_path'])
+        device = torch.device(config['device'])
+        return EncoderDistance(encoder, device)
+    else:
+        raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
+
+
+def gen_navigation_env(conf, verbose=False):
+    random_goal_generator = None
+    goal_achieving_criterion = get_goal_achieving_criterion(conf)
+
     if conf['env_type'] == 'gym_minigrid':
-        env = minigrid_envs.gen_wrapped_env(conf)
-        env = minigrid_envs.navigation_wrapper(env, conf, goal_achieving_criterion, reward_function, verbose=verbose)
-        return env
+        env = minigrid_envs.gen_wrapped_env(conf, verbose=verbose)
+        if conf.get('goal_type', None) == 'random':
+            random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+
+    env = environments.navigation_wrapper(
+        env=env,
+        conf=conf,
+        goal_achieving_criterion=goal_achieving_criterion,
+        random_goal_generator=random_goal_generator,
+        verbose=verbose)
+    return env
 
 
 def get_encoders(conf):
@@ -106,39 +140,14 @@ def get_agent(conf):
         raise AttributeError(f"unknown algorithm '{conf['agent.algorithm']}'")
 
 
-class EncoderDistance:
-    def __init__(self, encoder, device, threshold=5):
-        self.encoder = encoder.to(device)
-        self.device = device
-        self.threshold = threshold
-
-    def __call__(self, state, goal_state):
-        with torch.no_grad():
-            embeds = self.encoder(convert_to_torch([state, goal_state]).to(self.device))
-        return torch.dist(embeds[0], embeds[1], 2).cpu().item() < self.threshold
-
-
-def get_goal_achieving_criterion(config):
-    if config['env.goal_achieving_criterion'] == 'position':
-        return lambda state, goal_state: (state['position'] == goal_state['position']).all()
-    elif config['env.goal_achieving_criterion'] == 'state_distance_network':
-        encoder = torch.load(config['outputs.state_distance_network_path'])
-        device = torch.device(config['agent.device'])
-        return EncoderDistance(encoder, device)
-    else:
-        raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
-
-
 def main(args=None):
     config = get_conf(args)
     switch_reproducibility_on(config['seed'])
 
     agent = get_agent(config)
-    reward_function = get_reward_function(config)
-    goal_achieving_criterion = get_goal_achieving_criterion(config)
 
     logger.info(f"Running agent training: {config['training.n_episodes']} episodes")
-    env = gen_env(config['env'], goal_achieving_criterion, reward_function)
+    env = gen_navigation_env(config['env'])
     run_episodes(
         env=env,
         worker_agent=agent,
@@ -150,7 +159,7 @@ def main(args=None):
     if config['env'].get('goal_type', None) == 'from_buffer':
         # validation on random goal
         config['env']['goal_type'] = 'random'
-        env = gen_env(config['env'], goal_achieving_criterion, reward_function=reward_function)
+        env = gen_navigation_env(config['env'])
         run_episodes(
             env=env,
             worker_agent=agent,
@@ -161,9 +170,9 @@ def main(args=None):
 
     if config.get('outputs', False):
         if config['outputs.save_example']:
-            env = gen_env(config['env'], goal_achieving_criterion, reward_function, verbose=True)
+            env = gen_navigation_env(config['env'], verbose=True)
             if config['env.env_type'] == 'gym_minigrid':
-                env = minigrid_envs.visualisation_wrapper(env, config['env.video_path'])
+                env = environments.visualisation_wrapper(env, config['env.video_path'])
             logger.info(f"test episode: {run_episode(env, agent, train_mode=False)}")
             logger.info(f"episode's video saved")
 
@@ -179,5 +188,6 @@ def main(args=None):
 if __name__ == '__main__':
     init_logger(__name__)
     init_logger('dqn')
+    init_logger('environments')
     init_logger('gym_minigrid_navigation.environments')
     main()
