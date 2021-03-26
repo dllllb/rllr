@@ -1,0 +1,44 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Dynamic-Obstacles,
+    grid_size: 8,
+    action_size: 3,
+    rgb_image: true,
+    tile_size: 4,
+    video_path: outputs/video/
+  },
+
+  worker_agent: {
+    path: "outputs/models/minigrid_worker.p",
+    device: "cuda:0"
+  }
+
+  master: {
+    state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
+  }
+
+  master_agent: {
+    buffer_size: 1000000,
+    batch_size: 512,
+    noise_decay: 0.995,
+    min_noise: 0.01,
+    explore: true,
+    update_step: 4,
+    device: "cuda:0"
+  }
+
+  training: {
+    n_episodes: 1000,
+    verbose: 100,
+  },
+
+  seed: 42,
+
+  outputs: {
+      path: outputs/models/minigrid_master.p,
+  }
+}

@@ -15,20 +15,21 @@ class NavigationGoalWrapper(gym.Wrapper):
     """
     def __init__(self, env, goal_achieving_criterion):
         self.goal_state = None
+        self.is_goal_achieved = False
         self.goal_achieving_criterion = goal_achieving_criterion
         super().__init__(env)
 
     def _goal_achieved(self, state):
         if self.goal_state is not None:
-            return self.goal_achieving_criterion(state, self.goal_state)
+            self.is_goal_achieved = self.goal_achieving_criterion(state, self.goal_state)
         else:
-            return False
+            self.is_goal_achieved = False
+        return self.is_goal_achieved
 
     def step(self, action):
         next_state, _, _, info = self.env.step(action)
-        is_goal_achieved = self._goal_achieved(next_state)
-        done = is_goal_achieved or (self.step_count >= self.max_steps)
-        reward = 1 if is_goal_achieved else -0.1
+        done = self._goal_achieved(next_state) or (self.step_count >= self.max_steps)
+        reward = 1 if self.is_goal_achieved else -0.1
 
         return next_state, reward, done, info
 
@@ -44,7 +45,7 @@ class RandomGoalWrapper(NavigationGoalWrapper):
 
     def reset(self):
         self.goal_state = next(self.random_goal_generator)
-        # Return initial state
+        self.is_goal_achieved = False
         return super().reset()
 
 
@@ -62,9 +63,9 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         self.threshold = conf['threshold']
         self.update_period = conf['update_period']
         self.max_complexity = conf['max_complexity']
-        self.scale = 3
+        self.scale = conf['scale']
         self.episode_count = 0
-        self.done_count = 0
+        self.achieved_count = 0
         super().__init__(env, goal_achieving_criterion)
 
     def reset_buffer(self):
@@ -75,39 +76,47 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         p = norm.pdf(steps_array, loc=self.complexity, scale=self.scale)
         p /= p.sum()
         choice = np.random.choice(np.arange(len(steps_array)), p=p)
-        return self.buffer[choice]
+        _, goal_state = self.buffer[choice]
+
+        return goal_state
 
     def reset(self):
         if self.episode_count % self.update_period == 0:
             self.update_complexity()
         self.episode_count += 1
 
-        if len(self.buffer) < 1000:  # with out goal, only by max_steps episode completion
+        if len(self.buffer) < self.buffer_size:  # with out goal, only by max_steps episode completion
             return super().reset()
 
         else:
-            _, goal_state = self.buffer_random_choice()
+            state = super().reset()
+            while True:
+                # loop enforces goal_state != current state
+                self.goal_state = self.buffer_random_choice()
+                if not self._goal_achieved(state):
+                    break
 
             if self.verbose:
-                logger.info(f"Goal: {goal_state['position']}")
+                logger.info(f"Buffer goal: {self.goal_state['position'], self.goal_state['direction']}")
 
-            self.goal_state = goal_state
-            return super().reset()
+            return state
 
     def step(self, action):
         next_state, reward, done, info = super().step(action)
-        if not done:
+        if self.is_goal_achieved:
+            self.achieved_count += 1
+
+        if self.goal_state is None:
             self.buffer.append((self.step_count, next_state))
-        else:
-            self.done_count += 1
+
         return next_state, reward, done, info
 
     def update_complexity(self):
-        avg_achieved_goals = self.done_count / self.update_period
+        avg_achieved_goals = self.achieved_count / self.update_period
         if avg_achieved_goals >= self.threshold and self.complexity + self.complexity_step <= self.max_complexity:
             self.complexity += self.complexity_step
-            logger.info(f"avg achieved goals: {self.done_count}, new complexity: {self.complexity}")
-        self.done_count = 0
+            logger.info(f"avg achieved goals: {avg_achieved_goals}, new complexity: {self.complexity}")
+        self.achieved_count = 0
 
 
 class SetRewardWrapper(gym.Wrapper):
@@ -140,8 +149,9 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
 
     elif goal_type == 'from_buffer':
         # env with goal from buffer
-        env = FromBufferGoalWrapper(env, goal_achieving_criterion, conf, verbose=verbose)
-
+        env = FromBufferGoalWrapper(env, goal_achieving_criterion, conf['from_buffer_choice_params'], verbose=verbose)
+    else:
+        raise AttributeError(f"unknown goal_type '{goal_type}'")
     return env
 
 

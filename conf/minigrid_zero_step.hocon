@@ -21,7 +21,7 @@
     hidden_size: 128
   },
 
-  state_distance_training: {
+  training: {
     device: "cuda:0"
     n_episodes: 1000,
     n_epochs: 5,
@@ -31,6 +31,6 @@
   seed: 42,
 
   outputs: {
-    state_distance_network_path: outputs/models/state_distance_encoder.p,
+    path: outputs/models/minigrid_state_distance_encoder.p,
   }
 }

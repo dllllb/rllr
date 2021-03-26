@@ -34,12 +34,10 @@ pip install requirements.txt
 python -m ipykernel install --user --name rllr --display-name "Python 3.7 (rllr)"
 ```
 
-## Master-Worker Step
+## Pipeline
 ```bash
-# simple example:
-python train_worker.py --conf conf/minigrid_dqn_navigation_mlp.hocon
-
-# the whole STEP 1 part:
-python train_state_distance_network.py --conf conf/minigrid_first_step.hocon
+# minigrid environment
+python train_state_distance_network.py --conf conf/minigrid_zero_step.hocon
 python train_worker.py --conf conf/minigrid_first_step.hocon
+python train_master.py --conf conf/minigrid_second_step.hocon
 ```
