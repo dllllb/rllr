@@ -52,7 +52,8 @@ class DQNAgentGoal:
         # Sample batch from replay buffer
         states, next_states, goal_states, actions, rewards, dones = self.sample_batch()
 
-        values = self.qnetwork_target.forward(next_states, goal_states).detach()
+        with torch.no_grad():
+            values = self.qnetwork_target.forward(next_states, goal_states)
         targets = rewards + self.config['gamma'] * values.max(1)[0].view(dones.size()) * (1 - dones)
         outputs = self.qnetwork_local.forward(states, goal_states).gather(1, actions.long())
         self.optimizer.zero_grad()
@@ -130,9 +131,6 @@ class DQNAgentGoal:
 
     def reset_buffer(self):
         self.buffer = deque(maxlen=self.buffer_size)
-
-    def save_model(self, file):
-        torch.save(self.qnetwork_target, file)
 
 
 def get_dqn_agent(config, get_net_function, action_size):

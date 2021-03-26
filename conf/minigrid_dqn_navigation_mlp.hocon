@@ -38,14 +38,15 @@
 
   training: {
     reward: explicit_pos_reward
-    n_episodes: 3000,
+    n_episodes: 2000,
     verbose: 100
+    validation: true,
   },
 
   seed: 42,
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_simple_mlp.p,
+    path: outputs/models/minigrid_simple.p,
   }
 }

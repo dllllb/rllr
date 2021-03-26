@@ -7,35 +7,21 @@
     rgb_image: true,
     tile_size: 4,
     goal_type: from_buffer,
-    buffer_size: 10000,
-    init_complexity: 5,
-    complexity_step: 5,
-    threshold: 0.8,
-    max_complexity: 40,
-    update_period: 100,
+    from_buffer_choice_params: {
+        buffer_size: 10000,
+        init_complexity: 1,
+        scale: 5,
+        complexity_step: 5,
+        threshold: 0.9,
+        max_complexity: 100,
+        update_period: 100,
+    }
     goal_achieving_criterion: state_distance_network,
-    state_distance_network_path: outputs/models/state_distance_encoder.p,
-    device: "cuda:0",
+    state_distance_network_params: {
+        path: outputs/models/minigrid_state_distance_encoder.p,
+        device: "cuda:0",
+    }
     video_path: outputs/video/
-  },
-
-  state_distance_encoder: {
-    state_encoder_type: simple_cnn,
-    n_channels: [32, 64, 64],
-    kernel_sizes: [4, 4, 3],
-    strides: [4, 2, 1],
-    hidden_layers_sizes: [32]
-  },
-
-  state_distance_network = {
-    hidden_size: 128
-  },
-
-  state_distance_training: {
-    device: "cuda:0"
-    n_episodes: 1000,
-    n_epochs: 5,
-    verbose: 100,
   },
 
   worker: {
@@ -73,14 +59,14 @@
     reward: fair_goal_achievement,
     n_episodes: 3000,
     verbose: 100,
-    max_steps: 40,
+    max_steps: 256,
+    validation: true,
   },
 
   seed: 42,
 
   outputs: {
     save_example: true,
-    state_distance_network_path: outputs/models/state_distance_encoder.p,
-    path: outputs/models/dqn_first_step.p,
+    path: outputs/models/minigrid_worker.p,
   }
 }

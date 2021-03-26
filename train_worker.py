@@ -1,5 +1,6 @@
 import logging
 import os
+import pickle
 import torch
 
 from functools import partial
@@ -8,13 +9,13 @@ import environments
 from gym_minigrid_navigation import environments as minigrid_envs
 from gym_minigrid_navigation import encoders as minigrid_encoders
 from dqn import get_dqn_agent
-from models import get_master_worker_net
-from utils import get_conf, init_logger, switch_reproducibility_on, convert_to_torch
+from models import get_master_worker_net, EncoderDistance
+from utils import get_conf, init_logger, switch_reproducibility_on
 
 logger = logging.getLogger(__name__)
 
 
-def run_episode(env, worker_agent, master_agent=None, train_mode=True, max_steps=1_000):
+def run_episode(env, worker_agent, train_mode=True, max_steps=1_000):
     """
     A helper function for running single episode
     """
@@ -25,36 +26,28 @@ def run_episode(env, worker_agent, master_agent=None, train_mode=True, max_steps
     score, steps, done = 0, 0, False
     while not done and steps < max_steps:
         steps += 1
-        if master_agent is None:
-            action = worker_agent.act(state, env.goal_state)
-            next_state, reward, done, _ = env.step(action)
-            if train_mode and env.goal_state is not None:
-                worker_agent.update(state, env.goal_state, action, reward, next_state, done)
-            score += reward
-            state = next_state
-        else:
-            goal_emb = master_agent.sample_goal(state)
-            action = worker_agent.act(state, None, goal_emb)
-            next_state, reward, done, _ = env.step(action)
-            state = next_state
-            score += reward
-            master_agent.update(state, goal_emb, reward, next_state, done)
+        action = worker_agent.act(state, env.goal_state)
+        next_state, reward, done, _ = env.step(action)
+        if train_mode and env.goal_state is not None:
+            worker_agent.update(state, env.goal_state, action, reward, next_state, done)
+        score += reward
+        state = next_state
 
-    if train_mode and (master_agent is not None or env.goal_state is not None):
-        worker_agent.reset_episode()    
+    if train_mode and env.goal_state is not None:
+        worker_agent.reset_episode()
+
     env.close()
+    return score, steps, env.is_goal_achieved
 
-    return score, steps, steps < max_steps
 
-
-def run_episodes(env, worker_agent, master_agent=None, n_episodes=1_000, verbose=False, train_mode=True, max_steps=256):
+def run_episodes(env, worker_agent, n_episodes=1_000, verbose=False, train_mode=True, max_steps=256):
     """
     Runs a series of episode and collect statistics
     """
     score_sum, step_sum, goals_achieved_sum = 0, 0, 0
     scores, steps = [], []
     for episode in range(1, n_episodes + 1):
-        score, step, goal_achieved = run_episode(env, worker_agent, master_agent, train_mode, max_steps)
+        score, step, goal_achieved = run_episode(env, worker_agent, train_mode, max_steps)
         score_sum += score
         step_sum += step
         goals_achieved_sum += goal_achieved
@@ -66,44 +59,41 @@ def run_episodes(env, worker_agent, master_agent=None, n_episodes=1_000, verbose
             avg_step = step_sum / int(verbose)
             avg_goal = goals_achieved_sum / int(verbose)
             logger.info(f"Episode: {episode}. scores: {avg_score:.2f}, steps: {avg_step:.2f}, achieved: {avg_goal:.2f}")
-            score_sum, step_sum, goals_achieved_sum, losses = 0, 0, 0, []
+            score_sum, step_sum, goals_achieved_sum = 0, 0, 0
 
     return scores, steps
-
-
-class EncoderDistance:
-    def __init__(self, encoder, device, threshold=5):
-        self.encoder = encoder.to(device)
-        self.device = device
-        self.threshold = threshold
-
-    def __call__(self, state, goal_state):
-        with torch.no_grad():
-            embeds = self.encoder(convert_to_torch([state, goal_state]).to(self.device))
-        return torch.dist(embeds[0], embeds[1], 2).cpu().item() < self.threshold
 
 
 def get_goal_achieving_criterion(config):
     if config['goal_achieving_criterion'] == 'position':
         return lambda state, goal_state: (state['position'] == goal_state['position']).all()
     elif config['goal_achieving_criterion'] == 'state_distance_network':
-        encoder = torch.load(config['state_distance_network_path'])
-        device = torch.device(config['device'])
+        encoder = torch.load(config['state_distance_network_params.path'])
+        device = torch.device(config['state_distance_network_params.device'])
         return EncoderDistance(encoder, device)
     else:
         raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
 
 
-def gen_navigation_env(conf, verbose=False):
-    random_goal_generator = None
-    goal_achieving_criterion = get_goal_achieving_criterion(conf)
-
+def gen_env(conf, verbose=False):
     if conf['env_type'] == 'gym_minigrid':
         env = minigrid_envs.gen_wrapped_env(conf, verbose=verbose)
-        if conf.get('goal_type', None) == 'random':
-            random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+    return env
+
+
+def gen_navigation_env(conf, verbose=False):
+    env = gen_env(conf=conf, verbose=verbose)
+    goal_achieving_criterion = get_goal_achieving_criterion(conf)
+
+    if conf.get('goal_type', None) == 'random':
+        if conf['env_type'] == 'gym_minigrid':
+            random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
+        else:
+            raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+    else:
+        random_goal_generator = None
 
     env = environments.navigation_wrapper(
         env=env,
@@ -145,9 +135,9 @@ def main(args=None):
     switch_reproducibility_on(config['seed'])
 
     agent = get_agent(config)
+    env = gen_navigation_env(config['env'])
 
     logger.info(f"Running agent training: {config['training.n_episodes']} episodes")
-    env = gen_navigation_env(config['env'])
     run_episodes(
         env=env,
         worker_agent=agent,
@@ -156,14 +146,15 @@ def main(args=None):
         max_steps=config['training'].get('max_steps', 100_000),
     )
 
-    if config['env'].get('goal_type', None) == 'from_buffer':
-        # validation on random goal
+    if config['training'].get('validation', False):
+        logger.info(f"Running validation: {100} episodes")
+        # validation on random goal w/o train_mode
         config['env']['goal_type'] = 'random'
         env = gen_navigation_env(config['env'])
         run_episodes(
             env=env,
             worker_agent=agent,
-            train_mode=True,
+            train_mode=False,
             n_episodes=100,
             verbose=config['training.verbose']
         )
@@ -171,18 +162,19 @@ def main(args=None):
     if config.get('outputs', False):
         if config['outputs.save_example']:
             env = gen_navigation_env(config['env'], verbose=True)
-            if config['env.env_type'] == 'gym_minigrid':
-                env = environments.visualisation_wrapper(env, config['env.video_path'])
+            env = environments.visualisation_wrapper(env, config['env.video_path'])
             logger.info(f"test episode: {run_episode(env, agent, train_mode=False)}")
             logger.info(f"episode's video saved")
 
-        if config.get('outputs.path', False) and hasattr(agent, 'save_model'):
+        if config.get('outputs.path', False):
 
             save_dir = os.path.dirname(config['outputs.path'])
             os.makedirs(save_dir, exist_ok=True)
 
-            agent.save_model(config['outputs.path'])
-            logger.info(f"Models saved to '{config['outputs.path']}'")
+            with open(config['outputs.path'], 'wb') as f:
+                pickle.dump(agent, f)
+
+            logger.info(f"Agent saved to '{config['outputs.path']}'")
 
 
 if __name__ == '__main__':

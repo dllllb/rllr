@@ -19,11 +19,13 @@ class PosObsWrapper(gym.Wrapper):
     def step(self, action):
         next_state, reward, done, info = self.env.step(action)
         next_state['position'] = self.unwrapped.agent_pos
+        next_state['direction'] = self.unwrapped.agent_dir
         return next_state, reward, done, info
 
     def reset(self):
         state = self.env.reset()
         state['position'] = self.unwrapped.agent_pos
+        state['direction'] = self.unwrapped.agent_dir
         return state
 
 
@@ -54,7 +56,7 @@ def random_grid_goal_generator(conf, verbose=False):
         while goal_pos is None or (init_pos == goal_pos).all():
             goal_pos = np.random.randint(1, grid_size - 2, 2)
         if verbose:
-            logger.info(f"Goal: {goal_pos}")
+            logger.info(f"Random goal: {goal_pos}")
 
         env.unwrapped.agent_pos = goal_pos
         goal_state = env.observation(env.unwrapped.gen_obs())

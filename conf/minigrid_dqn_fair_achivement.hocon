@@ -47,12 +47,13 @@
     n_episodes: 3000,
     verbose: 100,
     max_steps: 256,
+    validation: true,
   },
 
   seed: 42,
 
   outputs: {
     save_example: true,
-    path: outputs/models/dqn_rgb_rgb_cnn.p,
+    path: outputs/models/minigrid_worker.p,
   }
 }

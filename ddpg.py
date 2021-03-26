@@ -127,27 +127,20 @@ class DDPGAgentMaster:
         Master agent sets goal for worker to achieve higher future reward.
     """
 
-    def __init__(self, master_network, config, buffer_size=int(1e6), batch_size=512,
-                 noise_decay=0.995, min_noise=0.01, explore=True,
-                 update_step=4, ):
-        """Initializes an Agent.
-
-        Params:
-        -------
-            state_size (int): dimension of each state
-            action_size (int): dimension of each action
-            seed (int): random seed
+    def __init__(self, master_network, conf):
+        """
+        Initializes an Agent.
         """
 
-        self.device = torch.device(config.agent['device'])
+        self.device = torch.device(conf['device'])
         self.master_network = master_network.to(self.device)
-        self.replay_buffer = ReplayBuffer(buffer_size, batch_size, self.device)
+        self.replay_buffer = ReplayBuffer(conf['buffer_size'], conf['batch_size'], self.device)
         self.iter = 0
-        self.update_step = update_step
-        self.explore = explore
+        self.update_step = conf['update_step']
+        self.explore = conf['explore']
         self.act_noise = 1
-        self.noise_decay = noise_decay
-        self.min_noise = min_noise
+        self.noise_decay = conf['noise_decay']
+        self.min_noise = conf['min_noise']
 
     def _vstack(self, arr):
         if arr and isinstance(arr[0], dict):
@@ -156,7 +149,6 @@ class DDPGAgentMaster:
         return torch.from_numpy(arr).float().to(self.device)
 
     def sample_goal(self, state):
-
         goal_state = self.master_network.target_actor.forward(self._vstack([state]))
 
         if self.explore:

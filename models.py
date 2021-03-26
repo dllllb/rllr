@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+from utils import convert_to_torch
+
 
 class WorkerNetwork(nn.Module):
     def __init__(self, state_encoder, emb_size, action_size, config):
@@ -78,3 +80,15 @@ class StateDistanceNetwork(nn.Module):
         y = self.encoder(next_state)
 
         return self.fc(torch.cat((x, y), 1))
+
+
+class EncoderDistance:
+    def __init__(self, encoder, device, threshold=5):
+        self.encoder = encoder.to(device)
+        self.device = device
+        self.threshold = threshold
+
+    def __call__(self, state, goal_state):
+        with torch.no_grad():
+            embeds = self.encoder(convert_to_torch([state, goal_state]).to(self.device))
+        return torch.dist(embeds[0], embeds[1], 2).cpu().item() < self.threshold

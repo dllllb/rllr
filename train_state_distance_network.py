@@ -50,7 +50,7 @@ def main(args=None):
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-6)
     nll_loss = nn.NLLLoss()
 
-    conf = config['state_distance_training']
+    conf = config['training']
     device = torch.device(conf['device'])
     net.to(device)
     for roll in range(conf['n_episodes']):
@@ -67,13 +67,13 @@ def main(args=None):
             logger.info("Rollout: {0}, loss: {1}".format(roll, loss.item()))
 
     if config.get('outputs', False):
-        if config.get('outputs.state_distance_network_path', False):
+        if config.get('outputs.path', False):
 
-            save_dir = os.path.dirname(config['outputs.state_distance_network_path'])
+            save_dir = os.path.dirname(config['outputs.path'])
             os.makedirs(save_dir, exist_ok=True)
 
-            torch.save(net.encoder, config['outputs.state_distance_network_path'])
-            logger.info(f"Models saved to '{config['outputs.state_distance_network_path']}'")
+            torch.save(net.encoder, config['outputs.path'])
+            logger.info(f"Models saved to '{config['outputs.path']}'")
 
     if config['env.env_type'] == 'gym_minigrid':  # sanity check
         env.reset()
