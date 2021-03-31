@@ -36,7 +36,7 @@ class MasterCriticNetwork(nn.Module):
     """
 
     def __init__(self, emb_size, state_encoder, goals_state_encoder, config,
-                 learning_rate_critic=1e-4, learning_rate_actor=1e-4, tau=0.01, gamma=0.99):
+                 learning_rate_critic=1e-4, learning_rate_actor=1e-4, tau=0.005, gamma=0.99):
         super(MasterCriticNetwork, self).__init__()
         self.tau = tau
         self.gamma = gamma
@@ -62,7 +62,6 @@ class MasterCriticNetwork(nn.Module):
         q = self.critic.forward(states, goal_states)
         loss = F.mse_loss(q, y)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1)
         self.critic_optimizer.step()
 
     def update_target_networks(self):
