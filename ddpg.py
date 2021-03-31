@@ -1,61 +1,17 @@
 import torch
 import numpy as np
-from collections import deque
-import random
 
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim
 
+from models import MasterNetwork
+from replay import ReplayBuffer
 
-class ReplayBuffer:
-    """
-    Memory buffer for saving trajectories
-    """
+from utils import convert_to_torch
+import logging
 
-    def __init__(self, buffer_size, batch_size, device):
-        self.buffer = deque(maxlen=buffer_size)
-        self.batch_size = batch_size
-        self.buffer_size = buffer_size
-        self.device = device
-
-    def add(self, states, goal_states, rewards, next_states, dones):
-        self.buffer.append((states, goal_states, rewards, next_states, dones))
-
-    def sample(self):
-
-        batch = random.sample(self.buffer, k=self.batch_size)
-
-        def _vstack(arr):
-            if arr and isinstance(arr[0], dict):
-                arr = [x['image'] for x in arr]
-            arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
-            return torch.from_numpy(arr).float().to(self.device)
-
-        states, goal_states, rewards, next_states, dones  = map(_vstack, zip(*batch))
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
-        return states, goal_states, rewards, next_states, dones
-
-    def is_enough(self):
-        return len(self.buffer) > self.batch_size
-
-
-class ActorNetwork(nn.Module):
-
-    """
-    Actor network for DDPG master agent.
-    """
-
-    def __init__(self, emb_size, state_encoder, hidden_size=64):
-        super(ActorNetwork, self).__init__()
-        self.state_encoder = state_encoder
-        self.layer1 = nn.Linear(state_encoder.output_size, hidden_size)
-        self.layer2 = nn.Linear(hidden_size, emb_size)
-
-    def forward(self, states):
-        x = self.state_encoder(states)
-        x = F.relu(self.layer1(x))
-        return torch.tanh(self.layer2(x))
+logger = logging.getLogger(__name__)
 
 
 class CriticNetwork(nn.Module):
@@ -66,28 +22,27 @@ class CriticNetwork(nn.Module):
     def __init__(self, emb_size, state_encoder, hidden_size=64):
         super(CriticNetwork, self).__init__()
         self.state_encoder = state_encoder
-        self.layer1 = nn.Linear(state_encoder.output_size + emb_size, hidden_size)
-        self.layer2 = nn.Linear(hidden_size, 1)
+        self.layer = nn.Linear(state_encoder.output_size + emb_size, 1)
 
     def forward(self, states, goal_embs):
         x = self.state_encoder(states)
         x = torch.cat((x, goal_embs), 1)
-        x = F.relu(self.layer1(x))
-        return F.relu(self.layer2(x))
+        return F.relu(self.layer(x))
 
 
-class MasterNetwork(nn.Module):
+class MasterCriticNetwork(nn.Module):
     """
     Actor-critic model for DDPG
     """
 
-    def __init__(self, emb_size, state_encoder, learning_rate_critic=1e-4, learning_rate_actor=1e-4, tau=0.01, gamma=0.99):
-        super(MasterNetwork, self).__init__()
+    def __init__(self, emb_size, state_encoder, goals_state_encoder, config,
+                 learning_rate_critic=1e-4, learning_rate_actor=1e-4, tau=0.01, gamma=0.99):
+        super(MasterCriticNetwork, self).__init__()
         self.tau = tau
         self.gamma = gamma
-        self.actor = ActorNetwork(emb_size, state_encoder)
+        self.actor = MasterNetwork(emb_size, goals_state_encoder, config)
         self.critic = CriticNetwork(emb_size, state_encoder)
-        self.target_actor = ActorNetwork(emb_size, state_encoder)
+        self.target_actor = MasterNetwork(emb_size, goals_state_encoder, config)
         self.target_critic = CriticNetwork(emb_size, state_encoder)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=learning_rate_critic)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate_actor)
@@ -138,18 +93,14 @@ class DDPGAgentMaster:
         self.iter = 0
         self.update_step = conf['update_step']
         self.explore = conf['explore']
-        self.act_noise = 1
+        self.act_noise = conf.get('start_noise', 1)
         self.noise_decay = conf['noise_decay']
         self.min_noise = conf['min_noise']
-
-    def _vstack(self, arr):
-        if arr and isinstance(arr[0], dict):
-            arr = [x['image'] for x in arr]
-        arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
-        return torch.from_numpy(arr).float().to(self.device)
+        self.epochs = conf.get('epochs', 1)
+        self.steps_per_epoch = conf.get('steps_per_epochs', 1)
 
     def sample_goal(self, state):
-        goal_state = self.master_network.target_actor.forward(self._vstack([state]))
+        goal_state = self.master_network.target_actor.forward(convert_to_torch([state]).to(self.device))
 
         if self.explore:
             goal_state += self.act_noise * torch.randn(goal_state.size()).to(self.device)
@@ -165,13 +116,16 @@ class DDPGAgentMaster:
             return
 
         self.iter = 0
-        self._update_master()
+        for _ in range(self.epochs):
+            self._update_master()
 
     def reset_episode(self):
         self.act_noise = max(self.noise_decay * self.act_noise, self.min_noise)
 
     def _update_master(self):
         states, goal_states, rewards, next_states, dones = self.replay_buffer.sample()
-        self.master_network.update_critic(states, goal_states, rewards, dones, next_states)
-        self.master_network.update_actor(states)
-        self.master_network.update_target_networks()
+        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+        for _ in range(self.steps_per_epoch):
+            self.master_network.update_critic(states, goal_states, rewards, dones, next_states)
+            self.master_network.update_actor(states)
+            self.master_network.update_target_networks()

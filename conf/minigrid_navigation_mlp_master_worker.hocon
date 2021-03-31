@@ -1,0 +1,68 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Empty,
+    grid_size: 8,
+    action_size: 3,
+    rgb_image: false,
+    goal_achieving_criterion: position,
+    goal_type: random,
+    video_path: outputs/video/
+  },
+
+  master: {
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [32],
+    head: {
+        hidden_size: 32
+    }
+  }
+
+  worker: {
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [32],
+    head: {
+        hidden_size: 32
+    }
+  },
+
+  agent: {
+    algorithm: DQN,
+    device: "cpu",
+    batch_size: 128,
+    update_step: 4,
+    buffer_size: 100000,
+    learning_rate: 0.001,
+    gamma: 0.9,
+    eps_start: 1,
+    eps_end: 0.1,
+    eps_decay: 0.995,
+    tau: 0.001
+  },
+
+  master_agent: {
+    buffer_size: 1000000,
+    batch_size: 256,
+    noise_decay: 1,
+    start_noise: 0.1
+    min_noise: 0.01,
+    explore: true,
+    update_step: 50,
+    epochs: 100,
+    steps_per_epoch: 1,
+    device: "cpu"
+  }
+
+  training: {
+    n_episodes: 500,
+    verbose: 100,
+  },
+
+  seed: 42,
+
+  outputs: {
+    save_example: true,
+    path: outputs/models/minigrid_simple.p,
+  }
+
+}

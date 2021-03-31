@@ -16,7 +16,6 @@ class MLP(nn.Module):
         for size_in, size_out in zip(layers_size[:-1], layers_size[1:]):
             layers.append(nn.Linear(size_in, size_out))
             layers.append(nn.ReLU())
-        layers.append(nn.Tanh())
         self.output_size = layers_size[-1]
         self.model = nn.Sequential(*layers)
 

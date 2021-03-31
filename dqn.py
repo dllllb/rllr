@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from collections import deque
+from replay import ReplayBuffer
 
 from utils import convert_to_torch
 
@@ -31,8 +31,7 @@ class DQNAgentGoal:
 
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=config['learning_rate'])
         self.action_size = action_size
-        self.buffer_size = config['buffer_size']
-        self.buffer = deque(maxlen=self.buffer_size)
+        self.replay_buffer = ReplayBuffer(config['buffer_size'], config['batch_size'], self.device)
         self.step = 0
         self.eps = config['eps_start']
         self.explore = True
@@ -50,7 +49,8 @@ class DQNAgentGoal:
 
         """
         # Sample batch from replay buffer
-        states, next_states, goal_states, actions, rewards, dones = self.sample_batch()
+        states, next_states, goal_states, actions, rewards, dones = self.replay_buffer.sample()
+        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
         with torch.no_grad():
             values = self.qnetwork_target.forward(next_states, goal_states)
@@ -73,11 +73,11 @@ class DQNAgentGoal:
         next_state - next state from env
         done - episode finishing flag
         """
-        self.buffer.append((state, next_state, goal_state, action, reward, float(done)))
+        self.replay_buffer.add(state, next_state, goal_state, action, reward, float(done))
 
         self.step = (self.step + 1) % self.config['update_step']
         if self.step == 0:
-            if len(self.buffer) > self.config['batch_size']:
+            if self.replay_buffer.is_enough():
                 self.learn()
                 self.reset_target_network()
 
@@ -89,12 +89,6 @@ class DQNAgentGoal:
         for target_param, local_param in params:
             updated_params = self.config['tau'] * local_param.data + (1 - self.config['tau']) * target_param.data
             target_param.data.copy_(updated_params)
-
-    def _convert_to_torch(self, arr):
-        if arr and isinstance(arr[0], dict):
-            arr = [x['image'] for x in arr]
-        arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
-        return torch.from_numpy(arr).float().to(self.device)
 
     def act(self, state, goal_state, goal_emb=None):
         """
@@ -117,20 +111,6 @@ class DQNAgentGoal:
 
             self.qnetwork_local.train()
             return np.argmax(action_values.cpu().data.numpy())
-
-    def sample_batch(self):
-        """
-        Samples a batch of experience from replay buffer random uniformily
-        """
-        batch = random.sample(self.buffer, k=self.config['batch_size'])
-
-        states, next_states, goal_states, actions, rewards, dones = map(self._convert_to_torch, zip(*batch))
-
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
-        return states, next_states, goal_states, actions, rewards, dones
-
-    def reset_buffer(self):
-        self.buffer = deque(maxlen=self.buffer_size)
 
 
 def get_dqn_agent(config, get_net_function, action_size):

@@ -3,10 +3,8 @@ import os
 import pickle
 import torch
 
-from dqn import get_dqn_agent
-from ddpg import DDPGAgentMaster, MasterNetwork
-from gym_minigrid_navigation import encoders as minigrid_encoders
-from train_worker import gen_env
+from ddpg import DDPGAgentMaster, MasterCriticNetwork
+from train_worker import gen_env, get_encoders
 from utils import get_conf, init_logger, switch_reproducibility_on
 
 logger = logging.getLogger(__name__)
@@ -28,6 +26,7 @@ def run_episode(env, worker_agent, master_agent):
         score += reward
         master_agent.update(state, goal_emb, reward, next_state, done)
 
+    master_agent.reset_episode()
     env.close()
 
     return score, steps
@@ -65,15 +64,9 @@ def load_worker_agent(conf):
 
 
 def get_master_agent(emb_size, conf):
-    if conf['env.env_type'] == 'gym_minigrid':
-        grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-        state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
-    else:
-        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
-
-    master_network = MasterNetwork(emb_size, state_encoder)
+    state_encoder, goal_state_encoder = get_encoders(conf)
+    master_network = MasterCriticNetwork(emb_size, state_encoder, goal_state_encoder, conf['master'])
     master_agent = DDPGAgentMaster(master_network, conf['master_agent'])
-
     return master_agent
 
 
@@ -89,11 +82,16 @@ def main(args=None):
     master_agent = get_master_agent(emb_size, config)
 
     logger.info(f"Running agent training: {config['training.n_episodes']} episodes")
-    _, _ = run_episodes(env, worker_agent, master_agent, n_episodes=1000, verbose=config['training.verbose'])
+    run_episodes(
+        env,
+        worker_agent,
+        master_agent,
+        n_episodes=config['training.n_episodes'],
+        verbose=config['training.verbose']
+    )
 
     if config.get('outputs', False):
         if config.get('outputs.path', False):
-
             save_dir = os.path.dirname(config['outputs.path'])
             os.makedirs(save_dir, exist_ok=True)
 
@@ -102,9 +100,11 @@ def main(args=None):
 
             logger.info(f"Master agent saved to '{config['outputs.path']}'")
 
+
 if __name__ == '__main__':
     init_logger(__name__)
     init_logger('dqn')
+    init_logger('ddpg')
     init_logger('environments')
     init_logger('gym_minigrid_navigation.environments')
     main()
