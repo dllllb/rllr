@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-
 from utils import convert_to_torch
 
 
@@ -35,6 +34,40 @@ class WorkerNetwork(nn.Module):
         return self.fc(x)
 
 
+class MasterNetwork(nn.Module):
+
+    """
+    Master network. Input is current state and output is state embedding.
+    """
+    def __init__(self, emb_size, goal_state_encoder, config):
+        super().__init__()
+        self.state_encoder = goal_state_encoder
+        hidden_size = config['head.hidden_size']
+        input_size = goal_state_encoder.output_size
+        fc_layers = []
+        if type(hidden_size) == int:
+            fc_layers += [
+                nn.Linear(input_size, hidden_size),
+                nn.ReLU(inplace=False),
+                nn.Linear(hidden_size, emb_size)
+            ]
+        elif type(hidden_size) == list:
+            for hs in hidden_size:
+                fc_layers.append(nn.Linear(input_size, hs))
+                fc_layers.append(nn.ReLU(inplace=False))
+                input_size = hs
+            fc_layers.append(nn.Linear(input_size, emb_size))
+        else:
+            AttributeError(f"unknown type of {hidden_size} parameter")
+        fc_layers.append(nn.Tanh())
+        self.fc = nn.Sequential(*fc_layers)
+        self.output_size = emb_size
+
+    def forward(self, states):
+        x = self.state_encoder(states)
+        return self.fc(x)
+
+
 class MasterWorkerNetwork(nn.Module):
     """
     Master-Worker model
@@ -56,7 +89,13 @@ def get_master_worker_net(state_encoder, goal_state_encoder, action_size, config
         action_size=action_size,
         config=config['worker']
     )
-    return MasterWorkerNetwork(master=goal_state_encoder, worker=worker)
+
+    master = MasterNetwork(
+        emb_size=goal_state_encoder.output_size,
+        goal_state_encoder=goal_state_encoder,
+        config=config['master']
+    )
+    return MasterWorkerNetwork(master=master, worker=worker)
 
 
 class StateDistanceNetwork(nn.Module):

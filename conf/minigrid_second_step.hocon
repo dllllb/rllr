@@ -19,6 +19,9 @@
     n_channels: [6, 16],
     kernel_sizes: [4, 3],
     max_pools: [4, 1],
+    head: {
+        hidden_size: 64
+    }
   }
 
   master_agent: {
