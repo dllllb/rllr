@@ -10,11 +10,12 @@ pylint = "*"
 [packages]
 gym = {extras = ["atari"], version = "0.10"}
 torch = ">=1.1"
+torchvision = ">=0.3.0"
 pytorch-ignite = ">=0.2"
 opencv-python = "*"
 gym-minigrid = ">=1.0"
-matplotlib
-pyhocon
+matplotlib = ">=3.4.1"
+pyhocon = ">=0.3.57"
 
 [requires]
 python_version = "3.8"

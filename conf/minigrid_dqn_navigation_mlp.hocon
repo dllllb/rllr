@@ -20,11 +20,14 @@
   master: {
     state_encoder_type: simple_mlp,
     hidden_layers_sizes: [128, 128],
+    head: {
+        hidden_size: 64
+    }
   }
 
   agent: {
     algorithm: DQN,
-    device: "cuda:0",
+    device: "cpu",
     batch_size: 128,
     update_step: 4,
     buffer_size: 100000,
