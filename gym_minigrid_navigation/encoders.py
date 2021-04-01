@@ -25,7 +25,6 @@ class MLP(nn.Module):
 
 
 class Flattener(nn.Module):
-
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -154,6 +153,49 @@ class ResNet(nn.Module):
         return self.resnet(x).reshape(x.shape[0], -1)
 
 
+class DummyRawStateEncoder(nn.Module):
+    """
+    code minigrid raw states as agent position and direction via one hot encoder
+    """
+    def __init__(self, grid_size):
+        super().__init__()
+        self.output_size = (grid_size - 2) ** 2 + 4
+
+    def forward(self, x: torch.Tensor):
+        x = x[:, 1:-1, 1:-1]
+        agent_pos = (x[:, :, :, 0] == 10)
+        directions = x[agent_pos][:, -1:]
+
+        agent_pos = agent_pos.flatten(start_dim=1).float()
+        directions = torch.eq(directions, torch.arange(4, device=x.device)).float()
+
+        return torch.cat([agent_pos, directions], dim=1)
+
+
+class DummyImageStateEncoder(nn.Module):
+    """
+    code minigrid image states as agent position and direction via one hot encoder
+    """
+    def __init__(self, grid_size, conf):
+        super().__init__()
+        self.tile_size = conf['tile_size']
+        self.output_size = (grid_size // self.tile_size - 2) ** 2 + 4
+
+    def forward(self, x: torch.Tensor):
+        x = x.permute(0, 3, 1, 2)
+        x = x[:, :1, self.tile_size:-self.tile_size, self.tile_size:-self.tile_size]
+        a = nn.MaxPool2d(self.tile_size, self.tile_size)(x) > 0
+
+        b = x[a.repeat_interleave(self.tile_size, dim=-2).repeat_interleave(self.tile_size, dim=-1)]
+        b = b.reshape(-1, self.tile_size, self.tile_size)
+        b = [b[:, :, -1].sum(dim=1) == 0, b[:, -1].sum(dim=1) == 0, b[:, :, 0].sum(dim=1) == 0, b[:, 0].sum(dim=1) == 0]
+
+        directions = torch.cat([x.unsqueeze(-1) for x in b], dim=1).float()
+        agent_pos = a.flatten(start_dim=1).float()
+
+        return torch.cat([agent_pos, directions], dim=1)
+
+
 def get_encoder(grid_size, config):
     if config['state_encoder_type'] == 'simple_mlp':
         state_size = 3 * (grid_size - 2) ** 2
@@ -164,6 +206,10 @@ def get_encoder(grid_size, config):
         state_encoder = CNNAllLayers(grid_size, config)
     elif config['state_encoder_type'] == 'resnet':
         state_encoder = ResNet(config)
+    elif config['state_encoder_type'] == 'dummy_raw':
+        state_encoder = DummyRawStateEncoder(grid_size)
+    elif config['state_encoder_type'] == 'dummy_image':
+        state_encoder = DummyImageStateEncoder(grid_size, config)
     else:
         raise AttributeError(f"unknown nn_type '{config['master.state_encoder_type']}'")
 

@@ -55,9 +55,11 @@ def random_grid_goal_generator(conf, verbose=False):
         goal_pos = None
         while goal_pos is None or (init_pos == goal_pos).all():
             goal_pos = np.random.randint(1, grid_size - 2, 2)
+        goal_dir = np.random.randint(0, 4)
         if verbose:
-            logger.info(f"Random goal: {goal_pos}")
+            logger.info(f"Random goal: position {goal_pos}, direction: {goal_dir}")
 
         env.unwrapped.agent_pos = goal_pos
+        env.unwrapped.agent_dir = goal_dir
         goal_state = env.observation(env.unwrapped.gen_obs())
         yield goal_state

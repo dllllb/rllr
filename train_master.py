@@ -102,6 +102,7 @@ def main(args=None):
 
             logger.info(f"Master agent saved to '{config['outputs.path']}'")
 
+
 if __name__ == '__main__':
     init_logger(__name__)
     init_logger('dqn')
