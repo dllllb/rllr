@@ -8,9 +8,19 @@ pip3 install pipenv
 pipenv install --dev
 
 pipenv shell
+
+# install ffmpeg for videos (optional)
+sudo apt install ffmpeg
+
+# installing spunningup (optional)
+cd ..
+git clone https://github.com/openai/spinningup.git
+cd spinningup
+pip install -e .
+cd rllr
 ```
 
-## Variant 2: Conda Installation
+## Variant 2: Conda Installation (deprecated)
 
 ### To install project environment
 
