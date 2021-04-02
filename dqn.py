@@ -50,7 +50,6 @@ class DQNAgentGoal:
         """
         # Sample batch from replay buffer
         states, next_states, goal_states, actions, rewards, dones = self.replay_buffer.sample()
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
         with torch.no_grad():
             values = self.qnetwork_target.forward(next_states, goal_states)

@@ -22,9 +22,9 @@ def run_episode(env, worker_agent, master_agent):
         goal_emb = master_agent.sample_goal(state)
         action = worker_agent.act(state, None, goal_emb)
         next_state, reward, done, _ = env.step(action)
-        state = next_state
         score += reward
         master_agent.update(state, goal_emb, reward, next_state, done)
+        state = next_state
 
     master_agent.reset_episode()
     env.close()
