@@ -97,7 +97,7 @@ class ExtendedStateFeatureExtractor(BaseFeaturesExtractor):
         return torch.cat([x1, x2], dim=1)
 
 
-def main():
+def train_1st_stage():
 
     worker_env_config = {
         "env_type": "gym_minigrid",
@@ -131,9 +131,12 @@ def main():
         "verbose": 1
     }
 
-    worker = DQN("MlpPolicy", worker_env, **dqn_kwargs)
+    agent = DQN("MlpPolicy", worker_env, **dqn_kwargs)
+    agent.learn(100000, log_interval=10)
+    return agent
 
-    worker.learn(10000, log_interval=10)
+
+def train_2nd_stage(agent):
 
     master_env_config = {
         "env_type": "gym_minigrid",
@@ -146,16 +149,17 @@ def main():
 
     master_env = minigrid_envs.gen_wrapped_env(master_env_config)
     master_env = StateExtenderWrapper(master_env)
-    worker.set_env(master_env)
+    agent.set_env(master_env)
 
-    for param in worker.policy.q_net.features_extractor.state_encoder.parameters():
+    for param in agent.policy.q_net.features_extractor.state_encoder.parameters():
         param.requires_gradient = False
 
-    for param in worker.policy.q_net.q_net.parameters():
+    for param in agent.policy.q_net.q_net.parameters():
         param.requires_gradient = False
 
-    worker.learn(30000, log_interval=10)
+    agent.learn(100000, log_interval=10)
 
 
 if __name__ == '__main__':
-    main()
+    agent = train_1st_stage()
+    train_2nd_stage(agent)
