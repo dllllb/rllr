@@ -70,7 +70,8 @@ def get_goal_achieving_criterion(config):
     elif config['goal_achieving_criterion'] == 'state_distance_network':
         encoder = torch.load(config['state_distance_network_params.path'])
         device = torch.device(config['state_distance_network_params.device'])
-        return EncoderDistance(encoder, device)
+        threshold = config['state_distance_network_params.threshold']
+        return EncoderDistance(encoder, device, threshold)
     else:
         raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
 
