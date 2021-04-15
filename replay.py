@@ -1,5 +1,6 @@
 import random
 from collections import deque
+from functools import partial
 
 from utils import convert_to_torch
 
@@ -21,8 +22,7 @@ class ReplayBuffer:
     def sample(self):
 
         batch = random.sample(self.buffer, k=self.batch_size)
-
-        return map(lambda x: convert_to_torch(x).to(self.device), zip(*batch))
+        return map(partial(convert_to_torch, device=self.device), zip(*batch))
 
     def is_enough(self):
         return len(self.buffer) > self.batch_size

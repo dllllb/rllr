@@ -64,6 +64,7 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         self.update_period = conf['update_period']
         self.max_complexity = conf['max_complexity']
         self.scale = conf['scale']
+        self.warmup_steps = conf['warmup_steps']
         self.episode_count = 0
         self.achieved_count = 0
         super().__init__(env, goal_achieving_criterion)
@@ -85,7 +86,7 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
             self.update_complexity()
         self.episode_count += 1
 
-        if len(self.buffer) < self.buffer_size:  # with out goal, only by max_steps episode completion
+        if len(self.buffer) < self.warmup_steps:  # with out goal, only by max_steps episode completion
             return super().reset()
 
         else:
@@ -103,10 +104,9 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
 
     def step(self, action):
         next_state, reward, done, info = super().step(action)
-        if self.is_goal_achieved:
-            self.achieved_count += 1
+        self.achieved_count += self.is_goal_achieved
 
-        if self.goal_state is None:
+        if not self.is_goal_achieved:
             self.buffer.append((self.step_count, next_state))
 
         return next_state, reward, done, info
@@ -117,6 +117,30 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
             self.complexity += self.complexity_step
             logger.info(f"avg achieved goals: {avg_achieved_goals}, new complexity: {self.complexity}")
         self.achieved_count = 0
+
+
+class GoalObsWrapper(gym.core.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        if isinstance(env.observation_space, gym.spaces.dict.Dict):
+            observation_space = self.observation_space.spaces['image']
+        else:
+            observation_space = env.observation_space
+        self.observation_space = gym.spaces.Dict({
+            'state': observation_space,
+            'goal_state': observation_space,
+        })
+
+    def observation(self, obs):
+        obs = self.env.observation(obs)
+        if isinstance(obs, dict):
+            obs = obs['image']
+
+        goal_obs = self.env.goal_state
+        if isinstance(goal_obs, dict):
+            goal_obs = goal_obs['image']
+
+        return {'state': obs, 'goal_state': goal_obs}
 
 
 class SetRewardWrapper(gym.Wrapper):
@@ -152,6 +176,8 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
         env = FromBufferGoalWrapper(env, goal_achieving_criterion, conf['from_buffer_choice_params'], verbose=verbose)
     else:
         raise AttributeError(f"unknown goal_type '{goal_type}'")
+
+    env = GoalObsWrapper(env)
     return env
 
 

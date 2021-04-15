@@ -77,9 +77,9 @@ class MasterWorkerNetwork(nn.Module):
         self.master = master
         self.worker = worker
 
-    def forward(self, states, goal_states, goal_states_emb=None):
-        goal_states_emb = self.master(goal_states) if goal_states_emb is None else goal_states_emb
-        return self.worker(states, goal_states_emb)
+    def forward(self, states):
+        goal_states_emb = self.master(states['goal_state'])
+        return self.worker(states['state'], goal_states_emb)
 
 
 def get_master_worker_net(state_encoder, goal_state_encoder, action_size, config):
@@ -128,6 +128,8 @@ class EncoderDistance:
         self.threshold = threshold
 
     def __call__(self, state, goal_state):
+        if isinstance(state, dict):
+            state, goal_state = state['image'], goal_state['image']
         with torch.no_grad():
-            embeds = self.encoder(convert_to_torch([state, goal_state]).to(self.device))
+            embeds = self.encoder(convert_to_torch([state, goal_state], device=self.device))
         return torch.dist(embeds[0], embeds[1], 2).cpu().item() < self.threshold

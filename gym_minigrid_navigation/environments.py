@@ -3,17 +3,17 @@ import logging
 import numpy as np
 
 from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper
-
 logger = logging.getLogger(__name__)
 
 
 class PosObsWrapper(gym.Wrapper):
     """
-    Add agent pos to state dict
+    Add agent position and direction to state dict
     """
     def observation(self, obs):
         obs = self.env.observation(obs)
         obs['position'] = self.agent_pos
+        obs['direction'] = self.agent_dir
         return obs
 
     def step(self, action):

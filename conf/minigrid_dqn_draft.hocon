@@ -6,30 +6,40 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    goal_type: random,
+    goal_type: from_buffer,
+    from_buffer_choice_params: {
+        buffer_size: 100000,
+        init_complexity: 1,
+        scale: 10,
+        complexity_step: 10,
+        threshold: 0.95,
+        max_complexity: 100,
+        update_period: 100,
+        warmup_steps: 10000,
+    }
     goal_achieving_criterion: state_distance_network,
     state_distance_network_params: {
-        path: outputs/models/state_distance_encoder.p,
-        device: "cuda:0"
+        path: outputs/models/minigrid_state_distance_encoder.p,
+        device: "cuda:0",
+        threshold: 5
     }
     video_path: outputs/video/
   },
 
   worker: {
-    state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
-    kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    state_encoder_type: dummy_image,
+    tile_size: 4,
     head: {
         hidden_size: 64
     }
   },
 
   master: {
-    state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
-    kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    state_encoder_type: dummy_image,
+    tile_size: 4,
+    head: {
+        hidden_size: 32
+    }
   }
 
   agent: {
@@ -48,7 +58,7 @@
 
   training: {
     reward: fair_goal_achievement,
-    n_episodes: 3000,
+    n_episodes: 10000,
     verbose: 100,
     max_steps: 256,
     validation: true,
