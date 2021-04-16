@@ -22,8 +22,8 @@ def rollout(env, max_steps=False, device=torch.device("cpu")):
     while not done:
         action = env.action_space.sample()
         next_state, reward, done, info = env.step(action)
-        states.append(state['image'])
-        next_states.append(next_state['image'])
+        states.append(state)
+        next_states.append(next_state)
         actions.append(action)
         state = next_state
         if i > max_steps and max_steps:

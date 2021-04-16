@@ -60,7 +60,7 @@ class MasterCriticNetwork(nn.Module):
         self.actor_optimizer.step()
 
     def update_critic(self, states, goal_states, rewards, dones, next_states, act_noise):
-        noise = act_noise * torch.randn(goal_states.size())
+        noise = act_noise * torch.randn(goal_states.size()).to(act_noise.device)
         next_goal_states = (self.target_actor.forward(next_states) + noise).clamp(-1, 1)
         q_target = self.target_critic.forward(next_states, next_goal_states).detach()
         y = rewards + self.gamma * (1 - dones) * q_target
@@ -108,7 +108,7 @@ class DDPGAgentMaster:
         self.policy_delay = conf.get('policy_delay', 2)
 
     def sample_goal(self, state):
-        goal_state = self.master_network.target_actor.forward(convert_to_torch([state]).to(self.device))
+        goal_state = self.master_network.target_actor.forward(convert_to_torch([state], device=self.device))
 
         if self.explore:
             goal_state += self.act_noise * torch.randn(goal_state.size()).to(self.device)

@@ -49,18 +49,18 @@ class DQNAgentGoal:
 
         """
         # Sample batch from replay buffer
-        states, next_states, goal_states, actions, rewards, dones = self.replay_buffer.sample()
+        states, next_states, actions, rewards, dones = self.replay_buffer.sample()
 
         with torch.no_grad():
-            values = self.qnetwork_target.forward(next_states, goal_states)
+            values = self.qnetwork_target.forward(next_states)
         targets = rewards + self.config['gamma'] * values.max(1)[0].view(dones.size()) * (1 - dones)
-        outputs = self.qnetwork_local.forward(states, goal_states).gather(1, actions.long())
+        outputs = self.qnetwork_local.forward(states).gather(1, actions.long())
         self.optimizer.zero_grad()
         loss = F.mse_loss(outputs, targets)
         loss.backward()
         self.optimizer.step()
 
-    def update(self, state, goal_state, action, reward, next_state, done):
+    def update(self, state, action, reward, next_state, done):
         """
         Makes an update step of algorithm and append sars to buffer replay
 
@@ -72,7 +72,7 @@ class DQNAgentGoal:
         next_state - next state from env
         done - episode finishing flag
         """
-        self.replay_buffer.add(state, next_state, goal_state, action, reward, float(done))
+        self.replay_buffer.add(state, next_state, action, reward, float(done))
 
         self.step = (self.step + 1) % self.config['update_step']
         if self.step == 0:
@@ -89,7 +89,7 @@ class DQNAgentGoal:
             updated_params = self.config['tau'] * local_param.data + (1 - self.config['tau']) * target_param.data
             target_param.data.copy_(updated_params)
 
-    def act(self, state, goal_state, goal_emb=None):
+    def act(self, state):
         """
         Selects action from state if epsilon-greedy way
 
@@ -104,17 +104,16 @@ class DQNAgentGoal:
         else:
             self.qnetwork_local.eval()
             with torch.no_grad():
-                goal_embs = goal_emb if goal_emb is None else convert_to_torch([goal_emb]).to(self.device)
-                goal_states = goal_state if goal_state is None else convert_to_torch([goal_state]).to(self.device)
-                action_values = self.qnetwork_local(convert_to_torch([state]).to(self.device), goal_states, goal_embs)
+                states = convert_to_torch([state], self.device)
+                action_values = self.qnetwork_local(states)
 
             self.qnetwork_local.train()
             return np.argmax(action_values.cpu().data.numpy())
 
 
-def get_dqn_agent(config, get_net_function, action_size):
-    qnetwork_local = get_net_function()
-    qnetwork_target = get_net_function()
+def get_dqn_agent(config, get_policy_function, action_size):
+    qnetwork_local = get_policy_function()
+    qnetwork_target = get_policy_function()
     qnetwork_target.load_state_dict(qnetwork_local.state_dict())
 
     agent = DQNAgentGoal(

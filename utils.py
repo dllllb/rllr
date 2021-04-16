@@ -91,8 +91,13 @@ def switch_reproducibility_on(seed=42):
     torch.cuda.manual_seed_all(seed)
 
 
-def convert_to_torch(arr):
+def convert_to_torch(arr, device='cpu'):
     if arr and isinstance(arr[0], dict):
-        arr = [x['image'] for x in arr]
-    arr = np.vstack([np.expand_dims(x, axis=0) for x in arr])
-    return torch.from_numpy(arr).float()
+        res = {
+            key: convert_to_torch([x[key] for x in arr], device=device) for key in arr[0].keys()
+        }
+        return res
+
+    else:
+        res = np.vstack([np.expand_dims(x, axis=0) for x in arr])
+        return torch.from_numpy(res).float().to(device)

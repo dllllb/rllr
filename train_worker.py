@@ -26,14 +26,14 @@ def run_episode(env, worker_agent, train_mode=True, max_steps=1_000):
     score, steps, done = 0, 0, False
     while not done and steps < max_steps:
         steps += 1
-        action = worker_agent.act(state, env.goal_state)
+        action = worker_agent.act(state)
         next_state, reward, done, _ = env.step(action)
-        if train_mode and env.goal_state is not None:
-            worker_agent.update(state, env.goal_state, action, reward, next_state, done)
+        if train_mode and state['goal_state'] is not None:
+            worker_agent.update(state, action, reward, next_state, done)
         score += reward
         state = next_state
 
-    if train_mode and env.goal_state is not None:
+    if train_mode and state['goal_state'] is not None:
         worker_agent.reset_episode()
 
     env.close()
@@ -108,7 +108,7 @@ def gen_navigation_env(conf, verbose=False):
 def get_encoders(conf):
     if conf['env.env_type'] == 'gym_minigrid':
         grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-        state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
+        state_encoder = minigrid_encoders.get_encoder(grid_size, conf['worker'])
         goal_state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
         return state_encoder, goal_state_encoder
     else:
@@ -118,14 +118,14 @@ def get_encoders(conf):
 def get_agent(conf):
     if conf['agent.algorithm'] == 'DQN':
         state_encoder, goal_state_encoder = get_encoders(conf)
-        get_net_function = partial(
+        get_policy_function = partial(
             get_master_worker_net,
             state_encoder=state_encoder,
             goal_state_encoder=goal_state_encoder,
             action_size=conf['env.action_size'],
             config=conf
         )
-        agent = get_dqn_agent(conf['agent'], get_net_function, conf['env.action_size'])
+        agent = get_dqn_agent(conf['agent'], get_policy_function, conf['env.action_size'])
         return agent
     else:
         raise AttributeError(f"unknown algorithm '{conf['agent.algorithm']}'")

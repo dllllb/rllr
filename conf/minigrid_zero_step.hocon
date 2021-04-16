@@ -14,7 +14,7 @@
     n_channels: [32, 64, 64],
     kernel_sizes: [4, 4, 3],
     strides: [4, 2, 1],
-    hidden_layers_sizes: [32]
+    hidden_layers_sizes: [128]
   },
 
   state_distance_network = {
