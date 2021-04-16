@@ -4,10 +4,10 @@ import os
 import torch
 import torch.nn as nn
 
-from gym_minigrid_navigation.encoders import get_encoder
-from gym_minigrid_navigation.environments import gen_wrapped_env
-from models import StateDistanceNetwork
-from utils import get_conf, init_logger, switch_reproducibility_on, convert_to_torch
+from rllr.env.gym_minigrid_navigation.encoders import get_encoder
+from rllr.env.gym_minigrid_navigation.environments import gen_wrapped_env
+from rllr.models import StateDistanceNetwork
+from rllr.utils import get_conf, init_logger, switch_reproducibility_on, convert_to_torch
 
 logger = logging.getLogger(__name__)
 

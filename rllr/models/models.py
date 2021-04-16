@@ -1,6 +1,7 @@
 import torch
 from torch import nn
-from utils import convert_to_torch
+
+from ..utils import convert_to_torch
 
 
 class WorkerNetwork(nn.Module):

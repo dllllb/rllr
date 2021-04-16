@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 
 import train_worker
-from environments import NavigationGoalWrapper
-from gym_minigrid_navigation import environments as minigrid_envs
+from rllr.env import NavigationGoalWrapper
+from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
 
 from stable_baselines3 import DQN
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor

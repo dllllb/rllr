@@ -1,7 +1,8 @@
 import train_worker
 from master_worker_dqn_stable_baselines3 import GoalStateExtenderWrapper
 from master_worker_dqn_stable_baselines3 import ExtendedStateFeatureExtractor, StateExtenderWrapper
-from gym_minigrid_navigation import environments as minigrid_envs
+
+from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
 
 from stable_baselines3 import PPO
 

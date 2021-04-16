@@ -2,7 +2,7 @@ import random
 from collections import deque
 from functools import partial
 
-from utils import convert_to_torch
+from ..utils import convert_to_torch
 
 
 class ReplayBuffer:

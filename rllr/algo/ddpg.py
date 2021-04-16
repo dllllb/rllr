@@ -1,15 +1,15 @@
 import torch
 import numpy as np
+import logging
 
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim
 
-from models import MasterNetwork
-from replay import ReplayBuffer
+from ..models import MasterNetwork
+from ..buffer import ReplayBuffer
+from ..utils import convert_to_torch
 
-from utils import convert_to_torch
-import logging
 
 logger = logging.getLogger(__name__)
 
