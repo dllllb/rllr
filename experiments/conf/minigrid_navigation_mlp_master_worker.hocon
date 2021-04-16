@@ -7,7 +7,7 @@
     rgb_image: false,
     goal_achieving_criterion: position,
     goal_type: random,
-    video_path: outputs/video/
+    video_path: artifacts/video/
   },
 
   master: {
@@ -62,7 +62,7 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/minigrid_simple.p,
+    path: artifacts/models/minigrid_simple.p,
   }
 
 }

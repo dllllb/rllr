@@ -6,11 +6,11 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    video_path: outputs/video/
+    video_path: artifacts/video/
   },
 
   worker_agent: {
-    path: "outputs/models/minigrid_worker.p",
+    path: "artifacts/models/minigrid_worker.p",
     device: "cuda:0"
   }
 
@@ -42,6 +42,6 @@
   seed: 42,
 
   outputs: {
-      path: outputs/models/minigrid_master.p,
+      path: artifacts/models/minigrid_master.p,
   }
 }

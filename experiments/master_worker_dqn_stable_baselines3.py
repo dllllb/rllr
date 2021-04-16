@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 
 import train_worker
-from environments import NavigationGoalWrapper
-from gym_minigrid_navigation import environments as minigrid_envs
+from rllr.env import NavigationGoalWrapper
+from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
 
 from stable_baselines3 import DQN
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -107,7 +107,7 @@ def train_1st_stage():
         "rgb_image": False,
         "goal_achieving_criterion": "position",
         "goal_type": "random",
-        "video_path": "outputs/video/"
+        "video_path": "artifacts/video/"
     }
     worker_env = train_worker.gen_navigation_env(worker_env_config)
     worker_env = GoalStateExtenderWrapper(worker_env)
@@ -144,7 +144,7 @@ def train_2nd_stage(agent):
         "grid_size": 8,
         "action_size": 3,
         "rgb_image": False,
-        "video_path": "outputs/video/"
+        "video_path": "artifacts/video/"
     }
 
     master_env = minigrid_envs.gen_wrapped_env(master_env_config)

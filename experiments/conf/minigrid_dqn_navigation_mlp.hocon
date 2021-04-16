@@ -1,36 +1,33 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Dynamic-Obstacles,
+    env_task: MiniGrid-Empty,
     grid_size: 8,
     action_size: 3,
-    rgb_image: true,
-    tile_size: 4,
     goal_type: random,
     goal_achieving_criterion: position,
-    video_path: outputs/video/
+    video_path: artifacts/video/
   },
 
   worker: {
-    state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
-    kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [128, 128],
     head: {
         hidden_size: 64
     }
   },
 
   master: {
-    state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
-    kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [128, 128],
+    head: {
+        hidden_size: 64
+    }
   }
 
   agent: {
     algorithm: DQN,
-    device: "cuda:0",
+    device: "cpu",
     batch_size: 128,
     update_step: 4,
     buffer_size: 100000,
@@ -43,10 +40,9 @@
   },
 
   training: {
-    reward: fair_goal_achievement,
-    n_episodes: 3000,
-    verbose: 100,
-    max_steps: 256,
+    reward: explicit_pos_reward
+    n_episodes: 2000,
+    verbose: 100
     validation: true,
   },
 
@@ -54,6 +50,6 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/minigrid_worker.p,
+    path: artifacts/models/minigrid_simple.p,
   }
 }

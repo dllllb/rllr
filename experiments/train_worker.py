@@ -5,12 +5,14 @@ import torch
 
 from functools import partial
 
-import environments
-from gym_minigrid_navigation import environments as minigrid_envs
-from gym_minigrid_navigation import encoders as minigrid_encoders
-from dqn import get_dqn_agent
-from models import get_master_worker_net, EncoderDistance
-from utils import get_conf, init_logger, switch_reproducibility_on
+import rllr.env as environments
+from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
+from rllr.env.gym_minigrid_navigation import encoders as minigrid_encoders
+from rllr.algo.dqn import get_dqn_agent
+from rllr.models import get_master_worker_net, EncoderDistance
+
+from rllr.utils import get_conf, switch_reproducibility_on
+from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
 
