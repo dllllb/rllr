@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from ..replay import ReplayBuffer
+from ..buffer import ReplayBuffer
 from ..utils import convert_to_torch
 
 logger = logging.getLogger(__name__)
