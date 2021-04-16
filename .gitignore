@@ -9,11 +9,6 @@ saved_models
 *.jpg
 outputs/
 
-### custom
-experiments/*
-!experiments/*.ipynb
-prototypes/*
-
 # Created by https://www.gitignore.io/api/macos,python,jupyternotebooks
 # Edit at https://www.gitignore.io/?templates=macos,python,jupyternotebooks
 
