@@ -4,8 +4,9 @@ import pickle
 import torch
 
 from ddpg import DDPGAgentMaster, MasterCriticNetwork
-from train_worker import gen_env, get_encoders
+from train_worker import gen_env
 from utils import get_conf, init_logger, switch_reproducibility_on
+from gym_minigrid_navigation import encoders as minigrid_encoders
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ def run_episode(env, worker_agent, master_agent):
     while not done:
         steps += 1
         goal_emb = master_agent.sample_goal(state)
-        action = worker_agent.act(state, None, goal_emb)
+        action = worker_agent.act({'state': state, 'goal_emb': goal_emb})
         next_state, reward, done, _ = env.step(action)
         score += reward
         master_agent.update(state, goal_emb, reward, next_state, done)
@@ -64,7 +65,13 @@ def load_worker_agent(conf):
 
 
 def get_master_agent(emb_size, conf):
-    state_encoder, goal_state_encoder = get_encoders(conf)
+    if conf['env.env_type'] == 'gym_minigrid':
+        grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+        state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
+        goal_state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
+    else:
+        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+
     master_network = MasterCriticNetwork(emb_size, state_encoder, goal_state_encoder, conf['master'])
     master_agent = DDPGAgentMaster(master_network, conf['master_agent'])
     return master_agent

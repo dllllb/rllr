@@ -78,7 +78,10 @@ class MasterWorkerNetwork(nn.Module):
         self.worker = worker
 
     def forward(self, states):
-        goal_states_emb = self.master(states['goal_state'])
+        if 'goal_emb' in states.keys():
+            goal_states_emb = states['goal_emb']
+        else:
+            goal_states_emb = self.master(states['goal_state'])
         return self.worker(states['state'], goal_states_emb)
 
 

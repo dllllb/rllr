@@ -68,6 +68,6 @@
 
   outputs: {
     save_example: true,
-    path: outputs/models/minigrid_worker_draft.p,
+    path: outputs/models/minigrid_worker.p,
   }
 }

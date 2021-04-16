@@ -132,7 +132,6 @@ class GoalObsWrapper(gym.core.ObservationWrapper):
         })
 
     def observation(self, obs):
-        obs = self.env.observation(obs)
         if isinstance(obs, dict):
             obs = obs['image']
 

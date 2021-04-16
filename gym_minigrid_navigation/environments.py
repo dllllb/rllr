@@ -29,6 +29,15 @@ class PosObsWrapper(gym.Wrapper):
         return state
 
 
+class ImageObsWrapper(gym.core.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.observation_space = self.observation_space.spaces['image']
+
+    def observation(self, obs):
+        return obs['image']
+
+
 def gen_wrapped_env(conf, verbose=False):
     if conf['env_task'] in ['MiniGrid-Empty', 'MiniGrid-Dynamic-Obstacles']:
         env_name = f"{conf['env_task']}-{conf['grid_size']}x{conf['grid_size']}-v0"
@@ -43,6 +52,9 @@ def gen_wrapped_env(conf, verbose=False):
 
     if conf.get('goal_achieving_criterion', None) == 'position' or verbose:
         env = PosObsWrapper(env)
+    else:
+        env = ImageObsWrapper(env)
+
     return env
 
 
