@@ -8,8 +8,8 @@ from train_worker import gen_env, get_encoders
 
 from rllr.env.gym_minigrid_navigation import encoders as minigrid_encoders
 
-from rllr.algo.utils import get_conf, switch_reproducibility_on
-from rllr.algo.utils.logger import init_logger
+from rllr.utils import get_conf, switch_reproducibility_on
+from rllr.utils.logger import init_logger
 
 
 logger = logging.getLogger(__name__)

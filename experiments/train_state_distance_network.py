@@ -42,6 +42,7 @@ def rollout(env, max_steps=False, device=torch.device("cpu")):
 def main(args=None):
     config = get_conf(args)
     switch_reproducibility_on(config['seed'])
+    # TODO: don't reproduce. some seed isn't fixed. make reproducible
 
     env = gen_wrapped_env(config['env'])
 

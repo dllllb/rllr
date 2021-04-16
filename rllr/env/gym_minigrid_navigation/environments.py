@@ -6,7 +6,7 @@ from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper
 logger = logging.getLogger(__name__)
 
 
-class PosObsWrapper(gym.Wrapper):
+class PosObsWrapper(gym.core.ObservationWrapper):
     """
     Add agent position and direction to state dict
     """
@@ -16,18 +16,6 @@ class PosObsWrapper(gym.Wrapper):
         obs['direction'] = self.agent_dir
         return obs
 
-    def step(self, action):
-        next_state, reward, done, info = self.env.step(action)
-        next_state['position'] = self.unwrapped.agent_pos
-        next_state['direction'] = self.unwrapped.agent_dir
-        return next_state, reward, done, info
-
-    def reset(self):
-        state = self.env.reset()
-        state['position'] = self.unwrapped.agent_pos
-        state['direction'] = self.unwrapped.agent_dir
-        return state
-
 
 class ImageObsWrapper(gym.core.ObservationWrapper):
     def __init__(self, env):
@@ -35,6 +23,7 @@ class ImageObsWrapper(gym.core.ObservationWrapper):
         self.observation_space = self.observation_space.spaces['image']
 
     def observation(self, obs):
+        obs = self.env.observation(obs)
         return obs['image']
 
 
@@ -59,7 +48,7 @@ def gen_wrapped_env(conf, verbose=False):
 
 
 def random_grid_goal_generator(conf, verbose=False):
-    env = gen_wrapped_env(conf)
+    env = gen_wrapped_env(conf, verbose=verbose)
     grid_size = env.unwrapped.grid.encode().shape[0]
     init_pos = np.array([1, 1])
 
