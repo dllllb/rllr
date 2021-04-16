@@ -17,6 +17,7 @@ gym-minigrid = ">=1.0"
 matplotlib = ">=3.4.1"
 pyhocon = ">=0.3.57"
 pytest = "*"
+rllr = {editable = true, path = "."}
 
 [requires]
 python_version = "3.8"
