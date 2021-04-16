@@ -1,8 +1,8 @@
 JUPCLEAR="jupyter nbconvert --clear-output --inplace"
 
-.PHONY: project.zip
+.PHONY: rllr-project.tar.gz
 
-project.zip: code
+rllr-project.tar.gz: code
 	# prepare a temporary directory
 	$(eval target := $(shell mktemp -d))
 
@@ -11,27 +11,28 @@ project.zip: code
 	cp ./README.md "${target}"/
 	# cp ./LICENSE "${target}"/
 
-	# copy notebooks and clean up
-	if [ -d './experiments' ]; then \
-		cp -r ./experiments/. "${target}"; \
-	fi
-		# find "${target}" -type f -name "*.ipynb" -exec "${JUPCLEAR}" {} \; ; \
-		# find "${target}" -type f ! -name "*.ipynb" -delete; \
+	# copy notebooks and unittests
+	cp -r ./experiments/. "${target}/experiments"
+	cp -r ./tests "${target}/tests"
+	# find "${target}/experiments" -type f -name "*.ipynb" -exec "${JUPCLEAR}" {} \;
 
-	# put a sdist of the package into the folder
-	# cp ./dist/*.tar.gz "${target}"/
-	cp -p "`ls -dtr1 ./dist/*.tar.gz | tail -1`" "${target}"/
+	# put the latest sdist of the package into the folder
+	cp -p "`ls -t1 ./dist/*.tar.gz | head -1`" "${target}"/
+
+	# remove junk
+	find "${target}" -type f -name ".*" -delete
 
 	# zip it all and cleanup
-	$(eval zip := $(shell mktemp))
+	$(eval filename := $(shell mktemp))
 	cd "${target}"; \
-		zip -9qr "${zip}.zip" . -x ".*" -x "__MACOSX" -x ".ipynb_checkpoints"
+		tar -zcvf "${filename}.tar.gz" ./
+		# zip -9qr "${filename}.zip" . -x ".*" -x "__MACOSX" -x ".ipynb_checkpoints"
 
-	mv "${zip}.zip" ./project.zip
+	mv "${filename}.tar.gz" "./rllr-project.tar.gz"
 
 	rm -rf "${target}"
 
 code:
 	python setup.py sdist
 
-all: project.zip
+all: rllr-project.tar.gz
