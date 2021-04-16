@@ -6,9 +6,10 @@ rllr-project.tar.gz: code
 	# prepare a temporary directory
 	$(eval target := $(shell mktemp -d))
 
-	# propagate the Makefile, the readme, and the license
+	# propagate the Makefile, the readme, and the pipfile
 	cp ./Makefile "${target}"/
 	cp ./README.md "${target}"/
+	cp ./Pipfile "${target}"/
 	# cp ./LICENSE "${target}"/
 
 	# copy notebooks and unittests
