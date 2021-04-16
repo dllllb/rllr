@@ -15,16 +15,16 @@ setup(
         'rllr.utils.plotting',  # visualization
         'rllr.env.gym_minigrid_navigation',  # namespace only
     ],
-    install_requires=[
+    install_requires=[  # as declared im rllr's module code
+        'numpy',
         'torch',
         'torchvision',
-        'numpy',
         'gym[atari]',
         'matplotlib',
-        'pyhocon',            # utils.py :: get_conf
+        'pyhocon',            # utils.config :: get_conf
+        'jupyter',            # utils.plotting :: IPython
         'gym_minigrid',       # git+https://github.com/maximecb/gym-minigrid.git
         'stable_baselines3',  # master_worker_*.py
         'scipy',              # environments.py :: scipy.stats
-        'jupyter',            # utils.py :: IPython
     ],
 )
