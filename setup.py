@@ -12,6 +12,7 @@ setup(
         'rllr.models',  # policies and models
         'rllr.buffer',  # replay buffer
         'rllr.utils',  # utilities
+        'rllr.utils.plotting',  # visualization
         'rllr.env.gym_minigrid_navigation',  # namespace only
     ],
     install_requires=[
