@@ -1,7 +1,6 @@
-from .ddpg import CriticNetwork
-from .ddpg import MasterCriticNetwork
-from .ddpg import DDPGAgentMaster
+from ..models.models import CriticNetwork, ActorCriticNetwork
+from .ddpg import DDPG
 
-from .dqn import DQNAgentGoal
+from .dqn import DQN
 
 from .dqn import get_dqn_agent

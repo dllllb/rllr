@@ -11,10 +11,22 @@ from ..utils import convert_to_torch
 logger = logging.getLogger(__name__)
 
 
-class DQNAgentGoal:
+class DQN:
     """ An agent implementing Deep Q-Network algorithm"""
 
-    def __init__(self, qnetwork_local, qnetwork_target, action_size, config):
+    def __init__(self,
+                 qnetwork_local: torch.nn.Module,
+                 qnetwork_target: torch.nn.Module,
+                 replay_buffer: ReplayBuffer,
+                 device: torch.device,
+                 learning_rate: float = 0.001,
+                 update_step: int = 4,
+                 gamma: float = 0.9,
+                 eps_start: float =  1.,
+                 eps_end: float = 0.1,
+                 eps_decay: float = 0.995,
+                 tau: float = 0.001,
+                 explore: bool = True):
         """Initializes an Agent.
 
         Params:
@@ -23,24 +35,31 @@ class DQNAgentGoal:
             action_size (int): dimension of each action
             seed (int): random seed
         """
-        self.device = torch.device(config['device'])
+        self.device = device
         logger.info("Running on device: {}".format(self.device))
         self.qnetwork_local = qnetwork_local.to(self.device)
         self.qnetwork_target = qnetwork_target.to(self.device)
 
-        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=config['learning_rate'])
-        self.action_size = action_size
-        self.replay_buffer = ReplayBuffer(config['buffer_size'], config['batch_size'], self.device)
+        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=learning_rate)
+        self.action_size = self.qnetwork_local.output_size
+        self.replay_buffer = replay_buffer
+        self.batch_size = replay_buffer.batch_size
+        self.buffer_size = replay_buffer.buffer_size
         self.step = 0
-        self.eps = config['eps_start']
-        self.explore = True
-        self.config = config
+        self.eps = eps_start
+        self.eps_decay = eps_decay
+        self.eps_end = eps_end
+        self.explore = explore
+        self.tau = tau
+        self.gamma = gamma
+        self.update_step = update_step
+
 
     def reset_episode(self):
         """
         Resets episode and update epsilon decay
         """
-        self.eps = max(self.config['eps_end'], self.config['eps_decay'] * self.eps)
+        self.eps = max(self.eps_end, self.eps_decay * self.eps)
 
     def learn(self):
         """
@@ -52,7 +71,7 @@ class DQNAgentGoal:
 
         with torch.no_grad():
             values = self.qnetwork_target.forward(next_states)
-        targets = rewards + self.config['gamma'] * values.max(1)[0].view(dones.size()) * (1 - dones)
+        targets = rewards + self.gamma * values.max(1)[0].view(dones.size()) * (1 - dones)
         outputs = self.qnetwork_local.forward(states).gather(1, actions.long())
         self.optimizer.zero_grad()
         loss = F.mse_loss(outputs, targets)
@@ -73,7 +92,7 @@ class DQNAgentGoal:
         """
         self.replay_buffer.add(state, next_state, action, reward, float(done))
 
-        self.step = (self.step + 1) % self.config['update_step']
+        self.step = (self.step + 1) % self.update_step
         if self.step == 0:
             if self.replay_buffer.is_enough():
                 self.learn()
@@ -85,7 +104,7 @@ class DQNAgentGoal:
         """
         params = zip(self.qnetwork_target.parameters(), self.qnetwork_local.parameters())
         for target_param, local_param in params:
-            updated_params = self.config['tau'] * local_param.data + (1 - self.config['tau']) * target_param.data
+            updated_params = self.tau * local_param.data + (1 - self.tau) * target_param.data
             target_param.data.copy_(updated_params)
 
     def act(self, state):
@@ -110,15 +129,23 @@ class DQNAgentGoal:
             return np.argmax(action_values.cpu().data.numpy())
 
 
-def get_dqn_agent(config, get_policy_function, action_size):
+def get_dqn_agent(config, get_policy_function):
     qnetwork_local = get_policy_function()
     qnetwork_target = get_policy_function()
     qnetwork_target.load_state_dict(qnetwork_local.state_dict())
+    device = torch.device(config['device'])
+    replay_buffer = ReplayBuffer(config['buffer_size'], config['batch_size'], device)
 
-    agent = DQNAgentGoal(
-        qnetwork_local=qnetwork_local,
-        qnetwork_target=qnetwork_target,
-        action_size=action_size,
-        config=config
-    )
+    agent = DQN(qnetwork_local,
+                qnetwork_target,
+                replay_buffer,
+                device,
+                learning_rate=config['learning_rate'],
+                update_step=config['update_step'],
+                gamma=config['gamma'],
+                eps_start=config['eps_start'],
+                eps_end=config['eps_end'],
+                eps_decay=config['eps_decay'],
+                tau=config['tau'] ,
+                )
     return agent

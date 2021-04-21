@@ -4,7 +4,7 @@ import os
 import torch
 import torch.nn as nn
 
-from rllr.env.gym_minigrid_navigation.encoders import get_encoder
+from rllr.models.encoders import get_encoder
 from rllr.env.gym_minigrid_navigation.environments import gen_wrapped_env
 
 from rllr.models import StateDistanceNetwork

@@ -77,6 +77,7 @@ class MasterWorkerNetwork(nn.Module):
         super(MasterWorkerNetwork, self).__init__()
         self.master = master
         self.worker = worker
+        self.output_size = worker.output_size
 
     def forward(self, states):
         if 'goal_emb' in states.keys():
@@ -137,3 +138,51 @@ class EncoderDistance:
         with torch.no_grad():
             embeds = self.encoder(convert_to_torch([state, goal_state], device=self.device))
         return torch.dist(embeds[0], embeds[1], 2).cpu().item() < self.threshold
+
+
+class CriticNetwork(nn.Module):
+    """
+    Critic network for DDPG master agent
+    """
+
+    def __init__(self, emb_size, state_encoder, config):
+        super(CriticNetwork, self).__init__()
+        self.state_encoder = state_encoder
+        hidden_size = config['head.hidden_size']
+        input_size = state_encoder.output_size + emb_size
+        fc_layers = []
+        if type(hidden_size) == int:
+            fc_layers += [
+                nn.Linear(input_size, hidden_size),
+                nn.ReLU(inplace=False),
+                nn.Linear(hidden_size, 1)
+            ]
+        elif type(hidden_size) == list:
+            for hs in hidden_size:
+                fc_layers.append(nn.Linear(input_size, hs))
+                fc_layers.append(nn.ReLU(inplace=False))
+                input_size = hs
+            fc_layers.append(nn.Linear(input_size, 1))
+        else:
+            AttributeError(f"unknown type of {hidden_size} parameter")
+        self.fc = nn.Sequential(*fc_layers)
+
+    def forward(self, states, goal_embs):
+        x = self.state_encoder(states)
+        x = torch.cat((x, goal_embs), 1)
+        return self.fc(x)
+
+
+class ActorCriticNetwork(nn.Module):
+    """
+    Actor-critic model for DDPG
+    """
+
+    def __init__(self, emb_size, actor_state_encoder, critic_state_encoder, config):
+        super(ActorCriticNetwork, self).__init__()
+        self.actor = MasterNetwork(emb_size, critic_state_encoder, config)
+        self.critic = CriticNetwork(emb_size, actor_state_encoder, config)
+        self.target_actor = MasterNetwork(emb_size, critic_state_encoder, config)
+        self.target_actor.load_state_dict(self.actor.state_dict())
+        self.target_critic = CriticNetwork(emb_size, actor_state_encoder, config)
+        self.target_critic.load_state_dict(self.critic.state_dict())
