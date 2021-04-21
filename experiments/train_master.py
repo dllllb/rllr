@@ -3,10 +3,11 @@ import os
 import pickle
 import torch
 
-from rllr.algo.ddpg import DDPGAgentMaster, MasterCriticNetwork
-from train_worker import gen_env, get_encoders
+from rllr.algo.ddpg import get_ddpg_agent
+from rllr.models.models import ActorCriticNetwork
+from .train_worker import gen_env
 
-from rllr.env.gym_minigrid_navigation import encoders as minigrid_encoders
+from rllr.models import encoders as minigrid_encoders
 
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
@@ -24,7 +25,7 @@ def run_episode(env, worker_agent, master_agent):
     score, steps, done = 0, 0, False
     while not done:
         steps += 1
-        goal_emb = master_agent.sample_goal(state)
+        goal_emb = master_agent.act(state)
         action = worker_agent.act({'state': state, 'goal_emb': goal_emb})
         next_state, reward, done, _ = env.step(action)
         score += reward
@@ -76,8 +77,8 @@ def get_master_agent(emb_size, conf):
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
-    master_network = MasterCriticNetwork(emb_size, state_encoder, goal_state_encoder, conf['master'])
-    master_agent = DDPGAgentMaster(master_network, conf['master_agent'])
+    master_network = ActorCriticNetwork(emb_size, state_encoder, goal_state_encoder, conf['master'])
+    master_agent = get_ddpg_agent(master_network, conf['master_agent'])
     return master_agent
 
 
