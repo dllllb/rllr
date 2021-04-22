@@ -12,8 +12,7 @@ class PosObsWrapper(gym.core.ObservationWrapper):
     """
     def observation(self, obs):
         obs = self.env.observation(obs)
-        obs['position'] = self.agent_pos
-        obs['direction'] = self.agent_dir
+        obs['position'] = np.array([*self.agent_pos, self.agent_dir])
         return obs
 
 
@@ -34,6 +33,12 @@ def gen_wrapped_env(conf, verbose=False):
         raise AttributeError(f"unknown env_task '{conf['env_task']}'")
 
     env = gym.make(env_name)
+
+    if conf.get('deterministic', True):
+        seed = conf.get('seed', 42)
+        env.action_space.np_random.seed(seed)
+        env.seed(seed)
+
     if not conf.get('rgb_image', False):
         env = FullyObsWrapper(env)  # Fully observable gridworld using a compact grid encoding
     else:

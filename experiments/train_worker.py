@@ -67,9 +67,12 @@ def run_episodes(env, worker_agent, n_episodes=1_000, verbose=False, train_mode=
 
 def get_goal_achieving_criterion(config):
     if config['goal_achieving_criterion'] == 'position':
-        return lambda state, goal_state: (state['position'] == goal_state['position']).all()
+        def position_achievement(state, goal_state):
+            return (state['position'] == goal_state['position']).all()
+        return position_achievement
+
     elif config['goal_achieving_criterion'] == 'state_distance_network':
-        encoder = torch.load(config['state_distance_network_params.path'])
+        encoder = torch.load(config['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(config['state_distance_network_params.device'])
         threshold = config['state_distance_network_params.threshold']
         return EncoderDistance(encoder, device, threshold)
@@ -108,6 +111,7 @@ def gen_navigation_env(conf, verbose=False):
 
 def get_encoders(conf):
     if conf['env.env_type'] == 'gym_minigrid':
+        init_logger('rllr.env.gym_minigrid_navigation.environments')
         grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
         state_encoder = minigrid_encoders.get_encoder(grid_size, conf['worker'])
         goal_state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
@@ -117,15 +121,17 @@ def get_encoders(conf):
 
 
 def get_agent(conf):
+    state_encoder, goal_state_encoder = get_encoders(conf)
+    get_policy_function = partial(
+        get_master_worker_net,
+        state_encoder=state_encoder,
+        goal_state_encoder=goal_state_encoder,
+        action_size=conf['env.action_size'],
+        config=conf
+    )
+
     if conf['agent.algorithm'] == 'DQN':
-        state_encoder, goal_state_encoder = get_encoders(conf)
-        get_policy_function = partial(
-            get_master_worker_net,
-            state_encoder=state_encoder,
-            goal_state_encoder=goal_state_encoder,
-            action_size=conf['env.action_size'],
-            config=conf
-        )
+        init_logger('rllr.algo.dqn')
         agent = get_dqn_agent(conf['agent'], get_policy_function)
         return agent
     else:
@@ -181,7 +187,5 @@ def main(args=None):
 
 if __name__ == '__main__':
     init_logger(__name__)
-    init_logger('dqn')
-    init_logger('environments')
-    init_logger('gym_minigrid_navigation.environments')
+    init_logger('rllr.env.wrappers')
     main()
