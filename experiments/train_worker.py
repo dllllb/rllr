@@ -7,9 +7,8 @@ from functools import partial
 
 import rllr.env as environments
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
-from rllr.env.gym_minigrid_navigation import encoders as minigrid_encoders
 from rllr.algo.dqn import get_dqn_agent
-from rllr.models import get_master_worker_net, EncoderDistance
+from rllr.models import get_master_worker_net, EncoderDistance, encoders as minigrid_encoders
 
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
@@ -133,7 +132,7 @@ def get_agent(conf):
 
     if conf['agent.algorithm'] == 'DQN':
         init_logger('rllr.algo.dqn')
-        agent = get_dqn_agent(conf['agent'], get_policy_function, conf['env.action_size'])
+        agent = get_dqn_agent(conf['agent'], get_policy_function)
         return agent
     else:
         raise AttributeError(f"unknown algorithm '{conf['agent.algorithm']}'")
