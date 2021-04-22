@@ -98,7 +98,7 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
                     break
 
             if self.verbose:
-                logger.info(f"Buffer goal: {self.goal_state['position'], self.goal_state['direction']}")
+                logger.info(f"Buffer goal: {self.goal_state['position']}")
 
             return state
 

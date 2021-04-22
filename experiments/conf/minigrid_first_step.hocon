@@ -21,7 +21,7 @@
     state_distance_network_params: {
         path: artifacts/models/minigrid_state_distance_encoder.p,
         device: "cuda:0",
-        threshold: 5
+        threshold: 7
     }
     video_path: artifacts/video/
   },

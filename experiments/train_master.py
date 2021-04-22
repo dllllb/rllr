@@ -116,6 +116,6 @@ if __name__ == '__main__':
     init_logger(__name__)
     init_logger('dqn')
     init_logger('ddpg')
-    init_logger('environments')
-    init_logger('gym_minigrid_navigation.environments')
+    init_logger('rllr.env.wrappers')
+    init_logger('rllr.env.gym_minigrid_navigation.environments')
     main()
