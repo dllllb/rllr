@@ -1,19 +1,18 @@
 import torch
 import logging
 
-from typing import Type
-
 import torch.nn.functional as F
 import torch.optim
 
 from ..buffer import ReplayBuffer
 from ..utils import convert_to_torch
+from .core import Algo
 
 
 logger = logging.getLogger(__name__)
 
 
-class DDPG:
+class DDPG(Algo):
     """ Deep deterministic policy gradient implementation for master agent.
         Master agent sets goal for worker to achieve higher future reward.
     """
@@ -26,8 +25,8 @@ class DDPG:
                  tau: float = 0.001,
                  gamma: float = 0.99,
                  update_step: int = 50,
-                 start_noise: float = 0.1,
-                 noise_decay: float = 1,
+                 start_noise: float = 1,
+                 noise_decay: float = 0.9995,
                  min_noise: float = 0.1,
                  epochs: int = 50,
                  steps_per_epoch: int = 1,
@@ -121,10 +120,3 @@ class DDPG:
         for target_param, param in actor_params:
             updated_params = self.tau * param.data + (1 - self.tau) * target_param.data
             target_param.data.copy_(updated_params)
-
-
-def get_ddpg_agent(master_network, conf):
-    device = torch.device(conf['device'])
-    replay_buffer = ReplayBuffer(conf['buffer_size'], conf['batch_size'], device)
-    return DDPG(master_network, replay_buffer, device, explore=conf['explore'], update_step=conf['update_step'],
-                start_noise=conf['start_noise'], noise_decay=conf['noise_decay'], min_noise=conf['min_noise'])

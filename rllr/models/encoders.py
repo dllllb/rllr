@@ -7,12 +7,12 @@ import torch
 
 class MLP(nn.Module):
     """Multi Layer Perceptron"""
-    def __init__(self, input_size, conf):
+    def __init__(self, input_size: int, hidden_layers_sizes: list):
         super().__init__()
         self.input_size = input_size
 
         layers = []
-        layers_size = [input_size] + list(conf['hidden_layers_sizes'])
+        layers_size = [input_size] + list(hidden_layers_sizes)
         for size_in, size_out in zip(layers_size[:-1], layers_size[1:]):
             layers.append(nn.Linear(size_in, size_out))
             layers.append(nn.ReLU())
@@ -195,10 +195,27 @@ class DummyImageStateEncoder(nn.Module):
         return torch.cat([agent_pos, directions], dim=1)
 
 
+class GoalStateEncoder(nn.Module):
+
+    def __init__(self, state_encoder, goal_state_encoder):
+        super().__init__()
+        self.state_encoder = state_encoder
+        self.goal_state_encoder = goal_state_encoder
+        self.output_size = state_encoder.output_size + goal_state_encoder.output_size
+
+    def forward(self, states_and_goals):
+        if 'goal_emb' in states_and_goals.keys():
+            goal_encoding = states_and_goals['goal_emb']
+        else:
+            goal_encoding = self.goal_state_encoder.forward(states_and_goals['goal_state'])
+        state_encoding = self.state_encoder.forward(states_and_goals['state'])
+        return torch.cat([state_encoding, goal_encoding], dim=1)
+
+
 def get_encoder(grid_size, config):
     if config['state_encoder_type'] == 'simple_mlp':
         state_size = 3 * (grid_size - 2) ** 2
-        state_encoder = Flattener(MLP(state_size, config))
+        state_encoder = Flattener(MLP(state_size, config['hidden_layers_sizes']))
     elif config['state_encoder_type'] == 'simple_cnn':
         state_encoder = SimpleCNN(grid_size, config)
     elif config['state_encoder_type'] == 'cnn_all_layers':
