@@ -4,8 +4,7 @@
     env_task: MiniGrid-Dynamic-Obstacles,
     grid_size: 8,
     action_size: 3,
-    rgb_image: true,
-    tile_size: 4,
+    rgb_image: false,
     goal_type: from_buffer,
     from_buffer_choice_params: {
         buffer_size: 100000,
@@ -19,7 +18,7 @@
     }
     goal_achieving_criterion: state_distance_network,
     state_distance_network_params: {
-        path: artifacts/models/minigrid_state_distance_encoder.p,
+        path: artifacts/models/minigrid_state_distance_encoder_draft.p,
         device: "cuda:0",
         threshold: 5
     }
@@ -27,18 +26,18 @@
   },
 
   worker: {
-    state_encoder_type: dummy_image,
-    tile_size: 4,
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [128, 128],
     head: {
         hidden_size: 64
     }
   },
 
   master: {
-    state_encoder_type: dummy_image,
-    tile_size: 4,
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [128, 128],
     head: {
-        hidden_size: 32
+        hidden_size: 64
     }
   }
 

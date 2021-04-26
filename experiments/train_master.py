@@ -27,16 +27,12 @@ def run_episode(env, worker_agent, master_agent):
     score, steps, done = 0, 0, False
     while not done:
         steps += 1
-        state_ = state
         goal_emb = master_agent.act(state)
-        for _ in range(1):
-            action = worker_agent.act({'state': state, 'goal_emb': goal_emb})
-            next_state, reward, done, _ = env.step(action)
-            score += reward
-            state = next_state
-            if done:
-                break
-        master_agent.update(state_, goal_emb, reward, next_state, done)
+        action = worker_agent.act({'state': state, 'goal_emb': goal_emb})
+        next_state, reward, done, _ = env.step(action)
+        score += reward
+        master_agent.update(state, goal_emb, reward, next_state, done)
+        state = next_state
 
     master_agent.reset_episode()
     env.close()
@@ -60,7 +56,7 @@ def run_episodes(env, worker_agent, master_agent, n_episodes=1_000, verbose=Fals
         if verbose and episode % int(verbose) == 0:
             avg_score = score_sum / int(verbose)
             avg_step = step_sum / int(verbose)
-            print(f"Episode: {episode}. scores: {avg_score:.2f}, steps: {avg_step:.2f}")
+            logger.info(f"Episode: {episode}. scores: {avg_score:.2f}, steps: {avg_step:.2f}")
             score_sum, step_sum, goals_achieved_sum, losses = 0, 0, 0, []
 
     return scores, steps
@@ -134,6 +130,6 @@ if __name__ == '__main__':
     init_logger(__name__)
     init_logger('dqn')
     init_logger('ddpg')
-    init_logger('environments')
-    init_logger('gym_minigrid_navigation.environments')
+    init_logger('rllr.env.wrappers')
+    init_logger('rllr.env.gym_minigrid_navigation.environments')
     main()

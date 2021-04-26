@@ -7,15 +7,14 @@ import torch.nn as nn
 from rllr.models.encoders import get_encoder
 from rllr.env.gym_minigrid_navigation.environments import gen_wrapped_env
 
-from rllr.models import StateDistanceNetwork
-
+from rllr.models import StateDistanceNetwork, EncoderDistance
 from rllr.utils import get_conf, switch_reproducibility_on, convert_to_torch
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
 
 
-def rollout(env, max_steps=False, device=torch.device("cpu")):
+def rollout(env, max_steps=False):
     states, next_states, actions = [], [], []
     done = False
 
@@ -33,16 +32,15 @@ def rollout(env, max_steps=False, device=torch.device("cpu")):
             break
         i += 1
 
-    states = torch.from_numpy(np.array(states)).to(device, dtype=torch.float32)
-    next_states = torch.from_numpy(np.array(next_states)).to(device, dtype=torch.float32)
-    actions = torch.from_numpy(np.array(actions)).to(device)
+    states = torch.from_numpy(np.array(states)).float()
+    next_states = torch.from_numpy(np.array(next_states)).float()
+    actions = torch.from_numpy(np.array(actions))
     return states, next_states, actions
 
 
 def main(args=None):
     config = get_conf(args)
     switch_reproducibility_on(config['seed'])
-    # TODO: don't reproduce. some seed isn't fixed. make reproducible
 
     env = gen_wrapped_env(config['env'])
 
@@ -51,24 +49,26 @@ def main(args=None):
 
     net = StateDistanceNetwork(encoder=encoder, action_size=env.action_space.n, config=config['state_distance_network'])
 
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-6)
+    lr = config['training'].get('lr', 1e-4)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-6)
     nll_loss = nn.NLLLoss()
 
     conf = config['training']
     device = torch.device(conf['device'])
     net.to(device)
+    sum_loss = 0
     for roll in range(conf['n_episodes']):
-        states, next_states, actions = rollout(env, device=device)
-
-        loss = 0
+        states, next_states, actions = map(lambda x: x.to(device), rollout(env))
         for epoch in range(conf['n_epochs']):
             optimizer.zero_grad()
             predicted_actions = net.forward(states, next_states)
             loss = nll_loss(predicted_actions, actions)
             loss.backward()
             optimizer.step()
-        if roll % conf['verbose'] == 0:
-            logger.info("Rollout: {0}, loss: {1}".format(roll, loss.item()))
+            sum_loss += loss.item()
+        if (roll + 1) % conf['verbose'] == 0:
+            logger.info("Rollout: {0}, loss: {1}".format(roll + 1, sum_loss / roll / conf['n_epochs']))
+            sum_loss = 0
 
     if config.get('outputs', False):
         if config.get('outputs.path', False):
