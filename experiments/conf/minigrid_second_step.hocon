@@ -28,6 +28,7 @@
     buffer_size: 1000000,
     batch_size: 512,
     noise_decay: 0.995,
+    start_noise: 1,
     min_noise: 0.01,
     explore: true,
     update_step: 4,

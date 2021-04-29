@@ -25,16 +25,17 @@ class DDPG(Algo):
                  tau: float = 0.001,
                  gamma: float = 0.99,
                  update_step: int = 50,
-                 start_noise: float = 1,
-                 noise_decay: float = 0.9995,
-                 min_noise: float = 0.1,
+                 start_noise: float = 1.,
+                 noise_decay: float = 0.995,
+                 min_noise: float = 0.01,
                  epochs: int = 50,
                  steps_per_epoch: int = 1,
                  policy_delay: int = 1,
                  learning_rate_critic: float = 1e-3,
                  learning_rate_actor: float = 1e-3,
                  actor_grad_clipping: int = None,
-                 critic_grad_clipping: int = None):
+                 critic_grad_clipping: int = None,
+                 action_range: tuple = (-1., 1.)):
 
         self.device = device
         self.actor_critic = actor_critic.to(self.device)
@@ -56,17 +57,30 @@ class DDPG(Algo):
         self.actor_optimizer = torch.optim.Adam(self.actor_critic.actor.parameters(), learning_rate_actor)
         self.actor_grad_clipping = actor_grad_clipping
         self.critic_grad_clipping = critic_grad_clipping
+        self.action_range = action_range
 
     def act(self, state):
-        goal_state = self.actor_critic.target_actor.forward(convert_to_torch([state], device=self.device))
+        action = self.actor_critic.actor.forward(convert_to_torch([state], device=self.device))
 
         if self.explore:
-            goal_state += self.act_noise * torch.randn(goal_state.size()).to(self.device)
-        return goal_state.clamp(-1, 1).cpu().data.numpy()[0]
+            action += self.act_noise * torch.randn(action.size()).to(self.device)
+        action = action.clamp(-1, 1).cpu().data.numpy()[0]
+        return self.unscale_action(action)
 
-    def update(self, states, goal_states, rewards, next_states, dones):
+    def scale_action(self, actions):
+        low = self.action_range[0]
+        high = self.action_range[1]
+        return (actions - low) / (high - low) * 2. - 1.
 
-        self.replay_buffer.add(states, goal_states, rewards, next_states, dones)
+    def unscale_action(self, scaled_actions):
+        low = self.action_range[0]
+        high = self.action_range[1]
+        return low + (scaled_actions + 1.)/2. * (high - low)
+
+    def update(self, states, actions, rewards, next_states, dones):
+
+        scaled_actions = self.scale_action(actions)
+        self.replay_buffer.add(states, scaled_actions, rewards, next_states, dones)
 
         if (self.iter < self.update_step) or not self.replay_buffer.is_enough():
             self.iter += 1
@@ -80,29 +94,29 @@ class DDPG(Algo):
         self.act_noise = max(self.noise_decay * self.act_noise, self.min_noise)
 
     def _update_actor_critic(self):
-        states, goal_states, rewards, next_states, dones = self.replay_buffer.sample()
+        states, actions, rewards, next_states, dones = self.replay_buffer.sample()
         n_updates = 0
         for _ in range(self.steps_per_epoch):
             n_updates += 1
-            self._update_critic(states, goal_states, rewards, dones, next_states)
+            self._update_critic(states, actions, rewards, dones, next_states)
             if n_updates % self.policy_delay == 0:
                 self._update_actor(states)
                 self._update_target_networks()
 
     def _update_actor(self, states):
-        goal_states = self.actor_critic.actor.forward(states)
-        loss = -self.actor_critic.critic.forward(states, goal_states).mean()
+        actions = self.actor_critic.actor.forward(states)
+        loss = -self.actor_critic.critic.forward(states, actions).mean()
         self.actor_optimizer.zero_grad()
         loss.backward()
         if self.actor_grad_clipping:
             torch.nn.utils.clip_grad_norm_(self.actor_critic.actor.parameters(), self.actor_grad_clipping)
         self.actor_optimizer.step()
 
-    def _update_critic(self, states, goal_states, rewards, dones, next_states):
-        next_goal_states = self.actor_critic.target_actor.forward(next_states)
-        q_target = self.actor_critic.target_critic.forward(next_states, next_goal_states).detach()
+    def _update_critic(self, states, actions, rewards, dones, next_states):
+        next_actions = self.actor_critic.target_actor.forward(next_states)
+        q_target = self.actor_critic.target_critic.forward(next_states, next_actions).detach()
         y = rewards + self.gamma * (1 - dones) * q_target
-        q = self.actor_critic.critic.forward(states, goal_states)
+        q = self.actor_critic.critic.forward(states, actions)
         loss = F.mse_loss(q, y)
         self.critic_optimizer.zero_grad()
         loss.backward()

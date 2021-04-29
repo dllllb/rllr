@@ -42,10 +42,9 @@ class ActorNetwork(nn.Module):
     """
     Actor network. Input is current state and output is action in continuous action space.
     """
-    def __init__(self, action_size, state_encoder, hidden_size, action_range):
+    def __init__(self, action_size, state_encoder, hidden_size):
         super().__init__()
         self.state_encoder = state_encoder
-        self.action_range = action_range
         input_size = state_encoder.output_size
         fc_layers = []
         if type(hidden_size) == int:
@@ -63,20 +62,14 @@ class ActorNetwork(nn.Module):
         else:
             AttributeError(f"unknown type of {hidden_size} parameter")
 
-        if self.action_range:
-            fc_layers.append(nn.Tanh())
+        fc_layers.append(nn.Tanh())
 
         self.fc = nn.Sequential(*fc_layers)
         self.output_size = action_size
 
     def forward(self, states):
         states_encoding = self.state_encoder(states)
-        actions = self.fc(states_encoding)
-        if self.action_range:
-            low = torch.tensor(self.action_range[0])
-            high = torch.tensor(self.action_range[1])
-            actions = low + (actions + torch.tensor(1.))/torch.tensor(2.) * high
-        return actions
+        return self.fc(states_encoding)
 
 
 class CriticNetwork(nn.Module):
@@ -116,14 +109,13 @@ class ActorCriticNetwork(nn.Module):
     Actor-critic model for DDPG
     """
 
-    def __init__(self, emb_size, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size,
-                 action_range=(-1., 1.)):
+    def __init__(self, action_size, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size):
         super(ActorCriticNetwork, self).__init__()
-        self.actor = ActorNetwork(emb_size, actor_state_encoder, actor_hidden_size, action_range=action_range)
-        self.critic = CriticNetwork(emb_size, critic_state_encoder, actor_hidden_size)
-        self.target_actor = ActorNetwork(emb_size, actor_state_encoder, actor_hidden_size, action_range=action_range)
+        self.actor = ActorNetwork(action_size, actor_state_encoder, actor_hidden_size)
+        self.critic = CriticNetwork(action_size, critic_state_encoder, actor_hidden_size)
+        self.target_actor = ActorNetwork(action_size, actor_state_encoder, actor_hidden_size)
         self.target_actor.load_state_dict(self.actor.state_dict())
-        self.target_critic = CriticNetwork(emb_size, critic_state_encoder, critic_hidden_size)
+        self.target_critic = CriticNetwork(action_size, critic_state_encoder, critic_hidden_size)
         self.target_critic.load_state_dict(self.critic.state_dict())
 
 

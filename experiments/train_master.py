@@ -88,8 +88,7 @@ def get_master_agent(emb_size, conf):
 
     hidden_size = conf['master']['head.hidden_size']
     master_network = ActorCriticNetwork(emb_size, state_encoder, goal_state_encoder,
-                                        actor_hidden_size=hidden_size, critic_hidden_size=hidden_size,
-                                        action_range=(-1., 1.))
+                                        actor_hidden_size=hidden_size, critic_hidden_size=hidden_size)
     master_agent = get_ddpg_agent(master_network, conf['master_agent'])
     return master_agent
 

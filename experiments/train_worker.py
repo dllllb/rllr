@@ -9,7 +9,7 @@ import rllr.env as environments
 from rllr.algo import DQN
 from rllr.buffer import ReplayBuffer
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
-from rllr.models import EncoderDistance, encoders as minigrid_encoders, QNetwork
+from rllr.models import EncoderDistance, encoders as minigrid_encoders, QNetwork, ActorNetwork
 from rllr.models.encoders import GoalStateEncoder
 
 from rllr.utils import get_conf, switch_reproducibility_on
@@ -123,10 +123,13 @@ def get_encoders(conf):
 
 
 def get_master_worker_net(state_encoder, goal_state_encoder, config):
-    goal_state_encoder = GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=goal_state_encoder)
-    hidden_size = config['worker']['head.hidden_size']
+    hidden_size_worker = config['worker']['head.hidden_size']
+    hidden_size_master = config['master']['head.hidden_size']
     action_size = config['env.action_size']
-    return QNetwork(action_size=action_size, state_encoder=goal_state_encoder, hidden_size=hidden_size)
+    emb_size = config['master']['emb_size']
+    master = ActorNetwork(emb_size, goal_state_encoder, hidden_size_master)
+    goal_state_encoder = GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=master)
+    return QNetwork(action_size=action_size, state_encoder=goal_state_encoder, hidden_size=hidden_size_worker)
 
 def get_dqn_agent(config, get_policy_function):
     qnetwork_local = get_policy_function()
@@ -145,8 +148,7 @@ def get_dqn_agent(config, get_policy_function):
                 eps_start=config['eps_start'],
                 eps_end=config['eps_end'],
                 eps_decay=config['eps_decay'],
-                tau=config['tau'] ,
-                )
+                tau=config['tau'])
     return agent
 
 
