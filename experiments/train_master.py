@@ -3,7 +3,9 @@ import os
 import pickle
 import torch
 
-from rllr.algo.ddpg import get_ddpg_agent
+from rllr.algo import DDPG
+from rllr.buffer import ReplayBuffer
+
 from rllr.models.models import ActorCriticNetwork
 from .train_worker import gen_env
 
@@ -69,6 +71,13 @@ def load_worker_agent(conf):
     return worker_agent
 
 
+def get_ddpg_agent(master_network, conf):
+    device = torch.device(conf['device'])
+    replay_buffer = ReplayBuffer(conf['buffer_size'], conf['batch_size'], device)
+    return DDPG(master_network, replay_buffer, device, explore=conf['explore'], update_step=conf['update_step'],
+                start_noise=conf['start_noise'], noise_decay=conf['noise_decay'], min_noise=conf['min_noise'])
+
+
 def get_master_agent(emb_size, conf):
     if conf['env.env_type'] == 'gym_minigrid':
         grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
@@ -77,7 +86,9 @@ def get_master_agent(emb_size, conf):
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
-    master_network = ActorCriticNetwork(emb_size, state_encoder, goal_state_encoder, conf['master'])
+    hidden_size = conf['master']['head.hidden_size']
+    master_network = ActorCriticNetwork(emb_size, state_encoder, goal_state_encoder,
+                                        actor_hidden_size=hidden_size, critic_hidden_size=hidden_size)
     master_agent = get_ddpg_agent(master_network, conf['master_agent'])
     return master_agent
 
@@ -89,7 +100,8 @@ def main(args=None):
     env = gen_env(config['env'])
 
     worker_agent = load_worker_agent(config['worker_agent'])
-    emb_size = worker_agent.qnetwork_local.master.output_size
+    worker_agent.explore = False
+    emb_size = worker_agent.qnetwork_local.state_encoder.goal_state_encoder.output_size
 
     master_agent = get_master_agent(emb_size, config)
 

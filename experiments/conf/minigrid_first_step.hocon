@@ -38,8 +38,9 @@
     state_encoder_type: dummy_image,
     tile_size: 4,
     head: {
-        hidden_size: 32
-    }
+        hidden_size: []
+    },
+    emb_size: 32
   }
 
   agent: {

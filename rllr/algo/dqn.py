@@ -7,11 +7,12 @@ import torch.optim as optim
 
 from ..buffer import ReplayBuffer
 from ..utils import convert_to_torch
+from .core import Algo
 
 logger = logging.getLogger(__name__)
 
 
-class DQN:
+class DQN(Algo):
     """ An agent implementing Deep Q-Network algorithm"""
 
     def __init__(self,
@@ -27,13 +28,17 @@ class DQN:
                  eps_decay: float = 0.995,
                  tau: float = 0.001,
                  explore: bool = True):
-        """Initializes an Agent.
+        """ Initializes a DQN agent.
 
         Params:
         -------
-            state_size (int): dimension of each state
-            action_size (int): dimension of each action
-            seed (int): random seed
+            qnetwork_local: qnetwork for local updates q-values
+            qnetwork_target: a copy of qnetwork_local for smooth q function
+            replay_buffer: buffer containing experience <s,a, r, s', d> tuples
+            device: cpu or gpu device
+            learning_rate: learning rate
+            update_step: number of steps between policy updates
+            gamma: reward discount factor
         """
         self.device = device
         logger.info("Running on device: {}".format(self.device))
@@ -54,14 +59,13 @@ class DQN:
         self.gamma = gamma
         self.update_step = update_step
 
-
     def reset_episode(self):
         """
         Resets episode and update epsilon decay
         """
         self.eps = max(self.eps_end, self.eps_decay * self.eps)
 
-    def learn(self):
+    def _learn(self):
         """
         Learns values-actions network
 
@@ -95,10 +99,10 @@ class DQN:
         self.step = (self.step + 1) % self.update_step
         if self.step == 0:
             if self.replay_buffer.is_enough():
-                self.learn()
-                self.reset_target_network()
+                self._learn()
+                self._reset_target_network()
 
-    def reset_target_network(self):
+    def _reset_target_network(self):
         """
         Resets params of target network to values from local network
         """
@@ -127,25 +131,3 @@ class DQN:
 
             self.qnetwork_local.train()
             return np.argmax(action_values.cpu().data.numpy())
-
-
-def get_dqn_agent(config, get_policy_function):
-    qnetwork_local = get_policy_function()
-    qnetwork_target = get_policy_function()
-    qnetwork_target.load_state_dict(qnetwork_local.state_dict())
-    device = torch.device(config['device'])
-    replay_buffer = ReplayBuffer(config['buffer_size'], config['batch_size'], device)
-
-    agent = DQN(qnetwork_local,
-                qnetwork_target,
-                replay_buffer,
-                device,
-                learning_rate=config['learning_rate'],
-                update_step=config['update_step'],
-                gamma=config['gamma'],
-                eps_start=config['eps_start'],
-                eps_end=config['eps_end'],
-                eps_decay=config['eps_decay'],
-                tau=config['tau'] ,
-                )
-    return agent

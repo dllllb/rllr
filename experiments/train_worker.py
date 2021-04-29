@@ -6,9 +6,11 @@ import torch
 from functools import partial
 
 import rllr.env as environments
+from rllr.algo import DQN
+from rllr.buffer import ReplayBuffer
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
-from rllr.algo.dqn import get_dqn_agent
-from rllr.models import get_master_worker_net, EncoderDistance, encoders as minigrid_encoders
+from rllr.models import EncoderDistance, encoders as minigrid_encoders, QNetwork, ActorNetwork
+from rllr.models.encoders import GoalStateEncoder
 
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
@@ -120,13 +122,42 @@ def get_encoders(conf):
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
 
+def get_master_worker_net(state_encoder, goal_state_encoder, config):
+    hidden_size_worker = config['worker']['head.hidden_size']
+    hidden_size_master = config['master']['head.hidden_size']
+    action_size = config['env.action_size']
+    emb_size = config['master']['emb_size']
+    master = ActorNetwork(emb_size, goal_state_encoder, hidden_size_master)
+    goal_state_encoder = GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=master)
+    return QNetwork(action_size=action_size, state_encoder=goal_state_encoder, hidden_size=hidden_size_worker)
+
+def get_dqn_agent(config, get_policy_function):
+    qnetwork_local = get_policy_function()
+    qnetwork_target = get_policy_function()
+    qnetwork_target.load_state_dict(qnetwork_local.state_dict())
+    device = torch.device(config['device'])
+    replay_buffer = ReplayBuffer(config['buffer_size'], config['batch_size'], device)
+
+    agent = DQN(qnetwork_local,
+                qnetwork_target,
+                replay_buffer,
+                device,
+                learning_rate=config['learning_rate'],
+                update_step=config['update_step'],
+                gamma=config['gamma'],
+                eps_start=config['eps_start'],
+                eps_end=config['eps_end'],
+                eps_decay=config['eps_decay'],
+                tau=config['tau'])
+    return agent
+
+
 def get_agent(conf):
     state_encoder, goal_state_encoder = get_encoders(conf)
     get_policy_function = partial(
         get_master_worker_net,
         state_encoder=state_encoder,
         goal_state_encoder=goal_state_encoder,
-        action_size=conf['env.action_size'],
         config=conf
     )
 

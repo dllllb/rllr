@@ -1,6 +1,7 @@
 import random
 from collections import deque
 from functools import partial
+import torch
 
 from ..utils import convert_to_torch
 
@@ -10,7 +11,7 @@ class ReplayBuffer:
     Memory buffer for saving trajectories
     """
 
-    def __init__(self, buffer_size, batch_size, device):
+    def __init__(self, buffer_size: int, batch_size: int, device: torch.device):
         self.buffer = deque(maxlen=buffer_size)
         self.batch_size = batch_size
         self.buffer_size = buffer_size
