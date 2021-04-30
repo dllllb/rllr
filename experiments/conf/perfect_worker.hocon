@@ -1,0 +1,46 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Empty,
+    grid_size: 8,
+    action_size: 3,
+    rgb_image: false,
+    goal_achieving_criterion: position,
+    goal_type: random,
+  },
+
+  master: {
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [128],
+    head: {
+        hidden_size: [128]
+    },
+    emb_size: 2
+  }
+
+  master_agent: {
+    buffer_size: 1000000,
+    batch_size: 128,
+    noise_decay: 0.995,
+    start_noise: 1,
+    min_noise: 0.1,
+    explore: true,
+    update_step: 50,
+    epochs: 50,
+    steps_per_epoch: 1,
+    device: "cpu"
+  }
+
+  training: {
+    n_episodes: 500,
+    verbose: 100,
+  },
+
+  seed: 0,
+
+  outputs: {
+    save_example: true,
+    path: artifacts/models/minigrid_simple.p,
+  }
+
+}
