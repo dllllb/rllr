@@ -68,11 +68,14 @@ def run_episodes(env, worker_agent, n_episodes=1_000, verbose=False, train_mode=
 
 
 def get_goal_achieving_criterion(config):
-    if config['goal_achieving_criterion'] == 'position':
+    if config['goal_achieving_criterion'] == 'position_and_direction':
         def position_achievement(state, goal_state):
             return (state['position'] == goal_state['position']).all()
         return position_achievement
-
+    elif config['goal_achieving_criterion'] == 'position':
+        def position_achievement(state, goal_state):
+            return (state['position'][:-1] == goal_state['position'][:-1]).all()
+        return position_achievement
     elif config['goal_achieving_criterion'] == 'state_distance_network':
         encoder = torch.load(config['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(config['state_distance_network_params.device'])

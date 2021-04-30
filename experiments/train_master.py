@@ -7,7 +7,7 @@ from rllr.algo import DDPG
 from rllr.buffer import ReplayBuffer
 
 from rllr.models.models import ActorCriticNetwork
-from .train_worker import gen_env
+from experiments.train_worker import gen_env
 
 from rllr.models import encoders as minigrid_encoders
 
@@ -18,7 +18,7 @@ from rllr.utils.logger import init_logger
 logger = logging.getLogger(__name__)
 
 
-def run_episode(env, worker_agent, master_agent):
+def run_episode(env, worker_agent, master_agent, worker_steps):
     """
     A helper function for running single episode
     """
@@ -26,13 +26,17 @@ def run_episode(env, worker_agent, master_agent):
 
     score, steps, done = 0, 0, False
     while not done:
-        steps += 1
         goal_emb = master_agent.act(state)
-        action = worker_agent.act({'state': state, 'goal_emb': goal_emb})
-        next_state, reward, done, _ = env.step(action)
-        score += reward
-        master_agent.update(state, goal_emb, reward, next_state, done)
-        state = next_state
+        state_ = state
+        for _ in range(worker_steps):
+            steps += 1
+            action = worker_agent.act({'state': state, 'goal_emb': goal_emb})
+            next_state, reward, done, _ = env.step(action)
+            state = next_state
+            score += reward
+            if done:
+                break
+        master_agent.update(state_, goal_emb, reward, next_state, done)
 
     master_agent.reset_episode()
     env.close()
@@ -40,14 +44,14 @@ def run_episode(env, worker_agent, master_agent):
     return score, steps
 
 
-def run_episodes(env, worker_agent, master_agent, n_episodes=1_000, verbose=False):
+def run_episodes(env, worker_agent, master_agent, n_episodes=1_000, verbose=False, worker_steps=1):
     """
     Runs a series of episode and collect statistics
     """
     score_sum, step_sum = 0, 0
     scores, steps = [], []
     for episode in range(1, n_episodes + 1):
-        score, step = run_episode(env, worker_agent, master_agent)
+        score, step = run_episode(env, worker_agent, master_agent, worker_steps=worker_steps)
         score_sum += score
         step_sum += step
         scores.append(score)

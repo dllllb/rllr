@@ -7,7 +7,7 @@
     rgb_image: true,
     tile_size: 4,
     goal_type: random,
-    goal_achieving_criterion: position,
+    goal_achieving_criterion: position_and_direction,
     video_path: artifacts/video/
   },
 
