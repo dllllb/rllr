@@ -5,7 +5,7 @@ import gym
 import torch
 import torch.nn as nn
 
-import train_worker
+from experiments import train_worker
 from rllr.env import NavigationGoalWrapper
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
 
@@ -20,7 +20,7 @@ class GoalStateExtenderWrapper(NavigationGoalWrapper):
 
     def __init__(self, env):
         super().__init__(env, env.goal_achieving_criterion)
-        obs_space = env.observation_space['image']
+        obs_space = env.observation_space['goal_state']
         low = np.expand_dims(obs_space.low, axis=0).repeat(2, 0)
         high = np.expand_dims(obs_space.high, axis=0).repeat(2, 0)
         extended_shape = (2,) + obs_space.shape
@@ -28,7 +28,7 @@ class GoalStateExtenderWrapper(NavigationGoalWrapper):
         self.action_space = gym.spaces.Discrete(3)
 
     def _extend_state(self, state):
-        return np.array([state["image"], self.env.goal_state['image']])
+        return np.array([state["state"], state['goal_state']])
 
     def step(self, action):
         next_state, reward, done, info = self.env.step(action)
@@ -43,7 +43,7 @@ class StateExtenderWrapper(gym.Wrapper):
 
     def __init__(self, env):
         super().__init__(env)
-        obs_space = env.observation_space['image']
+        obs_space = env.observation_space
         low = np.expand_dims(obs_space.low, axis=0).repeat(2, 0)
         high = np.expand_dims(obs_space.high, axis=0).repeat(2, 0)
         extended_shape = (2,) + obs_space.shape
@@ -51,7 +51,7 @@ class StateExtenderWrapper(gym.Wrapper):
         self.action_space = gym.spaces.Discrete(3)
 
     def _extend_state(self, state):
-        return np.array([state["image"], state["image"]])
+        return np.array([state, state])
 
     def step(self, action):
         next_state, reward, done, info = self.env.step(action)

@@ -4,9 +4,8 @@ import pickle
 import torch
 
 from rllr.algo import DDPG
-from rllr.buffer import ReplayBuffer
 
-from rllr.models.models import ActorCriticNetwork
+from rllr.models.ddpg import ActorCriticNetwork
 from experiments.train_worker import gen_env
 
 from rllr.models import encoders as minigrid_encoders
@@ -77,8 +76,8 @@ def load_worker_agent(conf):
 
 def get_ddpg_agent(master_network, conf):
     device = torch.device(conf['device'])
-    replay_buffer = ReplayBuffer(conf['buffer_size'], conf['batch_size'], device)
-    return DDPG(master_network, replay_buffer, device, explore=conf['explore'], update_step=conf['update_step'],
+    return DDPG(master_network, device, explore=conf['explore'],
+                batch_size=conf['batch_size'], buffer_size=conf['buffer_size'], update_step=conf['update_step'],
                 start_noise=conf['start_noise'], noise_decay=conf['noise_decay'], min_noise=conf['min_noise'])
 
 

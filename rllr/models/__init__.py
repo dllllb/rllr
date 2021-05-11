@@ -1,5 +1,4 @@
-from .models import QNetwork
-from .models import ActorNetwork
-from .models import CriticNetwork
+from .dqn import QNetwork
+from .ddpg import ActorNetwork, CriticNetwork
 from .models import StateDistanceNetwork
 from .models import EncoderDistance
