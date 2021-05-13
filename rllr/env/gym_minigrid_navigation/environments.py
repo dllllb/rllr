@@ -26,6 +26,12 @@ class ImageObsWrapper(gym.core.ObservationWrapper):
         return obs['image']
 
 
+class ChangeActionSizeWrapper(gym.Wrapper):
+    def __init__(self, env, action_size):
+        super().__init__(env)
+        self.action_space = gym.spaces.Discrete(action_size)
+
+
 def gen_wrapped_env(conf, verbose=False):
     if conf['env_task'] in ['MiniGrid-Empty', 'MiniGrid-Dynamic-Obstacles']:
         env_name = f"{conf['env_task']}-{conf['grid_size']}x{conf['grid_size']}-v0"
@@ -33,6 +39,9 @@ def gen_wrapped_env(conf, verbose=False):
         raise AttributeError(f"unknown env_task '{conf['env_task']}'")
 
     env = gym.make(env_name)
+
+    if conf.get('action_size', None) and conf['action_size'] != env.action_space.n:
+        env = ChangeActionSizeWrapper(env, conf['action_size'])
 
     if conf.get('deterministic', True):
         seed = conf.get('seed', 42)
