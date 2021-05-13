@@ -7,7 +7,7 @@ import torch.nn as nn
 from rllr.models.encoders import get_encoder
 from rllr.env.gym_minigrid_navigation.environments import gen_wrapped_env
 
-from rllr.models import StateDistanceNetwork, EncoderDistance
+from rllr.models import StateDistanceNetwork
 from rllr.utils import get_conf, switch_reproducibility_on, convert_to_torch
 from rllr.utils.logger import init_logger
 
