@@ -134,6 +134,7 @@ def get_master_worker_net(state_encoder, goal_state_encoder, config):
     goal_state_encoder = GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=master)
     return QNetwork(action_size=action_size, state_encoder=goal_state_encoder, hidden_size=hidden_size_worker)
 
+
 def get_dqn_agent(config, get_policy_function):
     qnetwork_local = get_policy_function()
     qnetwork_target = get_policy_function()
