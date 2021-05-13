@@ -21,9 +21,14 @@ class ReplayBuffer:
         self.buffer.append(args)
 
     def sample(self):
-
         batch = random.sample(self.buffer, k=self.batch_size)
         return map(partial(convert_to_torch, device=self.device), zip(*batch))
 
+    def get(self):
+        return map(partial(convert_to_torch, device=self.device), zip(*self.buffer))
+
+    def clear(self):
+        self.buffer.clear()
+
     def is_enough(self):
-        return len(self.buffer) > self.batch_size
+        return len(self.buffer) >= self.batch_size

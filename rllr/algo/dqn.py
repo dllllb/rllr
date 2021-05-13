@@ -18,8 +18,9 @@ class DQN(Algo):
     def __init__(self,
                  qnetwork_local: torch.nn.Module,
                  qnetwork_target: torch.nn.Module,
-                 replay_buffer: ReplayBuffer,
                  device: torch.device,
+                 buffer_size: int = 100000,
+                 batch_size: int = 128,
                  learning_rate: float = 0.001,
                  update_step: int = 4,
                  gamma: float = 0.9,
@@ -47,9 +48,9 @@ class DQN(Algo):
 
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=learning_rate)
         self.action_size = self.qnetwork_local.output_size
-        self.replay_buffer = replay_buffer
-        self.batch_size = replay_buffer.batch_size
-        self.buffer_size = replay_buffer.buffer_size
+        self.replay_buffer = ReplayBuffer(buffer_size=buffer_size, batch_size=batch_size, device=device)
+        self.batch_size = batch_size
+        self.buffer_size = buffer_size
         self.step = 0
         self.eps = eps_start
         self.eps_decay = eps_decay
@@ -70,7 +71,7 @@ class DQN(Algo):
         Learns values-actions network
 
         """
-        # Sample batch from replay buffer
+        # Sample batch from buffer buffer
         states, next_states, actions, rewards, dones = self.replay_buffer.sample()
 
         with torch.no_grad():
@@ -84,7 +85,7 @@ class DQN(Algo):
 
     def update(self, state, action, reward, next_state, done):
         """
-        Makes an update step of algorithm and append sars to buffer replay
+        Makes an update step of algorithm and append SARS to buffer buffer
 
         Params:
         -------
@@ -113,7 +114,7 @@ class DQN(Algo):
 
     def act(self, state):
         """
-        Selects action from state if epsilon-greedy way
+        Selects action from state in epsilon-greedy way
 
         Params:
         state - current state

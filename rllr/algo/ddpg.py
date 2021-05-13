@@ -19,9 +19,10 @@ class DDPG(Algo):
 
     def __init__(self,
                  actor_critic: torch.nn.Module,
-                 replay_buffer: ReplayBuffer,
                  device: torch.device,
                  explore: bool = True,
+                 buffer_size: int = int(1e6),
+                 batch_size: int = 128,
                  tau: float = 0.001,
                  gamma: float = 0.99,
                  update_step: int = 50,
@@ -39,9 +40,9 @@ class DDPG(Algo):
 
         self.device = device
         self.actor_critic = actor_critic.to(self.device)
-        self.buffer_size = replay_buffer.buffer_size
-        self.batch_size = replay_buffer.batch_size
-        self.replay_buffer = replay_buffer
+        self.buffer_size = buffer_size
+        self.batch_size = batch_size
+        self.replay_buffer = ReplayBuffer(buffer_size=buffer_size, batch_size=batch_size, device=device)
         self.iter = 0
         self.update_step = update_step
         self.explore = explore

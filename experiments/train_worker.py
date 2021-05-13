@@ -140,12 +140,12 @@ def get_dqn_agent(config, get_policy_function):
     qnetwork_target = get_policy_function()
     qnetwork_target.load_state_dict(qnetwork_local.state_dict())
     device = torch.device(config['device'])
-    replay_buffer = ReplayBuffer(config['buffer_size'], config['batch_size'], device)
 
     agent = DQN(qnetwork_local,
                 qnetwork_target,
-                replay_buffer,
                 device,
+                batch_size=config['batch_size'],
+                buffer_size=config['buffer_size'],
                 learning_rate=config['learning_rate'],
                 update_step=config['update_step'],
                 gamma=config['gamma'],
