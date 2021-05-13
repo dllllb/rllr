@@ -63,9 +63,9 @@ class CriticNetwork(nn.Module):
             AttributeError(f"unknown type of {hidden_size} parameter")
         self.fc = nn.Sequential(*fc_layers)
 
-    def forward(self, states, goal_embs):
+    def forward(self, states, actions):
         x = self.state_encoder(states)
-        x = torch.cat((x, goal_embs), 1)
+        x = torch.cat((x, actions), 1)
         return self.fc(x)
 
 
@@ -77,7 +77,7 @@ class ActorCriticNetwork(nn.Module):
     def __init__(self, action_size, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size):
         super(ActorCriticNetwork, self).__init__()
         self.actor = ActorNetwork(action_size, actor_state_encoder, actor_hidden_size)
-        self.critic = CriticNetwork(action_size, critic_state_encoder, actor_hidden_size)
+        self.critic = CriticNetwork(action_size, critic_state_encoder, critic_hidden_size)
         self.target_actor = ActorNetwork(action_size, actor_state_encoder, actor_hidden_size)
         self.target_actor.load_state_dict(self.actor.state_dict())
         self.target_critic = CriticNetwork(action_size, critic_state_encoder, critic_hidden_size)

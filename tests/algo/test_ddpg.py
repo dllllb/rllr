@@ -14,25 +14,25 @@ def get_ddpg_agent(env, device):
     actor_state_encoder = MLP(input_size=state_size, hidden_layers_sizes=[128])
     critic_state_encoder = MLP(input_size=state_size, hidden_layers_sizes=[128])
     actor_critic = ActorCriticNetwork(action_size, actor_state_encoder, critic_state_encoder,
-                                      actor_hidden_size=[128], critic_hidden_size=[128])
+                                      actor_hidden_size=[256, 128], critic_hidden_size=[256, 128])
     return DDPG(actor_critic, device, buffer_size=1000000, batch_size=128, action_range=action_range,
-                learning_rate_critic=1e-4, learning_rate_actor=1e-3, update_step=50, epochs=50)
+                learning_rate_critic=1e-3, learning_rate_actor=1e-3, update_step=50, epochs=10)
 
 
-#@pytest.mark.skip(reason="requires long running time, enable if needed")
+@pytest.mark.skip(reason="requires long running time, enable if needed")
 def test_ddpg_mountain_car_continuous():
     device = torch.device("cpu")
     env = gym.make('MountainCarContinuous-v0')
     ddpg = get_ddpg_agent(env, device)
-    assert ddpg.train(env, n_steps=40000, verbose=4)
+    assert ddpg.train(env, n_steps=100000, verbose=4)
 
 
-#@pytest.mark.skip(reason="requires long running time, enable if needed")
+@pytest.mark.skip(reason="requires long running time, enable if needed")
 def test_ddpg_pendulum():
     device = torch.device("cpu")
     env = gym.make('Pendulum-v0')
     ddpg = get_ddpg_agent(env, device)
-    assert ddpg.train(env, n_steps=40000, verbose=4)
+    assert ddpg.train(env, n_steps=100000, verbose=4)
 
 
 def test_scale_and_unscale():

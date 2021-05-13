@@ -1,31 +1,28 @@
 import torch
+import copy
 import torch.nn as nn
 import numpy as np
 from rllr.buffer import ReplayBuffer
 from rllr.algo.core import Algo
-from rllr.models.ppo import ActorCritic
 from rllr.utils import convert_to_torch
 
 
 class PPO(Algo):
 
     def __init__(self,
-                 state_size,
-                 action_size,
-                 device,
-                 T=128,
-                 K_epochs=10,
-                 lr=5e-3,
-                 lamb=0.8,
-                 gamma=0.97,
-                 eps=0.2,
-                 c1=0.5,
-                 c2=0.01):
+                 actor_critic: torch.nn.Module,
+                 device: torch.device,
+                 memory_size: int = 128,
+                 epochs: int = 10,
+                 lr: float = 5e-3,
+                 lamb: float = 0.8,
+                 gamma: float = 0.97,
+                 eps: float = 0.2,
+                 c1: float = 0.5,
+                 c2: float = 0.01):
         """Initializes agent object
 
         Args:
-         action_size - action space dimensions
-         state_size - state space dimensions
          actor_critic - pretrained actor-critic network
          T - time steps to collect before agent updating
          K_epochs - number of steps while optimizing networcs
@@ -37,12 +34,12 @@ class PPO(Algo):
          c2 - weight for entropy loss
 
         """
-        self.policy = ActorCritic(state_size, action_size).to(device)
-        self.policy_old = ActorCritic(state_size, action_size).to(device)
+        self.policy = actor_critic.to(device)
+        self.policy_old = copy.deepcopy(self.policy).to(device)
         self.policy_old.load_state_dict(self.policy.state_dict())
-        self.memory = ReplayBuffer(buffer_size=T, batch_size=T, device=device)
-        self.T = T
-        self.K_epochs = K_epochs
+        self.memory = ReplayBuffer(buffer_size=memory_size, batch_size=memory_size, device=device)
+        self.T = memory_size
+        self.K_epochs = epochs
         self.c1 = c1
         self.c2 = c2
         self.lamb = lamb
@@ -52,7 +49,7 @@ class PPO(Algo):
         self.device = device
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr)
 
-    def act(self, states):
+    def act(self, state):
         """Takes actions given batch of states
 
         Args:
@@ -61,10 +58,10 @@ class PPO(Algo):
         Returns:
          actions - a batch of actions generated given states
         """
-        states = convert_to_torch(states)
+        state = convert_to_torch([state])
         with torch.no_grad():
-            actions = self.policy_old.act(states)
-            return actions.detach().cpu().numpy()
+            action = self.policy_old.act(state).detach().cpu().numpy()[0]
+            return action
 
     def update(self, states, actions, rewards, next_states, dones):
         """Updates actor critic network
@@ -90,7 +87,6 @@ class PPO(Algo):
         loss = 0
 
         states, actions, rewards, next_states, dones = self.memory.get()
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         rewards_to_go = self._compute_rewards_to_go(rewards, dones)
 
         values, logprobs, S = self.policy.evaluate(states, actions)
@@ -107,7 +103,6 @@ class PPO(Algo):
         # Compute surrogate loss with clipping
         s1 = ratios * advantages
         s2 = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon) * advantages
-
         L_clip = torch.min(s1, s2)
 
         # Compute MSE loss for value functions
@@ -115,7 +110,6 @@ class PPO(Algo):
 
         # Combine losses
         loss += -L_clip.mean() + self.c1 * L_vf - self.c2 * S.mean()
-
         return loss
 
     def _compute_advantages(self, rewards, values, next_values, dones):
@@ -124,7 +118,7 @@ class PPO(Algo):
         for t in reversed(range(len(td_errors))):
             A = td_errors[t] + (self.lamb * self.gamma) * A * (1 - dones[t])
             advantages.insert(0, A)
-        return convert_to_torch(np.array(advantages), self.device)
+        return convert_to_torch(advantages, self.device)
 
     def _compute_rewards_to_go(self, rewards, dones):
         rewards_to_go = []
@@ -132,7 +126,7 @@ class PPO(Algo):
         for reward, done in zip(reversed(rewards), reversed(dones)):
             R = reward + self.gamma * R * (1 - done)
             rewards_to_go.insert(0, R)
-        return convert_to_torch(np.array(rewards_to_go), self.device)
+        return convert_to_torch(rewards_to_go, self.device)
 
     def reset_episode(self):
         return True
