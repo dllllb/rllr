@@ -1,0 +1,23 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Empty,
+    grid_size: 8,
+    action_size: 3,
+    goal_type: random,
+    goal_achieving_criterion: position,
+    video_path: artifacts/video/
+  },
+
+  worker_agent: {
+    path: artifacts/models/minigrid_simple.p,
+    device: cpu
+  }
+
+  training: {
+    n_episodes: 100,
+    verbose: 10,
+  },
+
+  seed: 42,
+}

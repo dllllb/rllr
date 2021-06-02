@@ -4,28 +4,27 @@
     env_task: MiniGrid-Empty,
     grid_size: 8,
     action_size: 3,
-    rgb_image: false,
-    goal_achieving_criterion: position,
     goal_type: random,
+    goal_achieving_criterion: position,
     video_path: artifacts/video/
+  },
+
+  worker: {
+    state_encoder_type: simple_mlp,
+    hidden_layers_sizes: [128, 128],
+    head: {
+        hidden_size: 128
+    }
   },
 
   master: {
     state_encoder_type: simple_mlp,
-    hidden_layers_sizes: [128],
+    hidden_layers_sizes: [128, 128],
     head: {
-        hidden_size: [128]
-    },
-    emb_size: 32
-  }
-
-  worker: {
-    state_encoder_type: simple_mlp,
-    hidden_layers_sizes: [128],
-    head: {
-        hidden_size: [128, 128]
+        hidden_size: 128
     }
-  },
+    emb_size: 128
+  }
 
   agent: {
     algorithm: DQN,
@@ -41,22 +40,11 @@
     tau: 0.001
   },
 
-  master_agent: {
-    buffer_size: 1000000,
-    batch_size: 256,
-    noise_decay: 0.9995,
-    start_noise: 1,
-    min_noise: 0.1,
-    explore: true,
-    update_step: 50,
-    epochs: 50,
-    steps_per_epoch: 1,
-    device: "cpu"
-  }
-
   training: {
-    n_episodes: 500,
-    verbose: 100,
+    reward: explicit_pos_reward
+    n_episodes: 1000,
+    verbose: 100
+    validation: true,
   },
 
   seed: 42,
@@ -65,5 +53,4 @@
     save_example: true,
     path: artifacts/models/minigrid_simple.p,
   }
-
 }
