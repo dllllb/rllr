@@ -7,11 +7,10 @@ from functools import partial
 
 import rllr.env as environments
 from rllr.algo import DQN
-from rllr.buffer import ReplayBuffer
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
-from rllr.models import EncoderDistance, encoders as minigrid_encoders, QNetwork, ActorNetwork
+from rllr.models import SameStatesCriterion, QNetwork, ActorNetwork, StateEmbedder
 from rllr.models.encoders import GoalStateEncoder
-
+from rllr.models import encoders as minigrid_encoders
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
 
@@ -80,7 +79,7 @@ def get_goal_achieving_criterion(config):
         encoder = torch.load(config['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(config['state_distance_network_params.device'])
         threshold = config['state_distance_network_params.threshold']
-        return EncoderDistance(encoder, device, threshold)
+        return SameStatesCriterion(encoder, device, threshold)
     else:
         raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
 
@@ -97,6 +96,13 @@ def gen_navigation_env(conf, verbose=False):
     env = gen_env(conf=conf, verbose=verbose)
     goal_achieving_criterion = get_goal_achieving_criterion(conf)
 
+    if conf['state_distance_network_params'].get('path', False):
+        encoder = torch.load(conf['state_distance_network_params.path'], map_location='cpu')
+        device = torch.device(conf['state_distance_network_params.device'])
+        embedder = StateEmbedder(encoder, device)
+    else:
+        embedder = None
+
     if conf.get('goal_type', None) == 'random':
         if conf['env_type'] == 'gym_minigrid':
             random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
@@ -110,7 +116,25 @@ def gen_navigation_env(conf, verbose=False):
         conf=conf,
         goal_achieving_criterion=goal_achieving_criterion,
         random_goal_generator=random_goal_generator,
+        state_embedder=embedder,
         verbose=verbose)
+
+    if conf.get('intrinsic_episodic_reward', False):
+        env = environments.IntrinsicEpisodicReward(env, embedder)
+
+    if conf.get('random_network_distillation_reward', False):
+        reward_conf = conf['random_network_distillation_reward']
+        device = torch.device(reward_conf['device'])
+
+        if conf['env_type'] == 'gym_minigrid':
+            grid_size = conf['grid_size'] * conf.get('tile_size', 1)
+            target_network = minigrid_encoders.get_encoder(grid_size, reward_conf['target'])
+            predictor_network = minigrid_encoders.get_encoder(grid_size, reward_conf['predictor'])
+        else:
+            raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+
+        env = environments.RandomNetworkDistillationReward(env, target_network, predictor_network, device)
+
     return env
 
 

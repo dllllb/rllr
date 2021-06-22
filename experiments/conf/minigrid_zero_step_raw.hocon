@@ -1,0 +1,31 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Dynamic-Obstacles,
+    grid_size: 8,
+    action_size: 4,
+    rgb_image: false,
+    video_path: artifacts/video/
+  },
+
+  state_distance_encoder: {
+    state_encoder_type: dummy_raw,
+  },
+
+  state_distance_network = {
+    hidden_size: 128
+  },
+
+  training: {
+    device: "cuda:0"
+    n_episodes: 1500,
+    n_epochs: 5,
+    verbose: 100,
+  },
+
+  seed: 42,
+
+  outputs: {
+    path: artifacts/models/minigrid_state_distance_encoder_raw.p,
+  }
+}
