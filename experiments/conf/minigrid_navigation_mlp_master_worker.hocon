@@ -1,7 +1,7 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Empty,
+    env_task: MiniGrid-Dynamic-Obstacles,
     grid_size: 8,
     action_size: 3,
     rgb_image: false,
@@ -12,11 +12,11 @@
 
   master: {
     state_encoder_type: simple_mlp,
-    hidden_layers_sizes: [128],
+    hidden_layers_sizes: [32],
     head: {
-        hidden_size: [128]
+        hidden_size: [32]
     },
-    emb_size: 32
+    emb_size: 4
   }
 
   worker: {
@@ -55,7 +55,7 @@
   }
 
   training: {
-    n_episodes: 500,
+    n_episodes: 1000,
     verbose: 100,
   },
 

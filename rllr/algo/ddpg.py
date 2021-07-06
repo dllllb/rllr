@@ -35,7 +35,7 @@ class DDPG(Algo):
                  learning_rate_critic: float = 1e-3,
                  learning_rate_actor: float = 1e-3,
                  actor_grad_clipping: int = None,
-                 critic_grad_clipping: int = None,
+                 critic_grad_clipping: int = 1,
                  action_range: tuple = (-1., 1.)):
 
         self.device = device
