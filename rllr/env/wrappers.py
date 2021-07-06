@@ -5,6 +5,7 @@ import torch
 
 from collections import deque
 from gym.wrappers import Monitor
+from scipy.stats import norm
 import torch.nn.functional as F
 
 from ..buffer import ReplayBuffer
@@ -58,37 +59,39 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
     """
     Wrapper for setting goal from buffer
     """
-    def __init__(self, env, goal_achieving_criterion, conf, state_embedder=None, verbose=False):
+    def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
         self.buffer_size = conf['buffer_size']
         self.buffer = deque(maxlen=self.buffer_size)
-        self.chosen = EpisodicMemory()
+        self.complexity_buffer = deque(maxlen=self.buffer_size)
         self.verbose = verbose
+        self.complexity = conf['init_complexity']
+        self.complexity_step = conf['complexity_step']
+        self.threshold = conf['threshold']
+        self.update_period = conf['update_period']
+        self.max_complexity = conf['max_complexity']
+        self.scale = conf['scale']
         self.warmup_steps = conf['warmup_steps']
-        self.prefer_unseen_states = conf.get('prefer_unseen_states', False)
-        self.explore = True
-        self.state_embedder = state_embedder if state_embedder is not None else lambda x: x.reshape(-1)
+        self.episode_count = 0
+        self.achieved_count = 0
         super().__init__(env, goal_achieving_criterion)
 
     def reset_buffer(self):
         self.buffer = deque(maxlen=self.buffer_size)
-        self.chosen.clear()
 
     def buffer_random_choice(self):
-        if self.prefer_unseen_states:
-            states = torch.stack([emb for emb, state in self.buffer], dim=0)
-            p = self.chosen.compute_reward(states).cpu().numpy()
-            if p.sum() < 1e-6: p = np.ones(len(self.buffer))
-        else:
-            p = np.ones(len(self.buffer))
-
+        steps_array = np.array([x for x, _ in self.buffer])
+        p = norm.pdf(steps_array, loc=self.complexity, scale=self.scale)
         p /= p.sum()
-        choice = np.random.choice(np.arange(len(self.buffer)), p=p)
-        goal_embedding, goal_state = self.buffer[choice]
+        choice = np.random.choice(np.arange(len(steps_array)), p=p)
+        _, goal_state = self.buffer[choice]
 
-        self.chosen.add(goal_embedding)
         return goal_state
 
     def reset(self):
+        if self.episode_count % self.update_period == 0:
+            self.update_complexity()
+        self.episode_count += 1
+
         if len(self.buffer) < self.warmup_steps:  # with out goal, only by max_steps episode completion
             return super().reset()
 
@@ -107,13 +110,19 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
 
     def step(self, action):
         next_state, reward, done, info = super().step(action)
-        with torch.no_grad():
-            embedding = self.state_embedder(next_state['image'] if isinstance(next_state, dict) else next_state)
+        self.achieved_count += self.is_goal_achieved
 
-        if self.explore and not done and not self.is_goal_achieved:
-            self.buffer.append((embedding, next_state))
+        if not self.is_goal_achieved:
+            self.buffer.append((self.step_count, next_state))
 
         return next_state, reward, done, info
+
+    def update_complexity(self):
+        avg_achieved_goals = self.achieved_count / self.update_period
+        if avg_achieved_goals >= self.threshold and self.complexity + self.complexity_step <= self.max_complexity:
+            self.complexity += self.complexity_step
+            logger.info(f"avg achieved goals: {avg_achieved_goals}, new complexity: {self.complexity}")
+        self.achieved_count = 0
 
 
 class GoalObsWrapper(gym.core.ObservationWrapper):
@@ -157,7 +166,7 @@ class SetRewardWrapper(gym.Wrapper):
         return next_state, reward, done, info
 
 
-def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generator=None, state_embedder=None, verbose=False):
+def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generator=None, verbose=False):
     goal_type = conf.get('goal_type', None)
     if goal_type == 'random':
         # env with random goal
@@ -173,7 +182,6 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
             env,
             goal_achieving_criterion,
             conf['from_buffer_choice_params'],
-            state_embedder=state_embedder,
             verbose=verbose)
     else:
         raise AttributeError(f"unknown goal_type '{goal_type}'")
@@ -236,15 +244,19 @@ class RandomNetworkDistillationReward(gym.Wrapper):
                  learning_rate=0.001,
                  buffer_size=10000,
                  batch_size=64,
-                 update_step=4):
+                 update_step=4,
+                 gamma=0.99):
 
         self.device = device
         self.target = target.to(device)
         self.predictor = predictor.to(device)
         self.optimizer = torch.optim.Adam(self.predictor.parameters(), lr=learning_rate)
         self.replay_buffer = ReplayBuffer(buffer_size=buffer_size, batch_size=batch_size, device=device)
-        self.step = 0
+        self.steps_count = 0
         self.update_step = update_step
+        self.running_mean = 0
+        self.running_sd = 1
+        self.gamma = gamma
         super().__init__(env)
 
     def reset(self):
@@ -253,8 +265,7 @@ class RandomNetworkDistillationReward(gym.Wrapper):
 
     def _learn(self):
         # Sample batch from buffer buffer
-        states = self.replay_buffer.sample()
-
+        states = list(self.replay_buffer.sample())[0]
         with torch.no_grad():
             targets = self.target(states)
         outputs = self.predictor(states)
@@ -262,20 +273,27 @@ class RandomNetworkDistillationReward(gym.Wrapper):
         loss = F.mse_loss(outputs, targets)
         loss.backward()
         self.optimizer.step()
+        with torch.no_grad():
+            intrinsic_reward = (targets - outputs).abs().pow(2).sum(1)
+            self.running_mean = self.gamma * self.running_mean + (1 - self.gamma) + intrinsic_reward.mean()
+            self.running_sd = self.gamma * self.running_sd + (1 - self.gamma) + intrinsic_reward.var().pow(0.5)
 
     def step(self, action):
         state, reward, done, info = self.env.step(action)
-        self.replay_buffer.add(state)
 
         if isinstance(state, dict):
+            self.replay_buffer.add(state['state'], )
             converted_state = convert_to_torch([state['state']], device=self.device)
         else:
+            self.replay_buffer.add(state, )
             converted_state = convert_to_torch([state], device=self.device)
         with torch.no_grad():
-            intrinsic_reward = (self.target(converted_state) - self.predictor(converted_state)).abs().pow(2).sum().item()
+            intrinsic_reward = (self.target(converted_state) - self.predictor(converted_state)).abs().pow(2).sum()
+            intrinsic_reward = (intrinsic_reward - self.running_mean) / self.running_sd
+            intrinsic_reward = torch.clamp(intrinsic_reward, max=5, min=-5).item()
 
-        self.step = (self.step + 1) % self.update_step
-        if self.step == 0:
+        self.steps_count = (self.steps_count + 1) % self.update_step
+        if self.steps_count == 0:
             if self.replay_buffer.is_enough():
                 self._learn()
 

@@ -23,8 +23,6 @@ def run_episode(env, worker_agent, train_mode=True, max_steps=1_000):
     """
 
     state = env.reset()
-    worker_agent.explore = train_mode
-
     score, steps, done = 0, 0, False
     while not done and steps < max_steps:
         steps += 1
@@ -96,7 +94,7 @@ def gen_navigation_env(conf, verbose=False):
     env = gen_env(conf=conf, verbose=verbose)
     goal_achieving_criterion = get_goal_achieving_criterion(conf)
 
-    if conf['state_distance_network_params'].get('path', False):
+    if conf.get('state_distance_network_params', {}).get('path', False):
         encoder = torch.load(conf['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(conf['state_distance_network_params.device'])
         embedder = StateEmbedder(encoder, device)
@@ -116,7 +114,6 @@ def gen_navigation_env(conf, verbose=False):
         conf=conf,
         goal_achieving_criterion=goal_achieving_criterion,
         random_goal_generator=random_goal_generator,
-        state_embedder=embedder,
         verbose=verbose)
 
     if conf.get('intrinsic_episodic_reward', False):
