@@ -7,7 +7,7 @@ import torch.nn as nn
 from rllr.models.encoders import get_encoder
 from rllr.env.gym_minigrid_navigation.environments import gen_wrapped_env
 
-from rllr.models import StateDistanceNetwork
+from rllr.models import InverseDynamicsModel
 from rllr.utils import get_conf, switch_reproducibility_on, convert_to_torch
 from rllr.utils.logger import init_logger
 
@@ -47,7 +47,7 @@ def main(args=None):
     grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
     encoder = get_encoder(grid_size, config['state_distance_encoder'])
 
-    net = StateDistanceNetwork(encoder=encoder, action_size=env.action_space.n, config=config['state_distance_network'])
+    net = InverseDynamicsModel(encoder=encoder, action_size=env.action_space.n, config=config['state_distance_network'])
 
     lr = config['training'].get('lr', 1e-4)
     optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-6)

@@ -4,9 +4,9 @@ from torch import nn as nn
 from ..utils import convert_to_torch
 
 
-class StateDistanceNetwork(nn.Module):
+class InverseDynamicsModel(nn.Module):
     """
-    State-Embedding model
+    inverse dynamics model as done by Pathak et al. (2017).
     """
     def __init__(self, encoder, action_size, config):
         super().__init__()
@@ -27,7 +27,18 @@ class StateDistanceNetwork(nn.Module):
         return self.fc(torch.cat((x, y), 1))
 
 
-class EncoderDistance:
+class StateEmbedder:
+    def __init__(self, encoder, device):
+        self.encoder = encoder.to(device)
+        self.device = device
+
+    def __call__(self, state):
+        if isinstance(state, dict):
+            state = state['state']
+        return self.encoder(convert_to_torch([state], device=self.device)).squeeze(0)
+
+
+class SameStatesCriterion:
     def __init__(self, encoder, device, threshold=5):
         self.encoder = encoder.to(device)
         self.device = device
