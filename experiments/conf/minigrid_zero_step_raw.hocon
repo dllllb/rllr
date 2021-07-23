@@ -9,6 +9,7 @@
   },
 
   state_distance_encoder: {
+    use_image_wrapper: true,
     state_encoder_type: dummy_raw,
   },
 

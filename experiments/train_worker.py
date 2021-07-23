@@ -8,9 +8,10 @@ from functools import partial
 import rllr.env as environments
 from rllr.algo import DQN
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
+from rllr.env.nle_environment import environments as nle_envs
 from rllr.models import SameStatesCriterion, QNetwork, ActorNetwork, StateEmbedder
 from rllr.models.encoders import GoalStateEncoder
-from rllr.models import encoders as minigrid_encoders
+from rllr.models import encoders
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
 
@@ -69,10 +70,17 @@ def get_goal_achieving_criterion(config):
         def position_achievement(state, goal_state):
             return (state['position'] == goal_state['position']).all()
         return position_achievement
+
     elif config['goal_achieving_criterion'] == 'position':
-        def position_achievement(state, goal_state):
-            return (state['position'][:-1] == goal_state['position'][:-1]).all()
-        return position_achievement
+        if config['env_type'] == 'gym_minigrid':
+            def position_achievement(state, goal_state):
+                return (state['position'][:-1] == goal_state['position'][:-1]).all()
+            return position_achievement
+        elif config['env_type'] == 'nle':
+            def position_achievement(state, goal_state):
+                return (state['position'] == goal_state['position']).all()
+            return position_achievement
+
     elif config['goal_achieving_criterion'] == 'state_distance_network':
         encoder = torch.load(config['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(config['state_distance_network_params.device'])
@@ -85,6 +93,8 @@ def get_goal_achieving_criterion(config):
 def gen_env(conf, verbose=False):
     if conf['env_type'] == 'gym_minigrid':
         env = minigrid_envs.gen_wrapped_env(conf, verbose=verbose)
+    elif conf['env_type'] == 'nle':
+        env = nle_envs.gen_wrapped_env(conf, verbose=verbose)
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
     return env
@@ -125,8 +135,8 @@ def gen_navigation_env(conf, verbose=False):
 
         if conf['env_type'] == 'gym_minigrid':
             grid_size = conf['grid_size'] * conf.get('tile_size', 1)
-            target_network = minigrid_encoders.get_encoder(grid_size, reward_conf['target'])
-            predictor_network = minigrid_encoders.get_encoder(grid_size, reward_conf['predictor'])
+            target_network = encoders.get_encoder(grid_size, reward_conf['target'])
+            predictor_network = encoders.get_encoder(grid_size, reward_conf['predictor'])
         else:
             raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
@@ -139,8 +149,8 @@ def get_encoders(conf):
     if conf['env.env_type'] == 'gym_minigrid':
         init_logger('rllr.env.gym_minigrid_navigation.environments')
         grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-        state_encoder = minigrid_encoders.get_encoder(grid_size, conf['worker'])
-        goal_state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
+        state_encoder = encoders.get_encoder(grid_size, conf['worker'])
+        goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
         return state_encoder, goal_state_encoder
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")

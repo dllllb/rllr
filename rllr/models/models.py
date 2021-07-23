@@ -11,7 +11,7 @@ class InverseDynamicsModel(nn.Module):
     def __init__(self, encoder, action_size, config):
         super().__init__()
         self.encoder = encoder
-
+        self.device = torch.device('cpu')
         self.fc = nn.Sequential(
             nn.Linear(2 * encoder.output_size, config['hidden_size']),
             nn.ReLU(inplace=False),
@@ -25,6 +25,11 @@ class InverseDynamicsModel(nn.Module):
         y = self.encoder(next_state)
 
         return self.fc(torch.cat((x, y), 1))
+
+    def set_device(self, device):
+        self.to(device)
+        self.device = device
+        self.encoder.device = device
 
 
 class StateEmbedder:
@@ -45,8 +50,6 @@ class SameStatesCriterion:
         self.threshold = threshold
 
     def __call__(self, state, goal_state):
-        if isinstance(state, dict):
-            state, goal_state = state['image'], goal_state['image']
         with torch.no_grad():
             embeds = self.encoder(convert_to_torch([state, goal_state], device=self.device))
         return torch.dist(embeds[0], embeds[1], 2).cpu().item() < self.threshold

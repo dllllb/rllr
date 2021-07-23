@@ -16,14 +16,14 @@ class PosObsWrapper(gym.core.ObservationWrapper):
         return obs
 
 
-class ImageObsWrapper(gym.core.ObservationWrapper):
+class DropMissionObsWrapper(gym.core.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.observation_space = self.observation_space.spaces['image']
 
     def observation(self, obs):
         obs = self.env.observation(obs)
-        return obs['image']
+        obs.pop('mission', None)
+        return obs
 
 
 class ChangeActionSizeWrapper(gym.Wrapper):
@@ -55,8 +55,8 @@ def gen_wrapped_env(conf, verbose=False):
 
     if conf.get('goal_achieving_criterion', None) == 'position_and_direction' or verbose:
         env = PosObsWrapper(env)
-    else:
-        env = ImageObsWrapper(env)
+
+    env = DropMissionObsWrapper(env)
 
     return env
 

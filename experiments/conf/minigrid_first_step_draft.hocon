@@ -12,28 +12,10 @@
         init_complexity: 1,
         scale: 10,
         complexity_step: 10,
-        threshold: 0.9,
+        threshold: 0.95,
         max_complexity: 100,
         update_period: 100,
         warmup_steps: 10000,
-    }
-    intrinsic_episodic_reward: false,
-    random_network_distillation_reward: {
-      device: "cuda:0",
-      target: {
-        state_encoder_type: simple_mlp,
-        hidden_layers_sizes: [128, 128],
-        head: {
-            hidden_size: 64
-        }
-      },
-      predictor: {
-        state_encoder_type: simple_mlp,
-        hidden_layers_sizes: [128, 128],
-        head: {
-            hidden_size: 64
-        }
-      },
     }
     goal_achieving_criterion: state_distance_network,
     state_distance_network_params: {
@@ -45,22 +27,18 @@
   },
 
   worker: {
-    state_encoder_type: simple_cnn,
-    n_channels: [32, 64, 64],
-    kernel_sizes: [4, 4, 3],
-    strides: [4, 2, 1],
-    hidden_layers_sizes: [128],
+    use_image_wrapper: true,
+    state_encoder_type: dummy_image,
+    tile_size: 4,
     head: {
         hidden_size: 64
     }
   },
 
   master: {
-    state_encoder_type: simple_cnn,
-    n_channels: [32, 64, 64],
-    kernel_sizes: [4, 4, 3],
-    strides: [4, 2, 1],
-    hidden_layers_sizes: [128],
+    use_image_wrapper: true,
+    state_encoder_type: dummy_image,
+    tile_size: 4,
     head: {
         hidden_size: []
     },
@@ -83,7 +61,7 @@
 
   training: {
     reward: fair_goal_achievement,
-    n_episodes: 10000,
+    n_episodes: 1000,
     verbose: 100,
     max_steps: 256,
     validation: true,

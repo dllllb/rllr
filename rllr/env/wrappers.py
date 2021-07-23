@@ -19,10 +19,12 @@ class NavigationGoalWrapper(gym.Wrapper):
     """
     Wrapper for navigation through environment to the goal
     """
-    def __init__(self, env, goal_achieving_criterion):
+
+    def __init__(self, env, goal_achieving_criterion, config=None):
         self.goal_state = None
         self.is_goal_achieved = False
         self.goal_achieving_criterion = goal_achieving_criterion
+        self.done_when_achieved = config.get('done_when_achieved', True)
         super().__init__(env)
 
     def _goal_achieved(self, state):
@@ -34,7 +36,8 @@ class NavigationGoalWrapper(gym.Wrapper):
 
     def step(self, action):
         next_state, _, _, info = self.env.step(action)
-        done = self._goal_achieved(next_state) or (self.step_count >= self.max_steps)
+        done = self.done_when_achieved and self._goal_achieved(next_state)
+        done = done or (hasattr(self, "step_count") and hasattr(self, "max_steps") and self.step_count > self.max_steps)
         reward = 1 if self.is_goal_achieved else -0.1
 
         return next_state, reward, done, info
@@ -44,10 +47,11 @@ class RandomGoalWrapper(NavigationGoalWrapper):
     """
     Wrapper for setting random goal
     """
-    def __init__(self, env, goal_achieving_criterion, random_goal_generator, verbose=False):
+
+    def __init__(self, env, goal_achieving_criterion, random_goal_generator, conf, verbose=False):
         self.verbose = verbose
         self.random_goal_generator = random_goal_generator
-        super().__init__(env, goal_achieving_criterion)
+        super().__init__(env, goal_achieving_criterion, conf)
 
     def reset(self):
         self.goal_state = next(self.random_goal_generator)
@@ -59,6 +63,7 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
     """
     Wrapper for setting goal from buffer
     """
+
     def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
         self.buffer_size = conf['buffer_size']
         self.buffer = deque(maxlen=self.buffer_size)
@@ -73,7 +78,7 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         self.warmup_steps = conf['warmup_steps']
         self.episode_count = 0
         self.achieved_count = 0
-        super().__init__(env, goal_achieving_criterion)
+        super().__init__(env, goal_achieving_criterion, conf)
 
     def reset_buffer(self):
         self.buffer = deque(maxlen=self.buffer_size)
@@ -125,26 +130,58 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         self.achieved_count = 0
 
 
+class FromCurrentEpisodeGoalWrapper(NavigationGoalWrapper):
+    """
+    Wrapper for setting goal from current episode
+    """
+
+    def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
+        self.buffer_size = conf['buffer_size']
+        self.buffer = deque(maxlen=self.buffer_size)
+        self.verbose = verbose
+        self.warmup_steps = conf['warmup_steps']
+        self.step_count = 0
+        super().__init__(env, goal_achieving_criterion, conf)
+
+    def buffer_random_choice(self):
+        choice = np.random.choice(np.arange(len(self.buffer)))
+        goal_state = self.buffer[choice]
+        return goal_state
+
+    def reset(self):
+        self.buffer = deque(maxlen=self.buffer_size)
+        self.goal_state = None
+        self.is_goal_achieved = False
+        self.step_count = 0
+        state = super().reset()
+        self.buffer.append(state)
+        return state
+
+    def step(self, action):
+        next_state, reward, done, info = super().step(action)
+        self.step_count += 1
+
+        if not self.is_goal_achieved:
+            self.buffer.append(next_state)
+
+        if self.is_goal_achieved or self.step_count == self.warmup_steps:
+            self.goal_state = self.buffer_random_choice()
+
+        return next_state, reward, done, info
+
+
 class GoalObsWrapper(gym.core.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
-        if isinstance(env.observation_space, gym.spaces.dict.Dict):
-            observation_space = self.observation_space.spaces['image']
-        else:
-            observation_space = env.observation_space
+
+        observation_space = env.observation_space
         self.observation_space = gym.spaces.Dict({
             'state': observation_space,
             'goal_state': observation_space,
         })
 
     def observation(self, obs):
-        if isinstance(obs, dict):
-            obs = obs['image']
-
         goal_obs = self.env.goal_state
-        if isinstance(goal_obs, dict):
-            goal_obs = goal_obs['image']
-
         return {'state': obs, 'goal_state': goal_obs}
 
 
@@ -161,7 +198,7 @@ class SetRewardWrapper(gym.Wrapper):
         if self.pos_reward:
             reward = self.reward_function(state['position'], next_state['position'], self.goal_state['position'])
         else:
-            reward = self.reward_function(state['image'], next_state['image'], self.goal_state['image'])
+            reward = self.reward_function(state, next_state, self.goal_state)
 
         return next_state, reward, done, info
 
@@ -174,6 +211,7 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
             env=env,
             goal_achieving_criterion=goal_achieving_criterion,
             random_goal_generator=random_goal_generator,
+            conf={},
             verbose=verbose)
 
     elif goal_type == 'from_buffer':
@@ -183,6 +221,15 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
             goal_achieving_criterion,
             conf['from_buffer_choice_params'],
             verbose=verbose)
+
+    elif goal_type == 'from_current_episode':
+        # env with goal from current episode
+        env = FromCurrentEpisodeGoalWrapper(
+            env,
+            goal_achieving_criterion,
+            conf['from_buffer_choice_params'],
+            verbose=verbose)
+
     else:
         raise AttributeError(f"unknown goal_type '{goal_type}'")
 
@@ -208,6 +255,7 @@ class IntrinsicEpisodicReward(gym.Wrapper):
     Wrapper for adding Intrinsic Episode Memory Reward
         [Badia et al. (2020)](https://openreview.net/forum?id=Sye57xStvB)
     """
+
     def __init__(self, env, state_embedder=None, beta=0.3):
         self.beta = beta
         self.episodic_memory = EpisodicMemory()
@@ -236,6 +284,7 @@ class RandomNetworkDistillationReward(gym.Wrapper):
     Wrapper for adding Random Network Distillation Reward
         [Burda et al. (2019)](https://arxiv.org/abs/1810.12894)
     """
+
     def __init__(self,
                  env,
                  target,

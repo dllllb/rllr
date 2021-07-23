@@ -1,0 +1,19 @@
+{
+  env: {
+    env_type: nle,
+    video_path: artifacts/video/,
+    goal_achieving_criterion: position,
+    goal_type: from_current_episode,
+    from_buffer_choice_params: {
+        buffer_size: 100000,
+        warmup_steps: 10,
+    }
+  },
+
+  seed: 42,
+
+  outputs: {
+    save_example: true,
+    path: artifacts/models/minigrid_worker.p,
+  }
+}

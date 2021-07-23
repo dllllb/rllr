@@ -10,6 +10,7 @@
   },
 
   worker: {
+    use_image_wrapper: true,
     state_encoder_type: simple_mlp,
     hidden_layers_sizes: [128, 128],
     head: {
@@ -18,6 +19,7 @@
   },
 
   master: {
+    use_image_wrapper: true,
     state_encoder_type: simple_mlp,
     hidden_layers_sizes: [128, 128],
     head: {

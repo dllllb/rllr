@@ -27,6 +27,7 @@
   },
 
   worker: {
+    use_image_wrapper: true,
     state_encoder_type: dummy_image,
     tile_size: 4,
     head: {
@@ -35,6 +36,7 @@
   },
 
   master: {
+    use_image_wrapper: true,
     state_encoder_type: dummy_image,
     tile_size: 4,
     head: {

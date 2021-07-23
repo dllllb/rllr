@@ -32,9 +32,6 @@ def rollout(env, max_steps=False):
             break
         i += 1
 
-    states = torch.from_numpy(np.array(states)).float()
-    next_states = torch.from_numpy(np.array(next_states)).float()
-    actions = torch.from_numpy(np.array(actions))
     return states, next_states, actions
 
 
@@ -58,11 +55,11 @@ def main(args=None):
     net.to(device)
     sum_loss = 0
     for roll in range(conf['n_episodes']):
-        states, next_states, actions = map(lambda x: x.to(device), rollout(env))
+        states, next_states, actions = map(lambda x: convert_to_torch(x, device=device), rollout(env))
         for epoch in range(conf['n_epochs']):
             optimizer.zero_grad()
             predicted_actions = net.forward(states, next_states)
-            loss = nll_loss(predicted_actions, actions)
+            loss = nll_loss(predicted_actions, actions.long().reshape(-1))
             loss.backward()
             optimizer.step()
             sum_loss += loss.item()
@@ -86,7 +83,7 @@ def main(args=None):
             state, _, _, _ = env.step(action)
             states.append(state)
 
-        embeds = net.encoder(convert_to_torch(states).to(device))
+        embeds = net.encoder(convert_to_torch(states, device=device))
         d_same = torch.dist(embeds[0], embeds[2], 2).detach().item()
         d_diff = torch.dist(embeds[0], embeds[1], 2).detach().item()
 

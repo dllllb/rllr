@@ -12,6 +12,7 @@
   },
 
   worker: {
+    use_image_wrapper: true,
     state_encoder_type: simple_cnn,
     n_channels: [6, 16],
     kernel_sizes: [4, 3],
@@ -22,6 +23,7 @@
   },
 
   master: {
+    use_image_wrapper: true,
     state_encoder_type: simple_cnn,
     n_channels: [6, 16],
     kernel_sizes: [4, 3],
