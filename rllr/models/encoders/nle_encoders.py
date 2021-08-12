@@ -5,7 +5,7 @@ from torch.nn import functional as F
 from nle import nethack
 
 
-class NetHackNet(nn.Module):
+class NetHackEncoder(nn.Module):
     """
     based on "The NetHack Learning Environment" implementation
     https://github.com/facebookresearch/nle
@@ -18,8 +18,9 @@ class NetHackNet(nn.Module):
         embedding_dim=32,
         crop_dim=9,
         num_layers=5,
+        **kwargs
     ):
-        super(NetHackNet, self).__init__()
+        super(NetHackEncoder, self).__init__()
 
         self.glyph_shape = observation_shape["glyphs"].shape
         self.blstats_size = observation_shape["blstats"].shape[0]
@@ -108,8 +109,8 @@ class NetHackNet(nn.Module):
         if self.use_lstm:
             self.core = nn.LSTM(self.h_dim, self.h_dim, num_layers=1)
 
-        self.policy = nn.Linear(self.h_dim, self.num_actions)
-        self.baseline = nn.Linear(self.h_dim, 1)
+        self.output_size = self.h_dim
+        # self.policy = nn.Linear(self.h_dim, self.num_actions)
 
     def initial_state(self, batch_size=1):
         if not self.use_lstm:
@@ -125,7 +126,7 @@ class NetHackNet(nn.Module):
         out = embed.weight.index_select(0, x.reshape(-1))
         return out.reshape(x.shape + (-1,))
 
-    def forward(self, env_outputs, core_state):
+    def forward(self, env_outputs, core_state=None):
         # -- [T x B x H x W]
         glyphs = env_outputs["glyphs"]
 
@@ -217,25 +218,7 @@ class NetHackNet(nn.Module):
         else:
             core_output = st
 
-        # -- [B x A]
-        policy_logits = self.policy(core_output)
-        # -- [B x A]
-        baseline = self.baseline(core_output)
-
-        if self.training:
-            action = torch.multinomial(F.softmax(policy_logits, dim=1), num_samples=1)
-        else:
-            # Don't sample when testing.
-            action = torch.argmax(policy_logits, dim=1)
-
-        policy_logits = policy_logits.view(T, B, self.num_actions)
-        baseline = baseline.view(T, B)
-        action = action.view(T, B)
-
-        return (
-            dict(policy_logits=policy_logits, baseline=baseline, action=action),
-            core_state,
-        )
+        return core_output.view(T, B, -1)
 
 
 def _step_to_range(delta, num_steps):

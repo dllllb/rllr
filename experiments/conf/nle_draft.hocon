@@ -7,8 +7,26 @@
     from_buffer_choice_params: {
         buffer_size: 100000,
         warmup_steps: 10,
+    },
+    action_size: 23
+  },
+
+  worker: {
+    state_encoder_type: net_hack_encoder,
+    use_lstm: false,
+    head: {
+        hidden_size: 64
     }
   },
+
+  master: {
+    state_encoder_type: net_hack_encoder,
+    use_lstm: false,
+    head: {
+        hidden_size: []
+    },
+    emb_size: 64
+  }
 
   seed: 42,
 

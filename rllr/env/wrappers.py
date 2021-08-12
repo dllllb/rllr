@@ -35,8 +35,8 @@ class NavigationGoalWrapper(gym.Wrapper):
         return self.is_goal_achieved
 
     def step(self, action):
-        next_state, _, _, info = self.env.step(action)
-        done = self.done_when_achieved and self._goal_achieved(next_state)
+        next_state, _, done, info = self.env.step(action)
+        done = done or (self.done_when_achieved and self._goal_achieved(next_state))
         done = done or (hasattr(self, "step_count") and hasattr(self, "max_steps") and self.step_count > self.max_steps)
         reward = 1 if self.is_goal_achieved else -0.1
 
@@ -150,7 +150,7 @@ class FromCurrentEpisodeGoalWrapper(NavigationGoalWrapper):
 
     def reset(self):
         self.buffer = deque(maxlen=self.buffer_size)
-        self.goal_state = None
+        self.goal_state = {}
         self.is_goal_achieved = False
         self.step_count = 0
         state = super().reset()

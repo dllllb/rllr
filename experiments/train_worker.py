@@ -78,7 +78,7 @@ def get_goal_achieving_criterion(config):
             return position_achievement
         elif config['env_type'] == 'nle':
             def position_achievement(state, goal_state):
-                return (state['position'] == goal_state['position']).all()
+                return goal_state and (state['position'] == goal_state['position']).all()
             return position_achievement
 
     elif config['goal_achieving_criterion'] == 'state_distance_network':
@@ -92,9 +92,13 @@ def get_goal_achieving_criterion(config):
 
 def gen_env(conf, verbose=False):
     if conf['env_type'] == 'gym_minigrid':
+        init_logger('rllr.env.gym_minigrid_navigation.environments')
         env = minigrid_envs.gen_wrapped_env(conf, verbose=verbose)
+
     elif conf['env_type'] == 'nle':
+        init_logger('rllr.env.nle_environment.environments')
         env = nle_envs.gen_wrapped_env(conf, verbose=verbose)
+
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
     return env
@@ -147,13 +151,26 @@ def gen_navigation_env(conf, verbose=False):
 
 def get_encoders(conf):
     if conf['env.env_type'] == 'gym_minigrid':
-        init_logger('rllr.env.gym_minigrid_navigation.environments')
         grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
         state_encoder = encoders.get_encoder(grid_size, conf['worker'])
         goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
-        return state_encoder, goal_state_encoder
+
+    elif conf['env.env_type'] == 'nle':
+        env = gen_env(conf['env'])
+        state_encoder = encoders.get_encoder(
+            None,
+            {'observation_shape': env.observation_space, 'num_actions': env.action_space.n, **conf['worker']}
+        )
+        goal_state_encoder = encoders.get_encoder(
+            None,
+            {'observation_shape': env.observation_space, 'num_actions': env.action_space.n, **conf['master']}
+        )
+        del env
+
     else:
-        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+        raise AttributeError(f"unknown env_type '{conf['env.env_type']}'")
+
+    return state_encoder, goal_state_encoder
 
 
 def get_master_worker_net(state_encoder, goal_state_encoder, config):

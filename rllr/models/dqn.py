@@ -31,4 +31,5 @@ class QNetwork(nn.Module):
 
     def forward(self, states):
         states_encoding = self.state_encoder(states)
-        return self.fc(states_encoding)
+        a = self.fc(states_encoding)
+        return a
