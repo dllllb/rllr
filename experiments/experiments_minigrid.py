@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def main(args=None):
-    config = get_conf([f"-c{Path(__file__).parent.absolute()}/conf/experiments_minigrid.hocon"])
+    config = get_conf([f"-c{Path(__file__).parent.absolute()}/conf/experiments_minigrid_simple_mlp.hocon"])
     # config = get_conf(args)
 
     env = gen_wrapped_env(config['env'])

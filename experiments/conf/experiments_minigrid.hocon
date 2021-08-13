@@ -24,9 +24,9 @@
     device: "cpu"
     training: {
         device: "cpu"
-        n_episodes: 100,
+        n_episodes: 1000,
         n_epochs: 5,
-        verbose: 10,
+        verbose: 100,
     },
 
     state_distance_network_params: {
@@ -99,8 +99,8 @@
 
     training: {
         reward: fair_goal_achievement,
-        n_episodes: 10,
-        verbose: 1,
+        n_episodes: 1000,
+        verbose: 100,
         max_steps: 256,
         validation: true,
     },
@@ -143,8 +143,8 @@
     },
 
     training: {
-        n_episodes: 10,
-        verbose: 1,
+        n_episodes: 1000,
+        verbose: 100,
         }
     }
 

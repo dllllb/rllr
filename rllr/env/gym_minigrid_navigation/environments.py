@@ -53,7 +53,7 @@ def gen_wrapped_env(conf, verbose=False):
     else:
         env = RGBImgObsWrapper(env, tile_size=conf['tile_size'])  # Fully observed RGB image
 
-    if conf.get('goal_achieving_criterion', None) == 'position_and_direction' or verbose:
+    if conf.get('goal_achieving_criterion', None) in {'position_and_direction', 'position'} or verbose:
         env = PosObsWrapper(env)
     else:
         env = ImageObsWrapper(env)
