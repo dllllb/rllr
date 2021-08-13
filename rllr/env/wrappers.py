@@ -1,10 +1,16 @@
 import gym
 import logging
 import numpy as np
+import torch
 
 from collections import deque
 from gym.wrappers import Monitor
 from scipy.stats import norm
+import torch.nn.functional as F
+
+from ..buffer import ReplayBuffer
+from ..exploration import EpisodicMemory
+from ..utils import convert_to_torch
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +178,11 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
 
     elif goal_type == 'from_buffer':
         # env with goal from buffer
-        env = FromBufferGoalWrapper(env, goal_achieving_criterion, conf['from_buffer_choice_params'], verbose=verbose)
+        env = FromBufferGoalWrapper(
+            env,
+            goal_achieving_criterion,
+            conf['from_buffer_choice_params'],
+            verbose=verbose)
     else:
         raise AttributeError(f"unknown goal_type '{goal_type}'")
 
@@ -191,3 +201,100 @@ def visualisation_wrapper(env, video_path):
     env = FullyRenderWrapper(env)  # removes the default visualization of the partially observable field of view.
     env = Monitor(env, video_path, force=True)
     return env
+
+
+class IntrinsicEpisodicReward(gym.Wrapper):
+    """
+    Wrapper for adding Intrinsic Episode Memory Reward
+        [Badia et al. (2020)](https://openreview.net/forum?id=Sye57xStvB)
+    """
+    def __init__(self, env, state_embedder=None, beta=0.3):
+        self.beta = beta
+        self.episodic_memory = EpisodicMemory()
+        self.state_embedder = state_embedder if state_embedder is not None else lambda x: x
+        super().__init__(env)
+
+    def reset(self):
+        state = super().reset()
+        self.episodic_memory.clear()
+        self.episodic_memory.add(self.state_embedder(state))
+        return state
+
+    def step(self, action):
+        state, reward, done, info = self.env.step(action)
+
+        with torch.no_grad():
+            embedded_state = self.state_embedder(state)
+        intrinsic_reward = self.episodic_memory.compute_reward(embedded_state.unsqueeze(0)).item()
+        self.episodic_memory.add(embedded_state)
+
+        return state, reward + intrinsic_reward, done, info
+
+
+class RandomNetworkDistillationReward(gym.Wrapper):
+    """
+    Wrapper for adding Random Network Distillation Reward
+        [Burda et al. (2019)](https://arxiv.org/abs/1810.12894)
+    """
+    def __init__(self,
+                 env,
+                 target,
+                 predictor,
+                 device,
+                 learning_rate=0.001,
+                 buffer_size=10000,
+                 batch_size=64,
+                 update_step=4,
+                 gamma=0.99):
+
+        self.device = device
+        self.target = target.to(device)
+        self.predictor = predictor.to(device)
+        self.optimizer = torch.optim.Adam(self.predictor.parameters(), lr=learning_rate)
+        self.replay_buffer = ReplayBuffer(buffer_size=buffer_size, batch_size=batch_size, device=device)
+        self.steps_count = 0
+        self.update_step = update_step
+        self.running_mean = 0
+        self.running_sd = 1
+        self.gamma = gamma
+        super().__init__(env)
+
+    def reset(self):
+        state = super().reset()
+        return state
+
+    def _learn(self):
+        # Sample batch from buffer buffer
+        states = list(self.replay_buffer.sample())[0]
+        with torch.no_grad():
+            targets = self.target(states)
+        outputs = self.predictor(states)
+        self.optimizer.zero_grad()
+        loss = F.mse_loss(outputs, targets)
+        loss.backward()
+        self.optimizer.step()
+        with torch.no_grad():
+            intrinsic_reward = (targets - outputs).abs().pow(2).sum(1)
+            self.running_mean = self.gamma * self.running_mean + (1 - self.gamma) + intrinsic_reward.mean()
+            self.running_sd = self.gamma * self.running_sd + (1 - self.gamma) + intrinsic_reward.var().pow(0.5)
+
+    def step(self, action):
+        state, reward, done, info = self.env.step(action)
+
+        if isinstance(state, dict):
+            self.replay_buffer.add(state['state'], )
+            converted_state = convert_to_torch([state['state']], device=self.device)
+        else:
+            self.replay_buffer.add(state, )
+            converted_state = convert_to_torch([state], device=self.device)
+        with torch.no_grad():
+            intrinsic_reward = (self.target(converted_state) - self.predictor(converted_state)).abs().pow(2).sum()
+            intrinsic_reward = (intrinsic_reward - self.running_mean) / self.running_sd
+            intrinsic_reward = torch.clamp(intrinsic_reward, max=5, min=-5).item()
+
+        self.steps_count = (self.steps_count + 1) % self.update_step
+        if self.steps_count == 0:
+            if self.replay_buffer.is_enough():
+                self._learn()
+
+        return state, reward + intrinsic_reward, done, info

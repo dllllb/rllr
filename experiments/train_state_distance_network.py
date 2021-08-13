@@ -7,7 +7,7 @@ import torch.nn as nn
 from rllr.models.encoders import get_encoder
 from rllr.env.gym_minigrid_navigation.environments import gen_wrapped_env
 
-from rllr.models import StateDistanceNetwork
+from rllr.models import InverseDynamicsModel
 from rllr.utils import get_conf, switch_reproducibility_on, convert_to_torch
 from rllr.utils.logger import init_logger
 
@@ -46,9 +46,9 @@ def main(args=None):
 
     grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
     encoder = get_encoder(grid_size, config['state_distance_encoder'])
-    device = torch.device(config['training']['device'])
+    device = torch.device(config['state_distance_encoder']['device'])
 
-    net = train_statedistance_network(config, encoder, env, device)
+    net = train_statedistance_network(config, encoder, env,)
 
     if config.get('outputs', False):
         if config.get('outputs.path', False):
@@ -76,24 +76,25 @@ def main(args=None):
 
 
 def train_statedistance_network(config, encoder, env):
-    device = config['device']
-    net = StateDistanceNetwork(encoder=encoder, action_size=env.action_space.n, config=config)
+    net = InverseDynamicsModel(encoder=encoder, action_size=env.action_space.n, config=config)
     lr = config['training'].get('lr', 1e-4)
     optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-6)
     nll_loss = nn.NLLLoss()
+    conf = config['training']
+    device = torch.device(conf['device'])
     net.to(device)
     sum_loss = 0
-    for roll in range(config['training']['n_episodes']):
+    for roll in range(conf['n_episodes']):
         states, next_states, actions = map(lambda x: x.to(device), rollout(env))
-        for epoch in range(config['training']['n_epochs']):
+        for epoch in range(conf['n_epochs']):
             optimizer.zero_grad()
             predicted_actions = net.forward(states, next_states)
             loss = nll_loss(predicted_actions, actions)
             loss.backward()
             optimizer.step()
             sum_loss += loss.item()
-        if (roll + 1) % config['training']['verbose'] == 0:
-            logger.info("Rollout: {0}, loss: {1}".format(roll + 1, sum_loss / roll / config['training']['n_epochs']))
+        if (roll + 1) % conf['verbose'] == 0:
+            logger.info("Rollout: {0}, loss: {1}".format(roll + 1, sum_loss / roll / conf['n_epochs']))
             sum_loss = 0
     return net
 

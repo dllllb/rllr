@@ -21,8 +21,9 @@
     state_encoder_type: simple_mlp,
     hidden_layers_sizes: [128, 128],
     head: {
-        hidden_size: 64
-    }
+        hidden_size: []
+    },
+    emb_size: 32
   }
 
   agent: {

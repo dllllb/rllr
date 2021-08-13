@@ -7,7 +7,7 @@ from experiments.train_worker import get_worker_agent, train_worker, gen_navigat
 from experiments.train_master import train_master, get_master_agent
 
 from rllr.models.encoders import get_encoder
-from rllr.models import EncoderDistance
+from rllr.models import SameStatesCriterion
 
 from rllr.env.gym_minigrid_navigation.environments import gen_wrapped_env
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def main(args=None):
-    config = get_conf([f"-c{Path(__file__).parent.absolute()}/conf/experiments_minigrid_simple_cnn.hocon"])
+    config = get_conf([f"-c{Path(__file__).parent.absolute()}/conf/experiments_minigrid.hocon"])
     # config = get_conf(args)
 
     env = gen_wrapped_env(config['env'])
@@ -42,7 +42,7 @@ def main(args=None):
             logger.info(f"Running statedistance training: {config['state_distance_network']['training.n_episodes']} episodes")
             net = train_statedistance_network(config['state_distance_network'], encoder, env)
             threshold = config['state_distance_network']['state_distance_network_params.threshold']
-            goal_achieving_criterion = EncoderDistance(net.encoder, device, threshold)
+            goal_achieving_criterion = SameStatesCriterion(net.encoder, device, threshold)
         else:
             goal_achieving_criterion = None
 
