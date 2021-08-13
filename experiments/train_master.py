@@ -43,7 +43,7 @@ def run_episode(env, worker_agent, master_agent, worker_steps):
     return score, steps
 
 
-def run_episodes(env, worker_agent, master_agent, n_episodes=1_000, verbose=False, worker_steps=1):
+def train_master(env, worker_agent, master_agent, n_episodes=1_000, verbose=False, worker_steps=1):
     """
     Runs a series of episode and collect statistics
     """
@@ -92,7 +92,7 @@ def get_master_agent(emb_size, conf):
     hidden_size = conf['master']['head.hidden_size']
     master_network = ActorCriticNetwork(emb_size, state_encoder, goal_state_encoder,
                                         actor_hidden_size=hidden_size, critic_hidden_size=hidden_size)
-    master_agent = get_ddpg_agent(master_network, conf['master_agent'])
+    master_agent = get_ddpg_agent(master_network, conf['agent'])
     return master_agent
 
 
@@ -109,7 +109,7 @@ def main(args=None):
     master_agent = get_master_agent(emb_size, config)
 
     logger.info(f"Running agent training: {config['training.n_episodes']} episodes")
-    run_episodes(
+    train_master(
         env,
         worker_agent,
         master_agent,

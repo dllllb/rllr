@@ -15,10 +15,10 @@
     head: {
         hidden_size: [128]
     },
-    emb_size: 2
+    emb_size: 4
   }
 
-  master_agent: {
+  agent: {
     buffer_size: 1000000,
     batch_size: 128,
     noise_decay: 0.995,
@@ -32,7 +32,7 @@
   }
 
   training: {
-    n_episodes: 500,
+    n_episodes: 1000,
     verbose: 100,
   },
 

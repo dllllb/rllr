@@ -24,7 +24,7 @@
     }
   }
 
-  master_agent: {
+  agent: {
     buffer_size: 1000000,
     batch_size: 512,
     noise_decay: 0.995,
