@@ -11,7 +11,7 @@
 
   worker_agent: {
     path: "artifacts/models/minigrid_worker.p",
-    device: "cuda:0"
+    device: "cpu"
   }
 
   master: {
@@ -32,7 +32,7 @@
     min_noise: 0.01,
     explore: true,
     update_step: 4,
-    device: "cuda:0"
+    device: "cpu"
   }
 
   training: {
