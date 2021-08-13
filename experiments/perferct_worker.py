@@ -117,7 +117,7 @@ def main():
     goal_state_encoder = StatePosEncoder(grid_size=conf["env"]["grid_size"], is_goal=True)
     encoder = GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=goal_state_encoder)
     perfect_worker = PerfectWorker(encoder)
-    scores, steps = train_worker.run_episodes(env, perfect_worker, n_episodes=100, verbose=10)
+    scores, steps = train_worker.train_worker(env, perfect_worker, n_episodes=100, verbose=10)
 
     # Check worker
     print(f"Maximum steps: {max(steps)}, , average_steps: {sum(steps)/len(steps)}, minimum score: {min(scores): .2f}")
@@ -129,7 +129,9 @@ def main():
     env = train_worker.gen_env(conf['env'])
 
     master = train_master.get_master_agent(conf["master"]["emb_size"], conf)
-    train_master.run_episodes(env, perfect_worker, master, n_episodes=100, verbose=10, worker_steps=1)
+    train_master.train_master(env, perfect_worker, master,
+                              n_episodes=conf['training']['n_episodes'],
+                              verbose=conf['training']['verbose'], worker_steps=1)
 
 
 if __name__ == '__main__':

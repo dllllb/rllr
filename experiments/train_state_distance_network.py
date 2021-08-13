@@ -46,29 +46,9 @@ def main(args=None):
 
     grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
     encoder = get_encoder(grid_size, config['state_distance_encoder'])
+    device = torch.device(config['training']['device'])
 
-    net = StateDistanceNetwork(encoder=encoder, action_size=env.action_space.n, config=config['state_distance_network'])
-
-    lr = config['training'].get('lr', 1e-4)
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-6)
-    nll_loss = nn.NLLLoss()
-
-    conf = config['training']
-    device = torch.device(conf['device'])
-    net.to(device)
-    sum_loss = 0
-    for roll in range(conf['n_episodes']):
-        states, next_states, actions = map(lambda x: x.to(device), rollout(env))
-        for epoch in range(conf['n_epochs']):
-            optimizer.zero_grad()
-            predicted_actions = net.forward(states, next_states)
-            loss = nll_loss(predicted_actions, actions)
-            loss.backward()
-            optimizer.step()
-            sum_loss += loss.item()
-        if (roll + 1) % conf['verbose'] == 0:
-            logger.info("Rollout: {0}, loss: {1}".format(roll + 1, sum_loss / roll / conf['n_epochs']))
-            sum_loss = 0
+    net = train_statedistance_network(config, encoder, env, device)
 
     if config.get('outputs', False):
         if config.get('outputs.path', False):
@@ -93,6 +73,29 @@ def main(args=None):
         logger.info("Sanity check:")
         logger.info(f"Same agent's position states distance: {d_same} (should be small)")
         logger.info(f"Different agent's position states distance: {d_diff} (should be bigger)")
+
+
+def train_statedistance_network(config, encoder, env):
+    device = config['device']
+    net = StateDistanceNetwork(encoder=encoder, action_size=env.action_space.n, config=config)
+    lr = config['training'].get('lr', 1e-4)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-6)
+    nll_loss = nn.NLLLoss()
+    net.to(device)
+    sum_loss = 0
+    for roll in range(config['training']['n_episodes']):
+        states, next_states, actions = map(lambda x: x.to(device), rollout(env))
+        for epoch in range(config['training']['n_epochs']):
+            optimizer.zero_grad()
+            predicted_actions = net.forward(states, next_states)
+            loss = nll_loss(predicted_actions, actions)
+            loss.backward()
+            optimizer.step()
+            sum_loss += loss.item()
+        if (roll + 1) % config['training']['verbose'] == 0:
+            logger.info("Rollout: {0}, loss: {1}".format(roll + 1, sum_loss / roll / config['training']['n_epochs']))
+            sum_loss = 0
+    return net
 
 
 if __name__ == '__main__':

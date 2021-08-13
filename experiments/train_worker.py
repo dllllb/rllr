@@ -43,7 +43,7 @@ def run_episode(env, worker_agent, train_mode=True, max_steps=1_000):
     return score, steps, env.is_goal_achieved
 
 
-def run_episodes(env, worker_agent, n_episodes=1_000, verbose=False, train_mode=True, max_steps=256):
+def train_worker(env, worker_agent, n_episodes=1_000, verbose=False, train_mode=True, max_steps=256):
     """
     Runs a series of episode and collect statistics
     """
@@ -93,9 +93,12 @@ def gen_env(conf, verbose=False):
     return env
 
 
-def gen_navigation_env(conf, verbose=False):
-    env = gen_env(conf=conf, verbose=verbose)
-    goal_achieving_criterion = get_goal_achieving_criterion(conf)
+def gen_navigation_env(conf, env=None, verbose=False, goal_achieving_criterion=None):
+    if not env:
+        env = gen_env(conf=conf, verbose=verbose)
+
+    if not goal_achieving_criterion:
+        goal_achieving_criterion = get_goal_achieving_criterion(conf)
 
     if conf.get('goal_type', None) == 'random':
         if conf['env_type'] == 'gym_minigrid':
@@ -156,7 +159,7 @@ def get_dqn_agent(config, get_policy_function):
     return agent
 
 
-def get_agent(conf):
+def get_worker_agent(conf):
     state_encoder, goal_state_encoder = get_encoders(conf)
     get_policy_function = partial(
         get_master_worker_net,
@@ -177,11 +180,11 @@ def main(args=None):
     config = get_conf(args)
     switch_reproducibility_on(config['seed'])
 
-    agent = get_agent(config)
+    agent = get_worker_agent(config)
     env = gen_navigation_env(config['env'])
 
     logger.info(f"Running agent training: {config['training.n_episodes']} episodes")
-    run_episodes(
+    train_worker(
         env=env,
         worker_agent=agent,
         n_episodes=config['training.n_episodes'],
@@ -194,7 +197,7 @@ def main(args=None):
         # validation on random goal w/o train_mode
         config['env']['goal_type'] = 'random'
         env = gen_navigation_env(config['env'])
-        run_episodes(
+        train_worker(
             env=env,
             worker_agent=agent,
             train_mode=False,

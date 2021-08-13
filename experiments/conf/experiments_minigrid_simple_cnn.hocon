@@ -1,0 +1,112 @@
+{
+
+device: "cpu",
+
+env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Empty,
+    grid_size: 8,
+    action_size: 3,
+    rgb_image: true,
+    tile_size: 4,
+},
+
+worker_agent: {
+worker: {
+    state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
+    tile_size: 4,
+    head: {
+        hidden_size: [128, 128]
+    }
+},
+
+master: {
+    state_encoder_type: simple_cnn,
+    n_channels: [8, 8],
+    kernel_sizes: [4, 4],
+    max_pools: [4, 1],
+    head: {
+        hidden_size: [16]
+    },
+    emb_size: 2
+},
+
+env: {
+        env_type: gym_minigrid,
+        env_task: MiniGrid-Empty,
+        grid_size: 8,
+        action_size: 3,
+        rgb_image: true,
+        tile_size: 4,
+        goal_type: random,
+        goal_achieving_criterion: position,
+}
+
+agent: {
+    algorithm: DQN,
+    device: "cpu",
+    batch_size: 128,
+    update_step: 4,
+    buffer_size: 100000,
+    learning_rate: 0.001,
+    gamma: 0.9,
+    eps_start: 1,
+    eps_end: 0.1,
+    eps_decay: 0.995,
+    tau: 0.001
+},
+
+
+training: {
+    reward: explicit_pos_reward
+    n_episodes: 1000,
+    verbose: 100
+},
+},
+
+master_agent: {
+
+
+env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Empty,
+    grid_size: 8,
+    action_size: 3,
+    rgb_image: true,
+    tile_size: 4,
+},
+
+agent: {
+    buffer_size: 1000000,
+    batch_size: 128,
+    noise_decay: 0.995,
+    start_noise: 1,
+    min_noise: 0.1,
+    explore: true,
+    update_step: 50,
+    epochs: 50,
+    steps_per_epoch: 1,
+    device: "cpu"
+},
+
+master: {
+    state_encoder_type: simple_cnn,
+    n_channels: [8, 8],
+    kernel_sizes: [4, 4],
+    max_pools: [4, 1],
+    head: {
+        hidden_size: [16]
+    },
+    emb_size: 2
+},
+
+training: {
+    n_episodes: 1000,
+    verbose: 100,
+    }
+}
+
+}
