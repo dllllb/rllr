@@ -26,5 +26,6 @@ setup(
         'gym_minigrid',       # git+https://github.com/maximecb/gym-minigrid.git
         'stable_baselines3',  # master_worker_*.py
         'scipy',              # environments.py :: scipy.stats
+        'tqdm'
     ],
 )

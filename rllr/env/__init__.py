@@ -13,5 +13,6 @@ from .rewards import ExplicitStepsAmount
 
 from .wrappers import navigation_wrapper
 from .wrappers import visualisation_wrapper
+from .vec_wrappers import make_vec_envs
 
 from .rewards import get_reward_function

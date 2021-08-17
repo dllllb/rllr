@@ -298,3 +298,35 @@ class RandomNetworkDistillationReward(gym.Wrapper):
                 self._learn()
 
         return state, reward + intrinsic_reward, done, info
+
+
+class HierarchicalWrapper(gym.Wrapper):
+    def __init__(self, env, low_level_policy, action_shape, n_steps=1):
+        super(HierarchicalWrapper, self).__init__(env)
+        self.policy = low_level_policy
+        self.state = None
+        self.n_steps = n_steps
+        self.episode_reward = 0
+        self.episode_steps = 0
+
+        self.action_space = gym.spaces.Box(-1, 1, action_shape)
+
+    def reset(self):
+        self.state = self.env.reset()
+        self.episode_reward = 0
+        self.episode_steps = 0
+        return self.state
+
+    def step(self, action):
+        cum_reward, step, done = 0, 0, False
+        while not done and step < self.n_steps:
+            self.state, reward, done, info = self.env.step(self.policy.act({'state': self.state, 'goal_emb': action}))
+            cum_reward += reward
+            step += 1
+
+        self.episode_reward += cum_reward
+        self.episode_steps += step
+        if done:
+            info['episode'] = {'r': self.episode_reward, 'steps': self.episode_steps}
+
+        return self.state, cum_reward, done, info

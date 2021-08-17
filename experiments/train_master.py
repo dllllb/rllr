@@ -3,66 +3,85 @@ import os
 import pickle
 import torch
 
-from rllr.algo import DDPG
-
-from rllr.models.ddpg import ActorCriticNetwork
+from rllr.algo import PPO
+from rllr.models.ppo import ActorCriticNetwork
 from experiments.train_worker import gen_env
+from rllr.env.vec_wrappers import make_vec_envs
+from rllr.buffer.rollout import RolloutStorage
+from rllr.env.wrappers import HierarchicalWrapper
 
 from rllr.models import encoders as minigrid_encoders
 
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
+from tqdm import trange
+
+from collections import deque
+import time
+from tqdm import trange
+import numpy as np
 
 
 logger = logging.getLogger(__name__)
 
 
-def run_episode(env, worker_agent, master_agent, worker_steps):
-    """
-    A helper function for running single episode
-    """
-    state = env.reset()
-
-    score, steps, done = 0, 0, False
-    while not done:
-        goal_emb = master_agent.act(state)
-        state_ = state
-        for _ in range(worker_steps):
-            steps += 1
-            action = worker_agent.act({'state': state, 'goal_emb': goal_emb})
-            next_state, reward, done, _ = env.step(action)
-            state = next_state
-            score += reward
-            if done:
-                break
-        master_agent.update(state_, goal_emb, reward, next_state, done)
-
-    master_agent.reset_episode()
-    env.close()
-
-    return score, steps
+def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
+    """Decreases the learning rate linearly"""
+    lr = initial_lr - (initial_lr * (epoch / float(total_num_epochs)))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
 
 
-def train_master(env, worker_agent, master_agent, n_episodes=1_000, verbose=False, worker_steps=1):
+def train_master(env, master_agent, conf):
     """
     Runs a series of episode and collect statistics
     """
-    score_sum, step_sum = 0, 0
-    scores, steps = [], []
-    for episode in range(1, n_episodes + 1):
-        score, step = run_episode(env, worker_agent, master_agent, worker_steps=worker_steps)
-        score_sum += score
-        step_sum += step
-        scores.append(score)
-        steps.append(step)
+    rollouts = RolloutStorage(
+        conf['training.n_steps'], conf['training.n_processes'], env.observation_space.shape, env.action_space.shape[0]
+    )
+    obs = env.reset()
+    rollouts.obs[0].copy_(obs)
+    rollouts.to(conf['agent.device'])
 
-        if verbose and episode % int(verbose) == 0:
-            avg_score = score_sum / int(verbose)
-            avg_step = step_sum / int(verbose)
-            logger.info(f"Episode: {episode}. scores: {avg_score:.2f}, steps: {avg_step:.2f}")
-            score_sum, step_sum, goals_achieved_sum, losses = 0, 0, 0, []
+    start = time.time()
+    num_updates = int(conf['training.n_env_steps'] // conf['training.n_steps'] // conf['training.n_processes'])
 
-    return scores, steps
+    episode_rewards = deque(maxlen=10)
+
+
+    for j in trange(num_updates):
+        update_linear_schedule(master_agent.optimizer, j, num_updates, conf['agent.lr'])
+
+        for step in range(conf['training.n_steps']):
+            # Sample actions
+            value, action, action_log_prob = master_agent.act(obs)
+            obs, reward, done, infos = env.step(action)
+
+            for info in infos:
+                if 'episode' in info.keys():
+                    episode_rewards.append(info['episode']['r'])
+
+            # If done then clean the history of observations.
+            masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
+            rollouts.insert(obs, action, action_log_prob, value, reward, masks)
+
+        next_value = master_agent.get_value(rollouts.obs[-1])
+        rollouts.compute_returns(next_value, conf['agent.gamma'], conf['agent.gae_lambda'])
+
+        value_loss, action_loss, dist_entropy = master_agent.update(rollouts)
+
+        if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
+            total_num_steps = (j + 1) * conf['training.n_processes'] * conf['training.n_steps']
+            end = time.time()
+            print(f'Updates {j}, '
+                  f'num timesteps {total_num_steps}, '
+                  f'FPS {int(total_num_steps / (end - start))} \n'
+                  f'Last {len(episode_rewards)} training episodes: '
+                  f'mean/median reward {np.mean(episode_rewards):.2f}/{np.median(episode_rewards):.2f}, '
+                  f'min/max reward {np.min(episode_rewards):.2f}/{np.max(episode_rewards):.2f}\n'
+                  f'dist_entropy {dist_entropy:.2f}, '
+                  f'value_loss {value_loss:.2f}, '
+                  f'action_loss {action_loss:.2f}')
 
 
 def load_worker_agent(conf):
@@ -74,13 +93,6 @@ def load_worker_agent(conf):
     return worker_agent
 
 
-def get_ddpg_agent(master_network, conf):
-    device = torch.device(conf['device'])
-    return DDPG(master_network, device, explore=conf['explore'],
-                batch_size=conf['batch_size'], buffer_size=conf['buffer_size'], update_step=conf['update_step'],
-                start_noise=conf['start_noise'], noise_decay=conf['noise_decay'], min_noise=conf['min_noise'])
-
-
 def get_master_agent(emb_size, conf):
     if conf['env.env_type'] == 'gym_minigrid':
         grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
@@ -89,33 +101,48 @@ def get_master_agent(emb_size, conf):
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
-    hidden_size = conf['master']['head.hidden_size']
+    hidden_size = conf['master.head.hidden_size']
     master_network = ActorCriticNetwork(emb_size, state_encoder, goal_state_encoder,
-                                        actor_hidden_size=hidden_size, critic_hidden_size=hidden_size)
-    master_agent = get_ddpg_agent(master_network, conf['agent'])
+                                 actor_hidden_size=hidden_size, critic_hidden_size=hidden_size)
+
+    master_agent = PPO(
+        master_network,
+        conf['agent.clip_param'],
+        conf['agent.ppo_epoch'],
+        conf['agent.num_mini_batch'],
+        conf['agent.value_loss_coef'],
+        conf['agent.entropy_coef'],
+        conf['agent.lr'],
+        conf['agent.eps'],
+        conf['agent.max_grad_norm']
+    )
     return master_agent
+
+
+def gen_env_with_seed(conf, seed):
+    conf['env.deterministic'] = True
+    conf['env.seed'] = seed
+
+    worker_agent = load_worker_agent(conf['worker_agent'])
+    worker_agent.explore = False
+    emb_size = worker_agent.qnetwork_local.state_encoder.goal_state_encoder.output_size
+    return HierarchicalWrapper(gen_env(conf['env']), worker_agent, (emb_size,), n_steps=1)
 
 
 def main(args=None):
     config = get_conf(args)
     switch_reproducibility_on(config['seed'])
 
-    env = gen_env(config['env'])
-
-    worker_agent = load_worker_agent(config['worker_agent'])
-    worker_agent.explore = False
-    emb_size = worker_agent.qnetwork_local.state_encoder.goal_state_encoder.output_size
-
-    master_agent = get_master_agent(emb_size, config)
-
-    logger.info(f"Running agent training: {config['training.n_episodes']} episodes")
-    train_master(
-        env,
-        worker_agent,
-        master_agent,
-        n_episodes=config['training.n_episodes'],
-        verbose=config['training.verbose']
+    env = make_vec_envs(
+        lambda env_id: lambda: gen_env_with_seed(config, env_id),
+        config['env.num_processes'],
+        config['agent.device']
     )
+
+    master_agent = get_master_agent(env.action_space.shape[0], config)
+
+    logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} episodes")
+    train_master(env, master_agent, config)
 
     if config.get('outputs', False):
         if config.get('outputs.path', False):
@@ -131,7 +158,7 @@ def main(args=None):
 if __name__ == '__main__':
     init_logger(__name__)
     init_logger('dqn')
-    init_logger('ddpg')
+    init_logger('ppo')
     init_logger('rllr.env.wrappers')
     init_logger('rllr.env.gym_minigrid_navigation.environments')
     main()

@@ -1,12 +1,13 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Dynamic-Obstacles,
+    env_task: MiniGrid-Empty,
     grid_size: 8,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    video_path: artifacts/video/
+    video_path: artifacts/video/,
+    num_processes: 16
   },
 
   worker_agent: {
@@ -25,19 +26,24 @@
   }
 
   agent: {
-    buffer_size: 1000000,
-    batch_size: 512,
-    noise_decay: 0.995,
-    start_noise: 1,
-    min_noise: 0.01,
-    explore: true,
-    update_step: 4,
-    device: "cpu"
+    device: "cpu",
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.01,
+    lr: 0.001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.99,
+    gae_lambda: 0.95
   }
 
   training: {
-    n_episodes: 1000,
-    verbose: 100,
+    n_env_steps: 1000000,
+    n_steps: 128,
+    n_processes: 16,
+    verbose: 1,
   },
 
   seed: 42,

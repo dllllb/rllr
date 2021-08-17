@@ -1,7 +1,17 @@
 import torch
 from torch import nn as nn
-from torch.distributions import Categorical
 from torch.nn import functional as F
+
+
+class FixedNormal(torch.distributions.Normal):
+    def log_probs(self, actions):
+        return super().log_prob(actions).sum(-1, keepdim=True)
+
+    def entropy(self):
+        return super().entropy().sum(-1)
+
+    def mode(self):
+        return self.mean
 
 
 class ActorNetwork(nn.Module):
@@ -30,18 +40,15 @@ class ActorNetwork(nn.Module):
         else:
             AttributeError(f"unknown type of {hidden_size} parameter")
 
-        fc_layers.append(nn.Softmax(dim=1))
         self.fc = nn.Sequential(*fc_layers)
+        self.logstd = nn.Parameter(torch.zeros((action_size,)))
         self.output_size = action_size
 
-    def forward(self, states, actions=None):
+    def forward(self, states):
         states_encoding = self.state_encoder(states)
-        probs = self.fc(states_encoding)
-        action_dist = Categorical(probs)
-        actions = actions if actions is not None else action_dist.sample()
-        action_log_prob = action_dist.log_prob(actions.squeeze())
-        entropy = action_dist.entropy()
-        return actions.detach(), action_log_prob.unsqueeze(1), entropy
+        mu = self.fc(states_encoding)
+        std = self.logstd.exp()
+        return FixedNormal(mu, std)
 
 
 class CriticNetwork(nn.Module):
@@ -75,21 +82,28 @@ class CriticNetwork(nn.Module):
         return self.fc(x)
 
 
-class ActorCritic(nn.Module):
+class ActorCriticNetwork(nn.Module):
     """
     Actor-critic model
     """
 
     def __init__(self, action_size, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size):
-        super(ActorCritic, self).__init__()
+        super(ActorCriticNetwork, self).__init__()
         self.actor = ActorNetwork(action_size, actor_state_encoder, actor_hidden_size)
         self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size)
 
-    def act(self, states):
-        actions, _, _ = self.actor.forward(states, None)
-        return actions
+    def act(self, states, deterministic=False):
+        dist = self.actor.forward(states)
+        if deterministic:
+            action = dist.mode()
+        else:
+            action = dist.sample()
+        return self.critic.forward(states), action, dist.log_probs(action)
 
-    def evaluate(self, states, actions):
-        _, logprobs, entropy = self.actor.forward(states, actions)
+    def get_value(self, states):
+        return self.critic.forward(states)
+
+    def evaluate_actions(self, states, actions):
+        dist = self.actor.forward(states)
         values = self.critic.forward(states)
-        return values, logprobs, entropy.reshape(-1, 1)
+        return values, dist.log_probs(actions), dist.entropy().mean()

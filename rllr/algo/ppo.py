@@ -1,132 +1,85 @@
 import torch
-import copy
 import torch.nn as nn
-import numpy as np
-from rllr.buffer import ReplayBuffer
-from rllr.algo.core import Algo
-from rllr.utils import convert_to_torch
+import torch.nn.functional as F
+import torch.optim as optim
 
 
-class PPO(Algo):
-
+class PPO():
     def __init__(self,
-                 actor_critic: torch.nn.Module,
-                 device: torch.device,
-                 memory_size: int = 128,
-                 epochs: int = 10,
-                 lr: float = 5e-3,
-                 lamb: float = 0.8,
-                 gamma: float = 0.97,
-                 eps: float = 0.2,
-                 c1: float = 0.5,
-                 c2: float = 0.01):
-        """Initializes agent object
+                 actor_critic,
+                 clip_param,
+                 ppo_epoch,
+                 num_mini_batch,
+                 value_loss_coef,
+                 entropy_coef,
+                 lr=None,
+                 eps=None,
+                 max_grad_norm=None):
 
-        Args:
-         actor_critic - pretrained actor-critic network
-         T - time steps to collect before agent updating
-         K_epochs - number of steps while optimizing networcs
-         lr - learning rate for Adam optimizer
-         lamb - smoothing parameter for generalized advantage estimator
-         gamma - decay
-         eps - clipping threshold
-         c1 - weight for critic loss
-         c2 - weight for entropy loss
+        self.actor_critic = actor_critic
 
-        """
-        self.policy = actor_critic.to(device)
-        self.policy_old = copy.deepcopy(self.policy).to(device)
-        self.policy_old.load_state_dict(self.policy.state_dict())
-        self.memory = ReplayBuffer(buffer_size=memory_size, batch_size=memory_size, device=device)
-        self.T = memory_size
-        self.K_epochs = epochs
-        self.c1 = c1
-        self.c2 = c2
-        self.lamb = lamb
-        self.gamma = gamma
-        self.epsilon = eps
-        self.mse_loss = nn.MSELoss()
-        self.device = device
-        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr)
+        self.clip_param = clip_param
+        self.ppo_epoch = ppo_epoch
+        self.num_mini_batch = num_mini_batch
+
+        self.value_loss_coef = value_loss_coef
+        self.entropy_coef = entropy_coef
+
+        self.max_grad_norm = max_grad_norm
+
+        self.optimizer = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
 
     def act(self, state):
-        """Takes actions given batch of states
-
-        Args:
-         states - a batch of states
-
-        Returns:
-         actions - a batch of actions generated given states
-        """
-        state = convert_to_torch([state])
         with torch.no_grad():
-            action = self.policy_old.act(state).detach().cpu().numpy()[0]
-            return action
+            return self.actor_critic.act(state)
 
-    def update(self, states, actions, rewards, next_states, dones):
-        """Updates actor critic network
-        """
-
-        # Add to memory untill collect trajectories of length memory_size
-        if not self.memory.is_enough():
-            self.memory.add(states, actions, rewards, next_states, dones)
-            return
-
-        # Optimize
-        for _ in range(self.K_epochs):
-            loss = self._compute_loss()
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-        self.policy_old.load_state_dict(self.policy.state_dict())
-        self.memory.clear()
-
-    def _compute_loss(self):
-
-        # Iterate over actors and create batch
-        loss = 0
-
-        states, actions, rewards, next_states, dones = self.memory.get()
-        rewards_to_go = self._compute_rewards_to_go(rewards, dones)
-
-        values, logprobs, S = self.policy.evaluate(states, actions)
-
+    def get_value(self, state):
         with torch.no_grad():
-            values_old, logprobs_old, _ = self.policy_old.evaluate(states, actions)
-            values_next_old, _, _ = self.policy_old.evaluate(next_states, None)
-            values_old = values_old.detach()
-            values_next_old = values_next_old.detach()
+            return self.actor_critic.get_value(state)
 
-        ratios = torch.exp(logprobs - logprobs_old.detach())
-        advantages = self._compute_advantages(rewards, values_old, values_next_old, dones)
+    def update(self, rollouts):
+        advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
 
-        # Compute surrogate loss with clipping
-        s1 = ratios * advantages
-        s2 = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon) * advantages
-        L_clip = torch.min(s1, s2)
+        value_loss_epoch = 0
+        action_loss_epoch = 0
+        dist_entropy_epoch = 0
 
-        # Compute MSE loss for value functions
-        L_vf = self.mse_loss(values, rewards_to_go)
+        for e in range(self.ppo_epoch):
+            data_generator = rollouts.feed_forward_generator(advantages, self.num_mini_batch)
 
-        # Combine losses
-        loss += -L_clip.mean() + self.c1 * L_vf - self.c2 * S.mean()
-        return loss
+            for sample in data_generator:
+                obs_batch, actions_batch, value_preds_batch, return_batch, masks_batch, \
+                old_action_log_probs_batch, adv_targ = sample
 
-    def _compute_advantages(self, rewards, values, next_values, dones):
-        td_errors = rewards + self.gamma * next_values * (1 - dones) - values
-        A, advantages = 0, []
-        for t in reversed(range(len(td_errors))):
-            A = td_errors[t] + (self.lamb * self.gamma) * A * (1 - dones[t])
-            advantages.insert(0, A)
-        return convert_to_torch(advantages, self.device)
+                # Reshape to do in a single forward pass for all steps
+                values, action_log_probs, dist_entropy = self.actor_critic.evaluate_actions(obs_batch, actions_batch)
 
-    def _compute_rewards_to_go(self, rewards, dones):
-        rewards_to_go = []
-        R = 0
-        for reward, done in zip(reversed(rewards), reversed(dones)):
-            R = reward + self.gamma * R * (1 - done)
-            rewards_to_go.insert(0, R)
-        return convert_to_torch(rewards_to_go, self.device)
+                ratio = torch.exp(action_log_probs - old_action_log_probs_batch)
+                surr1 = ratio * adv_targ
+                surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * adv_targ
+                action_loss = -torch.min(surr1, surr2).mean()
 
-    def reset_episode(self):
-        return True
+                # clipped_value_loss:
+                value_pred_clipped = value_preds_batch + \
+                     (values - value_preds_batch).clamp(-self.clip_param, self.clip_param)
+                value_losses = (values - return_batch).pow(2)
+                value_losses_clipped = (value_pred_clipped - return_batch).pow(2)
+                value_loss = 0.5 * torch.max(value_losses, value_losses_clipped).mean()
+
+                self.optimizer.zero_grad()
+                (value_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef).backward()
+                nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
+                self.optimizer.step()
+
+                value_loss_epoch += value_loss.item()
+                action_loss_epoch += action_loss.item()
+                dist_entropy_epoch += dist_entropy.item()
+
+        num_updates = self.ppo_epoch * self.num_mini_batch
+
+        value_loss_epoch /= num_updates
+        action_loss_epoch /= num_updates
+        dist_entropy_epoch /= num_updates
+
+        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch
