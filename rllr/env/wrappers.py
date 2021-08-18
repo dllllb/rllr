@@ -33,8 +33,8 @@ class NavigationGoalWrapper(gym.Wrapper):
         return self.is_goal_achieved
 
     def step(self, action):
-        next_state, _, _, info = self.env.step(action)
-        done = self._goal_achieved(next_state) or (self.step_count >= self.max_steps)
+        next_state, _, env_done, info = self.env.step(action)
+        done = env_done or self._goal_achieved(next_state) or (self.step_count >= self.max_steps)
         reward = 1 if self.is_goal_achieved else - 0.1
 
         return next_state, reward, done, info
