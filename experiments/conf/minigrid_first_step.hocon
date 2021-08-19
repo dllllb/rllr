@@ -20,32 +20,36 @@
     goal_achieving_criterion: state_distance_network,
     state_distance_network_params: {
         path: artifacts/models/minigrid_state_distance_encoder.p,
-        device: "cuda:0",
+        device: "cpu",
         threshold: 6
     }
     video_path: artifacts/video/
   },
 
   worker: {
-    state_encoder_type: dummy_image,
-    tile_size: 4,
+    state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
     head: {
         hidden_size: 64
     }
   },
 
   master: {
-    state_encoder_type: dummy_image,
-    tile_size: 4,
+    state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
     head: {
         hidden_size: []
     },
     emb_size: 32
-  }
+  },
 
   agent: {
     algorithm: DQN,
-    device: "cuda:0",
+    device: "cpu",
     batch_size: 128,
     update_step: 4,
     buffer_size: 100000,
