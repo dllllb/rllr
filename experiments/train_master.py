@@ -4,7 +4,7 @@ import pickle
 import torch
 
 from rllr.algo import PPO
-from rllr.utils.common import train_ppo
+from rllr.utils import train_ppo
 from rllr.models.ppo import ActorCriticNetwork
 from experiments.train_worker import gen_env
 from rllr.env.vec_wrappers import make_vec_envs

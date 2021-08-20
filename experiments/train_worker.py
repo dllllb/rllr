@@ -14,7 +14,7 @@ from rllr.models.encoders import GoalStateEncoder
 from rllr.models import encoders as minigrid_encoders
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
-from rllr.utils.common import train_ppo
+from rllr.utils import train_ppo
 from rllr.env.vec_wrappers import make_vec_envs
 from rllr.env.wrappers import EpisodeInfoWrapper
 
