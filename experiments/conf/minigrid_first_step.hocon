@@ -3,27 +3,13 @@
     env_type: gym_minigrid,
     env_task: MiniGrid-Dynamic-Obstacles,
     grid_size: 8,
-    action_size: 3,
+    action_size: 4,
     rgb_image: true,
     tile_size: 4,
-    goal_type: from_buffer,
-    from_buffer_choice_params: {
-        buffer_size: 100000,
-        init_complexity: 1,
-        scale: 10,
-        complexity_step: 10,
-        threshold: 0.95,
-        max_complexity: 100,
-        update_period: 100,
-        warmup_steps: 10000,
-    }
-    goal_achieving_criterion: state_distance_network,
-    state_distance_network_params: {
-        path: artifacts/models/minigrid_state_distance_encoder.p,
-        device: "cpu",
-        threshold: 6
-    }
-    video_path: artifacts/video/
+    goal_type: random,
+    goal_achieving_criterion: position,
+    video_path: artifacts/video/,
+    num_processes: 16
   },
 
   worker: {
@@ -48,31 +34,30 @@
   },
 
   agent: {
-    algorithm: DQN,
     device: "cpu",
-    batch_size: 128,
-    update_step: 4,
-    buffer_size: 100000,
-    learning_rate: 0.001,
-    gamma: 0.9,
-    eps_start: 1,
-    eps_end: 0.1,
-    eps_decay: 0.995,
-    tau: 0.001
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.01,
+    lr: 0.001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.99,
+    gae_lambda: 0.95
   },
 
   training: {
     reward: fair_goal_achievement,
-    n_episodes: 10000,
-    verbose: 100,
-    max_steps: 256,
-    validation: true,
+    n_env_steps: 2000000,
+    n_steps: 128,
+    n_processes: 16,
+    verbose: 1,
   },
 
   seed: 42,
 
   outputs: {
-    save_example: true,
     path: artifacts/models/minigrid_worker.p,
   }
 }

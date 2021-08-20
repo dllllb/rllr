@@ -6,6 +6,15 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnvWrapper
 
 
+def _to_torch(arr, device='cpu'):
+    if isinstance(arr, dict):
+        return {
+            key: _to_torch(arr[key], device) for key in arr.keys()
+        }
+    return torch.from_numpy(arr).to(device)
+
+
+
 def make_vec_envs(make_env, num_processes, device):
     envs = [make_env(env_id) for env_id in range(num_processes)]
 
@@ -23,22 +32,21 @@ class VecPyTorch(VecEnvWrapper):
         """Return only every `skip`-th frame"""
         super(VecPyTorch, self).__init__(venv)
         self.device = device
+        self.reward_range = None
 
     def reset(self):
-        obs = self.venv.reset()
-        obs = torch.from_numpy(obs).float().to(self.device)
-        return obs
+        return _to_torch(self.venv.reset(), self.device)
 
     def step_async(self, actions):
         if isinstance(actions, torch.LongTensor):
             # Squeeze the dimension for discrete actions
             actions = actions.squeeze(1)
+
         actions = actions.cpu().numpy()
         self.venv.step_async(actions)
 
     def step_wait(self):
         obs, reward, done, info = self.venv.step_wait()
-        obs = torch.from_numpy(obs).float().to(self.device)
         reward = torch.from_numpy(reward).unsqueeze(dim=1).float()
-        return obs, reward, done, info
+        return _to_torch(obs, self.device), reward, done, info
 

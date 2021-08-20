@@ -27,15 +27,15 @@ class NavigationGoalWrapper(gym.Wrapper):
 
     def _goal_achieved(self, state):
         if self.goal_state is not None:
-            self.is_goal_achieved = self.goal_achieving_criterion(state, self.goal_state)
+            return self.goal_achieving_criterion(state, self.goal_state)
         else:
-            self.is_goal_achieved = False
-        return self.is_goal_achieved
+            return False
 
     def step(self, action):
         next_state, _, env_done, info = self.env.step(action)
-        done = env_done or self._goal_achieved(next_state) or (self.step_count >= self.max_steps)
-        reward = 1 if self.is_goal_achieved else - 0.1
+        self.is_goal_achieved = self._goal_achieved(next_state)
+        done = env_done or self.is_goal_achieved or (self.step_count >= self.max_steps)
+        reward = 1 if self.is_goal_achieved else 0
 
         return next_state, reward, done, info
 
@@ -300,33 +300,46 @@ class RandomNetworkDistillationReward(gym.Wrapper):
         return state, reward + intrinsic_reward, done, info
 
 
+class EpisodeInfoWrapper(gym.Wrapper):
+    def __init__(self, env):
+        super(EpisodeInfoWrapper, self).__init__(env)
+        self.episode_reward = 0
+        self.episode_steps = 0
+
+    def reset(self):
+        self.episode_reward = 0
+        self.episode_steps = 0
+        return self.env.reset()
+
+    def step(self, action):
+        state, reward, done, info = self.env.step(action)
+        self.episode_reward += reward
+        self.episode_steps += 1
+        if done:
+            info['episode'] = {'r': self.episode_reward, 'steps': self.episode_steps}
+        return state, reward, done, info
+
+
 class HierarchicalWrapper(gym.Wrapper):
     def __init__(self, env, low_level_policy, action_shape, n_steps=1):
         super(HierarchicalWrapper, self).__init__(env)
         self.policy = low_level_policy
         self.state = None
         self.n_steps = n_steps
-        self.episode_reward = 0
-        self.episode_steps = 0
-
         self.action_space = gym.spaces.Box(-1, 1, action_shape)
 
     def reset(self):
         self.state = self.env.reset()
-        self.episode_reward = 0
-        self.episode_steps = 0
-        return self.state
+        return torch.from_numpy(self.state)
 
     def step(self, action):
         cum_reward, step, done = 0, 0, False
         while not done and step < self.n_steps:
-            self.state, reward, done, info = self.env.step(self.policy.act({'state': self.state, 'goal_emb': action}))
+            _, low_action, _ = self.policy.act({
+                'state': torch.from_numpy(self.state).unsqueeze(dim=0),
+                'goal_emb': torch.from_numpy(action).unsqueeze(dim=0)
+            }, deterministic=True)
+            self.state, reward, done, info = self.env.step(low_action)
             cum_reward += reward
             step += 1
-
-        self.episode_reward += cum_reward
-        self.episode_steps += step
-        if done:
-            info['episode'] = {'r': self.episode_reward, 'steps': self.episode_steps}
-
         return self.state, cum_reward, done, info

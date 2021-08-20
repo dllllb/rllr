@@ -7,20 +7,49 @@ def _flatten_helper(T, N, _tensor):
 
 
 class RolloutStorage(object):
-    def __init__(self, num_steps, num_processes, obs_shape, action_len):
-        self.obs = torch.zeros(num_steps + 1, num_processes, *obs_shape)
+    def __init__(self, num_steps, num_processes, obs_space, action_space):
+        if obs_space.__class__.__name__ == 'Dict':
+            self.obs = {key: torch.zeros(num_steps + 1, num_processes, *obs_space[key].shape) for key in obs_space}
+        else:
+            self.obs = torch.zeros(num_steps + 1, num_processes, *obs_space.shape)
+
+        if action_space.__class__.__name__ == 'Discrete':
+            self.actions = torch.zeros(num_steps, num_processes, 1).long()
+        else:
+            self.actions = torch.zeros(num_steps, num_processes, action_space.shape[0])
+
         self.rewards = torch.zeros(num_steps, num_processes, 1)
         self.value_preds = torch.zeros(num_steps + 1, num_processes, 1)
         self.returns = torch.zeros(num_steps + 1, num_processes, 1)
         self.action_log_probs = torch.zeros(num_steps, num_processes, 1)
-        self.actions = torch.zeros(num_steps, num_processes, action_len)
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
 
         self.num_steps = num_steps
         self.step = 0
 
+    def copy_obs(self, value, idx):
+        if self.obs.__class__.__name__ == 'dict':
+            for key  in self.obs:
+                self.obs[key][idx].copy_(value[key])
+        else:
+            self.obs[idx].copy_(value)
+
+    def set_first_obs(self, value):
+        self.copy_obs(value, 0)
+
+    def get_last_obs(self):
+        if self.obs.__class__.__name__ == 'dict':
+            return {key: self.obs[key][-1] for key in self.obs}
+        else:
+            return self.obs[-1]
+
     def to(self, device):
-        self.obs = self.obs.to(device)
+        if self.obs.__class__.__name__ == 'dict':
+            for key in self.obs:
+                self.obs[key] = self.obs[key].to(device)
+        else:
+            self.obs = self.obs.to(device)
+
         self.rewards = self.rewards.to(device)
         self.value_preds = self.value_preds.to(device)
         self.returns = self.returns.to(device)
@@ -29,7 +58,7 @@ class RolloutStorage(object):
         self.masks = self.masks.to(device)
 
     def insert(self, obs, actions, action_log_probs, value_preds, rewards, masks):
-        self.obs[self.step + 1].copy_(obs)
+        self.copy_obs(obs, self.step + 1)
         self.actions[self.step].copy_(actions)
         self.action_log_probs[self.step].copy_(action_log_probs)
         self.value_preds[self.step].copy_(value_preds)
@@ -39,7 +68,7 @@ class RolloutStorage(object):
         self.step = (self.step + 1) % self.num_steps
 
     def after_update(self):
-        self.obs[0].copy_(self.obs[-1])
+        self.copy_obs(self.obs, -1)
         self.masks[0].copy_(self.masks[-1])
 
     def compute_returns(self, next_value, gamma, gae_lambda):
@@ -70,7 +99,11 @@ class RolloutStorage(object):
             mini_batch_size,
             drop_last=True)
         for indices in sampler:
-            obs_batch = self.obs[:-1].view(-1, *self.obs.size()[2:])[indices]
+            if self.obs.__class__.__name__ == 'dict':
+                obs_batch = {key: self.obs[key][:-1].view(-1, *self.obs[key].size()[2:])[indices] for key in self.obs}
+            else:
+                obs_batch = self.obs[:-1].view(-1, *self.obs.size()[2:])[indices]
+
             actions_batch = self.actions.view(-1,
                                               self.actions.size(-1))[indices]
             value_preds_batch = self.value_preds[:-1].view(-1, 1)[indices]

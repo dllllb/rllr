@@ -29,9 +29,13 @@ class PPO():
 
         self.optimizer = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
 
-    def act(self, state):
+    def to(self, device):
+        self.actor_critic = self.actor_critic.to(device)
+        return self
+
+    def act(self, state, deterministic=False):
         with torch.no_grad():
-            return self.actor_critic.act(state)
+            return self.actor_critic.act(state, deterministic)
 
     def get_value(self, state):
         with torch.no_grad():

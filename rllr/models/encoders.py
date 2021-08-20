@@ -87,7 +87,7 @@ class SimpleCNN(nn.Module):
         self.output_size = output_size
 
     def forward(self, x):
-        res = self.conv_net(x).reshape(x.shape[0], -1)
+        res = self.conv_net(x.float() / 255.).reshape(x.shape[0], -1)
         if self.fc is not None:
             res = self.fc(res)
         return res
@@ -316,3 +316,32 @@ class VAE(nn.Module):
         z = self._reparameterize(mu, log_var)
         out = self.decoder(z)
         return out, mu, log_var
+
+
+class VarEmbedding(nn.Module):
+    def __init__(self, embedding_size, state_encoder):
+        super().__init__()
+        self.state_encoder = state_encoder
+        input_size = state_encoder.output_size
+
+
+        self.mu = nn.Sequential(nn.Linear(input_size, embedding_size))
+        self.logstd = nn.Sequential(nn.Linear(input_size, embedding_size))
+        self.output_size = embedding_size
+
+    def forward(self, states):
+        states_encoding = self.state_encoder(states)
+        mu = self.mu(states_encoding)
+        logstd = self.logstd(states_encoding)
+        sigma = logstd.exp()
+
+        eps = torch.randn_like(sigma)
+        z = eps.mul(sigma).add_(mu)
+        return z
+
+    def kl_loss(self, states):
+        states_encoding = self.state_encoder(states)
+        mu = self.mu(states_encoding)
+        logstd = self.logstd(states_encoding)
+        KLD = -0.5 * torch.sum(1 + 2 * logstd - mu.pow(2) - (2 * logstd).exp())
+        return KLD

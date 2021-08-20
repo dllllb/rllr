@@ -66,4 +66,6 @@ python train_state_distance_network.py --conf conf/minigrid_zero_step.hocon
 python train_worker.py --conf conf/minigrid_first_step.hocon
 
 python train_master.py --conf conf/minigrid_second_step.hocon
+
+python enjoy.py --mode master
 ```
