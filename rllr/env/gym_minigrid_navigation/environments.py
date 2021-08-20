@@ -67,6 +67,7 @@ def random_grid_goal_generator(conf, verbose=False):
     init_pos = np.array([1, 1])
 
     while True:
+        env.reset()
         goal_pos = None
         while goal_pos is None or (init_pos == goal_pos).all():
             goal_pos = np.random.randint(1, grid_size - 1, 2)
