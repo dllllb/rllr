@@ -17,12 +17,14 @@
     hidden_layers_sizes: [128]
   },
 
+  hidden_size: 128,
+
   state_distance_network = {
     hidden_size: 128
   },
 
   training: {
-    device: "cuda:0"
+    device: "cpu"
     n_episodes: 1500,
     n_epochs: 5,
     verbose: 100,

@@ -46,7 +46,7 @@ def main(args=None):
 
     grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
     encoder = get_encoder(grid_size, config['state_distance_encoder'])
-    device = torch.device(config['state_distance_encoder']['device'])
+    device = torch.device(config['training']['device'])
 
     net = train_statedistance_network(config, encoder, env,)
 
