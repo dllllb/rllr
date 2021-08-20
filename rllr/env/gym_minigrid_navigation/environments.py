@@ -63,6 +63,7 @@ def gen_wrapped_env(conf, verbose=False):
 
 def random_grid_goal_generator(conf, verbose=False):
     env = gen_wrapped_env(conf, verbose=verbose)
+    env.seed(conf['random_goal_seed'])
     grid_size = env.unwrapped.grid.encode().shape[0]
     init_pos = np.array([1, 1])
 

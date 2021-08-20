@@ -7,6 +7,7 @@
     rgb_image: true,
     tile_size: 4,
     goal_type: random,
+    random_goal_seed: 123456789,
     goal_achieving_criterion: position,
     video_path: artifacts/video/,
     num_processes: 16
