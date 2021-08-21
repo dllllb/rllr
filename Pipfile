@@ -6,7 +6,6 @@ verify_ssl = true
 [dev-packages]
 pytest = "*"
 pylint = "*"
-rllr = {editable = true, path = "."}
 
 [packages]
 gym = {extras = ["atari"], version = "0.10"}
