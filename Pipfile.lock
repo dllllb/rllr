@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "c1feee9e62aa41ded918a881105f18e5b53a82bacd469ce2d2e520396c98b8a4"
+            "sha256": "9c8479336bfa99e25b561e2e995a2a4af25527c0a79390e355e0057dd7514792"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -528,6 +528,13 @@
             "markers": "python_version >= '3.5'",
             "version": "==1.5.1"
         },
+        "nle": {
+            "hashes": [
+                "sha256:571c9f03cc975f2ba839d15e8e811f52761c0f58475259ac64e22a72a0ae5bbf"
+            ],
+            "index": "pypi",
+            "version": "==0.7.3"
+        },
         "notebook": {
             "hashes": [
                 "sha256:b50eafa8208d5db966efd1caa4076b4dfc51815e02a805b32ecd717e9e6cc071",
@@ -748,6 +755,14 @@
             ],
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
             "version": "==1.10.0"
+        },
+        "pybind11": {
+            "hashes": [
+                "sha256:34663b2a16e7ac6ae8b77fef13e2b135e9fbc5ec13d2505d34bd35b3a41b9d82",
+                "sha256:8950aac5e5f4d505f7a0f067c5cb3893dcf098ff29cedfcb4ccf1e9e44d0bd9a"
+            ],
+            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4'",
+            "version": "==2.7.1"
         },
         "pycparser": {
             "hashes": [

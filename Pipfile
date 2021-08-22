@@ -19,6 +19,7 @@ matplotlib = ">=3.4.1"
 pyhocon = ">=0.3.57"
 pytest = "*"
 rllr = {editable = true, path = "."}
+nle = "*"
 
 [requires]
 python_version = "3.8"
