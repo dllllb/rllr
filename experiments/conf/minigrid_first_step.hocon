@@ -10,7 +10,6 @@
     random_goal_seed: 123456789,
     goal_achieving_criterion: position,
     video_path: artifacts/video/,
-    num_processes: 16
   },
 
   worker: {

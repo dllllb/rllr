@@ -147,7 +147,7 @@ def main(args=None):
 
     env = make_vec_envs(
         lambda env_id: lambda: gen_env_with_seed(config, env_id),
-        config['env.num_processes'],
+        config['training.n_processes'],
         config['agent.device']
     )
 
