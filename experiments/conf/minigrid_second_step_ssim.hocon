@@ -1,0 +1,54 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Dynamic-Obstacles,
+    grid_size: 8,
+    action_size: 3,
+    rgb_image: true,
+    tile_size: 4,
+    video_path: artifacts/video/,
+    num_processes: 16
+  },
+
+  worker_agent: {
+    path: "artifacts/models/minigrid_worker_ssim.p",
+    device: "cpu"
+  }
+
+  master: {
+    state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
+    head: {
+        hidden_size: 64
+    }
+  }
+
+  agent: {
+    device: "cpu",
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.01,
+    lr: 0.001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.99,
+    gae_lambda: 0.95
+  }
+
+  training: {
+    n_env_steps: 1000000,
+    n_steps: 128,
+    n_processes: 16,
+    verbose: 1,
+  },
+
+  seed: 42,
+
+  outputs: {
+      path: artifacts/models/minigrid_master_ssim.p,
+  }
+}

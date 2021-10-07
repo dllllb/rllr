@@ -9,7 +9,7 @@ import rllr.env as environments
 from rllr.algo import PPO
 from rllr.models.ppo import ActorCriticNetwork
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
-from rllr.models import SameStatesCriterion, ActorNetwork, StateEmbedder
+from rllr.models import SameStatesCriterion, ActorNetwork, StateEmbedder, SSIMCriterion
 from rllr.models.encoders import GoalStateEncoder
 from rllr.models import encoders as minigrid_encoders
 from rllr.utils import get_conf, switch_reproducibility_on
@@ -36,6 +36,11 @@ def get_goal_achieving_criterion(config):
         device = torch.device(config['state_distance_network_params.device'])
         threshold = config['state_distance_network_params.threshold']
         return SameStatesCriterion(encoder, device, threshold)
+    elif config['goal_achieving_criterion'] == 'state_similarity':
+        ssim = torch.load(config['ssim_network_params.path'])
+        device = torch.device(config['ssim_network_params.device'])
+        threshold = config['ssim_network_params.threshold']
+        return SSIMCriterion(ssim, device, threshold)
     else:
         raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
 
