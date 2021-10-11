@@ -57,7 +57,7 @@ def gen_env_with_seed(conf, seed):
 
     return HierarchicalWrapper(
         EpisodeInfoWrapper(gen_env(conf['env'])),
-        worker_agent, (emb_size,), n_steps=1
+        worker_agent, (emb_size,), n_steps=5
     )
 
 

@@ -44,7 +44,6 @@ if __name__ == '__main__':
         obs = env.reset()
         done = False
         cum_reward = 0
-        import matplotlib.pyplot as plt
 
         while not done:
             env.render('human')
