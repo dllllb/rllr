@@ -7,6 +7,7 @@ from collections import deque
 from gym.wrappers import Monitor
 from scipy.stats import norm
 import torch.nn.functional as F
+from collections import Counter
 
 from ..buffer import ReplayBuffer
 from ..exploration import EpisodicMemory
@@ -245,7 +246,8 @@ class RandomNetworkDistillationReward(gym.Wrapper):
                  buffer_size=10000,
                  batch_size=64,
                  update_step=4,
-                 gamma=0.99):
+                 gamma=0.99,
+                 use_extrinsic_reward=False):
 
         self.device = device
         self.target = target.to(device)
@@ -257,6 +259,7 @@ class RandomNetworkDistillationReward(gym.Wrapper):
         self.running_mean = 0
         self.running_sd = 1
         self.gamma = gamma
+        self.use_extrinsic_reward = use_extrinsic_reward
         super().__init__(env)
 
     def reset(self):
@@ -275,8 +278,8 @@ class RandomNetworkDistillationReward(gym.Wrapper):
         self.optimizer.step()
         with torch.no_grad():
             intrinsic_reward = (targets - outputs).abs().pow(2).sum(1)
-            self.running_mean = self.gamma * self.running_mean + (1 - self.gamma) + intrinsic_reward.mean()
-            self.running_sd = self.gamma * self.running_sd + (1 - self.gamma) + intrinsic_reward.var().pow(0.5)
+            self.running_mean = self.gamma * self.running_mean + (1 - self.gamma) * intrinsic_reward.mean()
+            self.running_sd = self.gamma * self.running_sd + (1 - self.gamma) * intrinsic_reward.var().pow(0.5)
 
     def step(self, action):
         state, reward, done, info = self.env.step(action)
@@ -297,7 +300,7 @@ class RandomNetworkDistillationReward(gym.Wrapper):
             if self.replay_buffer.is_enough():
                 self._learn()
 
-        return state, reward + intrinsic_reward, done, info
+        return state, reward * self.use_extrinsic_reward + intrinsic_reward, done, info
 
 
 class EpisodeInfoWrapper(gym.Wrapper):
@@ -305,6 +308,7 @@ class EpisodeInfoWrapper(gym.Wrapper):
         super(EpisodeInfoWrapper, self).__init__(env)
         self.episode_reward = 0
         self.episode_steps = 0
+        self.visits_stats = dict()
 
     def reset(self):
         self.episode_reward = 0
@@ -315,6 +319,12 @@ class EpisodeInfoWrapper(gym.Wrapper):
         state, reward, done, info = self.env.step(action)
         self.episode_reward += reward
         self.episode_steps += 1
+        pos = tuple(self.agent_pos)
+        if pos in self.visits_stats:
+            self.visits_stats[pos] += 1
+        else:
+            self.visits_stats[pos] = 1
+        info['visit_stats'] = self.visits_stats
         if done:
             info['episode'] = {'r': self.episode_reward, 'steps': self.episode_steps}
         return state, reward, done, info

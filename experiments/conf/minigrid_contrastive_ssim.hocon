@@ -1,0 +1,98 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Dynamic-Obstacles,
+    grid_size: 8,
+    action_size: 3,
+    rgb_image: true,
+    tile_size: 4,
+    video_path: artifacts/video/,
+  },
+
+  random_network_distillation_reward: {
+      device: "cpu",
+      target: {
+        state_encoder_type: simple_cnn,
+        n_channels: [6, 16],
+        kernel_sizes: [4, 3],
+        max_pools: [4, 1],
+        head: {
+            hidden_size: 64
+        }
+      },
+      predictor: {
+        state_encoder_type: simple_cnn,
+        n_channels: [6, 16],
+        kernel_sizes: [4, 3],
+        max_pools: [4, 1],
+        head: {
+            hidden_size: 64
+        }
+      }
+    },
+
+
+  state_similarity: {
+    state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
+    head: {
+        hidden_size: 64
+     },
+    hidden_size: [128, 128],
+    lr: 1e-3,
+    radius: 3,
+    n_updates: 5,
+    epochs: 5,
+    verbose: 100,
+  }
+
+  worker: {
+    state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
+    head: {
+        hidden_size: 64
+    }
+  },
+
+  master: {
+    state_encoder_type: simple_cnn,
+    n_channels: [6, 16],
+    kernel_sizes: [4, 3],
+    max_pools: [4, 1],
+    head: {
+        hidden_size: []
+    },
+    emb_size: 32
+  },
+
+  agent: {
+    device: "cpu",
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.01,
+    lr: 0.001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.99,
+    gae_lambda: 0.95
+  },
+
+  training: {
+    n_env_steps: 100000,
+    n_steps: 128,
+    n_processes: 16,
+    verbose: 1,
+  },
+
+  seed: 42,
+
+  outputs: {
+    path: artifacts/models/minigrid_ssim.p
+  }
+}

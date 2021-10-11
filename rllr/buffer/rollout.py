@@ -23,7 +23,7 @@ class RolloutStorage(object):
         self.returns = torch.zeros(num_steps + 1, num_processes, 1)
         self.action_log_probs = torch.zeros(num_steps, num_processes, 1)
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
-
+        self.num_processes = num_processes
         self.num_steps = num_steps
         self.step = 0
 

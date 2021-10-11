@@ -1,5 +1,8 @@
 import torch
 from torch import nn as nn
+import numpy as np
+import torch.nn.functional as F
+import matplotlib.pylab as plt
 
 from ..utils import convert_to_torch
 
@@ -50,3 +53,51 @@ class SameStatesCriterion:
         with torch.no_grad():
             embeds = self.encoder(convert_to_torch([state, goal_state], device=self.device))
         return torch.dist(embeds[0], embeds[1], 2).cpu().item() < self.threshold
+
+
+class SSIMCriterion:
+    def __init__(self, ssim, device, threshold=0.5):
+        self.ssim = ssim.ssim_network.to(device)
+        self.device = device
+        self.threshold = threshold
+
+    def __call__(self, state, goal_state):
+        if isinstance(state, dict):
+            state, goal_state = state['image'], goal_state['image']
+
+        with torch.no_grad():
+            s1 = torch.from_numpy(np.array([state]))
+            s2 = torch.from_numpy(np.array([goal_state]))
+            dist = 1 - self.ssim(s1, s2).cpu().item()
+        return dist < self.threshold
+
+
+class StateSimilarityNetwork(nn.Module):
+
+    def __init__(self, encoder, hidden_size):
+        super(StateSimilarityNetwork, self).__init__()
+
+        self.encoder = encoder
+
+        fc = []
+        if type(hidden_size) == int:
+            fc += [
+                nn.Linear(2 * encoder.output_size, hidden_size),
+                nn.ReLU(inplace=False),
+                nn.Linear(hidden_size, 1)
+            ]
+        elif type(hidden_size) == list:
+            input_size = 2 * encoder.output_size
+            for hs in hidden_size:
+                fc.append(nn.Linear(input_size, hs))
+                fc.append(nn.ReLU(inplace=False))
+                input_size = hs
+            fc.append(nn.Linear(input_size, 1))
+        self.fc = nn.Sequential(*fc)
+
+    def forward(self, x, y):
+        x = self.encoder(x)
+        y = self.encoder(y)
+        z = torch.cat((x, y), 1)
+        z = self.fc(z)
+        return torch.sigmoid(z)
