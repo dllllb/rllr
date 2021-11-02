@@ -20,6 +20,8 @@ pyhocon = ">=0.3.57"
 pytest = "*"
 rllr = {editable = true, path = "."}
 nle = "*"
+miniwob = {git = "https://github.com/WeaselCMC/miniwob-plusplus"}
+stable-baselines3 = "*"
 
 [requires]
 python_version = "3.8"
