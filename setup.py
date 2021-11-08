@@ -24,8 +24,6 @@ setup(
         'pyhocon',            # utils.config :: get_conf
         'jupyter',            # utils.plotting :: IPython
         'gym_minigrid',       # git+https://github.com/maximecb/gym-minigrid.git
-        'miniwob @ git+https://github.com/WeaselCMC/miniwob-plusplus.git',
-        'stable_baselines3',  # master_worker_*.py
         'scipy',              # environments.py :: scipy.stats
         'tqdm'
     ],
