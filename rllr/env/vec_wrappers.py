@@ -14,7 +14,6 @@ def _to_torch(arr, device='cpu'):
     return torch.from_numpy(arr).to(device)
 
 
-
 def make_vec_envs(make_env, num_processes, device):
     envs = [make_env(env_id) for env_id in range(num_processes)]
 

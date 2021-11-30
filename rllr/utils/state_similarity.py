@@ -68,3 +68,7 @@ class ContrastiveStateSimilarity:
 
     def similarity(self, state1, state2):
         return self.ssim_network(state1, state2)
+
+    def to(self, device):
+        self.ssim_network = self.ssim_network.to(device)
+        return self

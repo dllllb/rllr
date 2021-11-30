@@ -38,6 +38,30 @@ def rollout(env, max_steps=False):
     return states, next_states, actions
 
 
+def train_statedistance_network(config, encoder, env):
+    net = InverseDynamicsModel(encoder=encoder, action_size=env.action_space.n, config=config)
+    lr = config['training'].get('lr', 1e-4)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-6)
+    nll_loss = nn.NLLLoss()
+    conf = config['training']
+    device = torch.device(conf['device'])
+    net.to(device)
+    sum_loss = 0
+    for roll in range(conf['n_episodes']):
+        states, next_states, actions = map(lambda x: x.to(device), rollout(env))
+        for epoch in range(conf['n_epochs']):
+            optimizer.zero_grad()
+            predicted_actions = net.forward(states, next_states)
+            loss = nll_loss(predicted_actions, actions)
+            loss.backward()
+            optimizer.step()
+            sum_loss += loss.item()
+        if (roll + 1) % conf['verbose'] == 0:
+            logger.info("Rollout: {0}, loss: {1}".format(roll + 1, sum_loss / roll / conf['n_epochs']))
+            sum_loss = 0
+    return net
+
+
 def main(args=None):
     config = get_conf(args)
     switch_reproducibility_on(config['seed'])
@@ -73,30 +97,6 @@ def main(args=None):
         logger.info("Sanity check:")
         logger.info(f"Same agent's position states distance: {d_same} (should be small)")
         logger.info(f"Different agent's position states distance: {d_diff} (should be bigger)")
-
-
-def train_statedistance_network(config, encoder, env):
-    net = InverseDynamicsModel(encoder=encoder, action_size=env.action_space.n, config=config)
-    lr = config['training'].get('lr', 1e-4)
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-6)
-    nll_loss = nn.NLLLoss()
-    conf = config['training']
-    device = torch.device(conf['device'])
-    net.to(device)
-    sum_loss = 0
-    for roll in range(conf['n_episodes']):
-        states, next_states, actions = map(lambda x: x.to(device), rollout(env))
-        for epoch in range(conf['n_epochs']):
-            optimizer.zero_grad()
-            predicted_actions = net.forward(states, next_states)
-            loss = nll_loss(predicted_actions, actions)
-            loss.backward()
-            optimizer.step()
-            sum_loss += loss.item()
-        if (roll + 1) % conf['verbose'] == 0:
-            logger.info("Rollout: {0}, loss: {1}".format(roll + 1, sum_loss / roll / conf['n_epochs']))
-            sum_loss = 0
-    return net
 
 
 if __name__ == '__main__':
