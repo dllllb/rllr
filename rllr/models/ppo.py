@@ -147,7 +147,7 @@ class ActorCriticNetwork(nn.Module):
         elif type(action_space) == gym.spaces.Discrete:
             self.actor = DiscreteActorNetwork(action_space.n, actor_state_encoder, actor_hidden_size)
         else:
-            raise f'{action_space} not supported'
+            raise NotImplementedError(f'{action_space} not supported')
         self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size)
 
         def init_params(m):

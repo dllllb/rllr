@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-
 from rllr.buffer.rollout import RolloutStorage
 from rllr.utils.training import update_linear_schedule
 from rllr.env.vec_wrappers import make_vec_envs
@@ -205,4 +204,6 @@ def main(args=None):
 
 
 if __name__ == '__main__':
+    init_logger(__name__)
+    init_logger('gym_minigrid_navigation.environments')
     main()
