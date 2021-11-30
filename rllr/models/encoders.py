@@ -216,6 +216,18 @@ class GoalStateEncoder(nn.Module):
         return torch.cat([state_encoding, goal_encoding], dim=1)
 
 
+class NormEncoder(nn.Module):
+    def __init__(self, model, eps=1e-9):
+        super().__init__()
+        self.eps = eps
+        self.model = model
+        self.output_size = model.output_size
+
+    def forward(self, out: torch.Tensor):
+        out = self.model(out)
+        return out / (out.pow(2).sum(dim=1) + self.eps).pow(0.5).unsqueeze(-1).expand(*out.size())
+
+
 def get_encoder(grid_size, config):
     if config['state_encoder_type'] == 'simple_mlp':
         state_size = 3 * (grid_size - 2) ** 2
@@ -233,11 +245,13 @@ def get_encoder(grid_size, config):
     else:
         raise AttributeError(f"unknown nn_type '{config['master.state_encoder_type']}'")
 
+    if config.get('normalize', False):
+        state_encoder = NormEncoder(state_encoder)
+
     return state_encoder
 
 
 class VAE(nn.Module):
-
     def __init__(self, input_size, n_channels, kernel_sizes, strides, hidden_sizes):
         super(VAE, self).__init__()
 

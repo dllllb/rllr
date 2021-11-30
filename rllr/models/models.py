@@ -56,8 +56,8 @@ class SameStatesCriterion:
 
 
 class SSIMCriterion:
-    def __init__(self, ssim, device, threshold=0.5):
-        self.ssim = ssim.ssim_network.to(device)
+    def __init__(self, ssim_network, device, threshold=0.5):
+        self.ssim = ssim_network.to(device)
         self.device = device
         self.threshold = threshold
 
@@ -66,14 +66,12 @@ class SSIMCriterion:
             state, goal_state = state['image'], goal_state['image']
 
         with torch.no_grad():
-            s1 = torch.from_numpy(np.array([state]))
-            s2 = torch.from_numpy(np.array([goal_state]))
-            dist = 1 - self.ssim(s1, s2).cpu().item()
+            s = convert_to_torch([state, goal_state], device=self.device)
+            dist = 1 - self.ssim(s[:1], s[1:]).cpu().item()
         return dist < self.threshold
 
 
 class StateSimilarityNetwork(nn.Module):
-
     def __init__(self, encoder, hidden_size):
         super(StateSimilarityNetwork, self).__init__()
 

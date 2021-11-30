@@ -72,6 +72,7 @@ def main(args=None):
     )
 
     master_agent = get_master_agent(env, config)
+    master_agent.to(config['agent.device'])
 
     logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
     train_ppo(env, master_agent, config)

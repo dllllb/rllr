@@ -34,13 +34,14 @@ def get_goal_achieving_criterion(config):
     elif config['goal_achieving_criterion'] == 'state_distance_network':
         encoder = torch.load(config['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(config['state_distance_network_params.device'])
+        encoder.to(device)
         threshold = config['state_distance_network_params.threshold']
         return SameStatesCriterion(encoder, device, threshold)
     elif config['goal_achieving_criterion'] == 'state_similarity':
         ssim = torch.load(config['ssim_network_params.path'])
         device = torch.device(config['ssim_network_params.device'])
         threshold = config['ssim_network_params.threshold']
-        return SSIMCriterion(ssim, device, threshold)
+        return SSIMCriterion(ssim.ssim_network, device, threshold)
     else:
         raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
 
@@ -157,6 +158,7 @@ def main(args=None):
     )
 
     agent = get_worker_agent(env, config)
+    agent.to(config['agent.device'])
 
     logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
     train_ppo(
