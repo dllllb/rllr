@@ -6,7 +6,7 @@ import torch
 from rllr.algo import PPO
 from rllr.utils import train_ppo
 from rllr.models.ppo import ActorCriticNetwork
-from experiments.train_worker import gen_env
+from experiments.minigrid.train_worker import gen_env
 from rllr.env.vec_wrappers import make_vec_envs
 from rllr.buffer.rollout import RolloutStorage
 from rllr.env.wrappers import HierarchicalWrapper, EpisodeInfoWrapper
@@ -57,7 +57,7 @@ def gen_env_with_seed(conf, seed):
 
     return HierarchicalWrapper(
         EpisodeInfoWrapper(gen_env(conf['env'])),
-        worker_agent, (emb_size,), n_steps=5
+        worker_agent, (emb_size,), n_steps=1
     )
 
 
@@ -75,7 +75,6 @@ def main(args=None):
 
     logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
     train_ppo(env, master_agent, config)
-
 
 
 if __name__ == '__main__':
