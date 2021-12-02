@@ -23,11 +23,11 @@ if __name__ == '__main__':
         agent_path = 'artifacts/models/minigrid_master.p'
     elif args.mode == 'ssim_master':
         from train_master import gen_env_with_seed
-        config = ConfigFactory.parse_file('conf/minigrid_second_step.hocon')
+        config = ConfigFactory.parse_file('conf/minigrid_second_step_ssim.hocon')
         agent_path = 'artifacts/models/minigrid_master_ssim.p'
     elif args.mode == 'ssim_worker':
         from train_worker import gen_env_with_seed
-        config = ConfigFactory.parse_file('conf/minigrid_first_step.hocon')
+        config = ConfigFactory.parse_file('conf/minigrid_first_step_ssim.hocon')
         agent_path = 'artifacts/models/minigrid_worker_ssim.p'
     elif args.mode == 'worker':
         from train_worker import gen_env_with_seed
