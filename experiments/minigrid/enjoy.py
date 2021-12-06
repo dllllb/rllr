@@ -62,7 +62,7 @@ if __name__ == '__main__':
             input(f'> the end!, reward = {episode_reward}')
 
     print(f'mode {args.mode}: '
-          f'reward {np.mean(rewards):.2f} +- {np.std(rewards):.2f}, '
-          f'steps {np.mean(steps):.2f} +- {np.std(steps):.2f}, '
-          f'success {np.mean(successes):.2f} +- {np.std(successes):.2f}'
+          f'reward {np.mean(rewards):.2f}, '
+          f'steps {np.mean(steps):.2f}, '
+          f'success {np.mean(successes):.2f}'
     )

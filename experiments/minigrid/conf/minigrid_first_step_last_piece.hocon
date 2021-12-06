@@ -6,11 +6,39 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    goal_type: random,
-    random_goal_seed: 123456789,
-    goal_achieving_criterion: position,
-    video_path: artifacts/video/,
-  },
+    from_buffer_choice_params: {
+        buffer_size: 100000,
+        warmup_steps: 1000,
+    }
+    random_network_distillation_reward: {
+      device: "cpu",
+      gamma: 0.999,
+      target: {
+        state_encoder_type: simple_cnn,
+        n_channels: [6, 16],
+        kernel_sizes: [4, 3],
+        max_pools: [4, 1],
+        head: {
+            hidden_size: 64
+        }
+      },
+      predictor: {
+        state_encoder_type: simple_cnn,
+        n_channels: [6, 16],
+        kernel_sizes: [4, 3],
+        max_pools: [4, 1],
+        head: {
+            hidden_size: 64
+        }
+      }
+    },
+    goal_achieving_criterion: state_similarity,
+    ssim_network_params: {
+        path: artifacts/models/minigrid_ssim.p,
+        device: "cpu",
+        threshold: 0.35
+    },
+    video_path: artifacts/video/
 
   worker: {
     state_encoder_type: simple_cnn,
@@ -58,6 +86,6 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_worker.p,
+    path: artifacts/models/minigrid_worker_ssim.p,
   }
 }

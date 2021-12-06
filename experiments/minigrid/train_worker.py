@@ -97,7 +97,14 @@ def gen_navigation_env(conf, env=None, verbose=False, goal_achieving_criterion=N
         else:
             raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
-        env = environments.RandomNetworkDistillationReward(env, target_network, predictor_network, device)
+        env = environments.RandomNetworkDistillationReward(
+            env,
+            target_network,
+            predictor_network,
+            device,
+            use_extrinsic_reward=True,
+            gamma=reward_conf['gamma']
+        )
 
     return env
 
