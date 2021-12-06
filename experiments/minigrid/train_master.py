@@ -50,7 +50,7 @@ def get_master_agent(env, conf):
 
 def gen_env_with_seed(conf, seed):
     conf['env.deterministic'] = True
-    conf['env.seed'] = seed
+    conf['env']['seed'] = seed
 
     worker_agent = torch.load(conf['worker_agent.path'], map_location='cpu').to(conf['worker_agent.device'])
     emb_size = worker_agent.actor_critic.actor.state_encoder.goal_state_encoder.output_size

@@ -70,7 +70,7 @@ def get_ssim(conf):
 def gen_env_with_seed(conf, seed):
 
     conf['env.deterministic'] = True
-    conf['env.seed'] = seed
+    conf['env']['seed'] = seed
     env = gen_env(conf['env'])
 
     reward_conf = conf['random_network_distillation_reward']

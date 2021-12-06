@@ -143,7 +143,7 @@ def get_worker_agent(env, conf):
 
 def gen_env_with_seed(conf, seed):
     conf['env.deterministic'] = True
-    conf['env.seed'] = seed
+    conf['env']['seed'] = seed
     return EpisodeInfoWrapper(gen_navigation_env(conf['env']))
 
 
