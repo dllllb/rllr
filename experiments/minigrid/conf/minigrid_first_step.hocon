@@ -3,7 +3,7 @@
     env_type: gym_minigrid,
     env_task: MiniGrid-Dynamic-Obstacles,
     grid_size: 8,
-    action_size: 3,
+    action_size: 4,
     rgb_image: true,
     tile_size: 4,
     goal_type: random,
