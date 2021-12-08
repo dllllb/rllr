@@ -79,7 +79,6 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
     def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
         self.buffer_size = conf['buffer_size']
         self.buffer = deque(maxlen=self.buffer_size)
-        self.complexity_buffer = deque(maxlen=self.buffer_size)
         self.verbose = verbose
         self.warmup_steps = conf['warmup_steps']
         super().__init__(env, goal_achieving_criterion)
@@ -306,6 +305,7 @@ class EpisodeInfoWrapper(gym.Wrapper):
     def reset(self):
         self.episode_reward = 0
         self.episode_steps = 0
+        self.visits_stats = dict()
         return self.env.reset()
 
     def step(self, action):

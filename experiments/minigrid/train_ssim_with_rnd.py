@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from tqdm import trange
 import time
-from collections import deque
+from collections import deque, defaultdict
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -95,15 +95,15 @@ def show_visits(visit_stats, action_stats):
     for k in visit_stats:
         df_visits.loc[k[0], k[1]] = visit_stats[k]
     df_visits.fillna(0, inplace=True)
-    print(df_visits)
+    logger.info(df_visits)
 
     sns.heatmap(df_visits, annot=False)
     plt.show()
 
-    print("Actions stats")
+    logger.info("Actions stats")
     a_sum = sum([action_stats[a] for a in  action_stats])
     for a in action_stats:
-        print(f'{a}: {action_stats[a]/a_sum}')
+        logger.info(f'{a}: {action_stats[a]/a_sum}')
 
 
 def train_ssim_with_rnd(env, agent, ssim, conf):
@@ -121,12 +121,11 @@ def train_ssim_with_rnd(env, agent, ssim, conf):
 
     start = time.time()
     num_updates = int(conf['training.n_env_steps'] // conf['training.n_steps'] // conf['training.n_processes'])
-    print(f"Total number of updates: {num_updates}.")
-
+    logger.info(f"Total number of updates: {num_updates}.")
 
     episode_rewards = deque(maxlen=10)
-    visit_stats = dict()
-    action_stats = {}
+    visit_stats = defaultdict(int)
+    action_stats = defaultdict(int)
 
     for j in trange(num_updates):
         update_linear_schedule(agent.optimizer, j, num_updates, conf['agent.lr'])
@@ -135,23 +134,20 @@ def train_ssim_with_rnd(env, agent, ssim, conf):
             # Sample actions
             value, action, action_log_prob = agent.act(obs)
 
-            for a in action.squeeze().numpy():
-                if a in action_stats:
-                    action_stats[a] += 1
-                else:
-                    action_stats[a] = 1
-            obs, reward, done, infos = env.step(action)
-            for info in infos:
-                for k in info["visit_stats"]:
-                    if k in visit_stats:
-                        visit_stats[k] += info["visit_stats"][k]
-                    else:
-                        visit_stats[k] = info["visit_stats"][k]
-                if 'episode' in info.keys():
-                    episode_rewards.append(info['episode']['r'])
+            for a in action.squeeze(-1).numpy():
+                action_stats[a] += 1
+
+            obs, reward, dones, infos = env.step(action)
+            for info, done in zip(infos, dones):
+                if done:
+                    for k in info['visit_stats']:
+                        visit_stats[k] += info['visit_stats'][k]
+
+                    if 'episode' in info.keys():
+                        episode_rewards.append(info['episode']['r'])
 
             # If done then clean the history of observations.
-            masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
+            masks = torch.FloatTensor(dones)
             rollouts.insert(obs, action, action_log_prob, value, reward, masks)
 
         next_value = agent.get_value(rollouts.get_last_obs())
@@ -163,16 +159,16 @@ def train_ssim_with_rnd(env, agent, ssim, conf):
         if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
             total_num_steps = (j + 1) * conf['training.n_processes'] * conf['training.n_steps']
             end = time.time()
-            print(f'Updates {j}, '
-                  f'num timesteps {total_num_steps}, '
-                  f'FPS {int(total_num_steps / (end - start))} \n'
-                  f'Last {len(episode_rewards)} training episodes: '
-                  f'mean/median reward {np.mean(episode_rewards):.2f}/{np.median(episode_rewards):.2f}, '
-                  f'min/max reward {np.min(episode_rewards):.2f}/{np.max(episode_rewards):.2f}\n'
-                  f'dist_entropy {dist_entropy:.2f}, '
-                  f'value_loss {value_loss:.2f}, '
-                  f'action_loss {action_loss:.2f}, '
-                  f'ssim_loss {ssim_loss:.6f}')
+            logger.info(f'Updates {j}, '
+                        f'num timesteps {total_num_steps}, '
+                        f'FPS {int(total_num_steps / (end - start))} \n'
+                        f'Last {len(episode_rewards)} training episodes: '
+                        f'mean/median reward {np.mean(episode_rewards):.2f}/{np.median(episode_rewards):.2f}, '
+                        f'min/max reward {np.min(episode_rewards):.2f}/{np.max(episode_rewards):.2f}\n'
+                        f'dist_entropy {dist_entropy:.2f}, '
+                        f'value_loss {value_loss:.2f}, '
+                        f'action_loss {action_loss:.2f}, '
+                        f'ssim_loss {ssim_loss:.6f}')
 
     torch.save(ssim, conf['outputs.path'])
     show_visits(visit_stats, action_stats)
