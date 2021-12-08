@@ -5,7 +5,7 @@ import torch
 
 from argparse import ArgumentParser
 from collections import defaultdict
-from tqdm import trange
+from tqdm import trange, tqdm
 
 from rllr.env.gym_minigrid_navigation.environments import RGBImgObsWrapper, PosObsWrapper
 from rllr.utils.logger import init_logger
@@ -71,21 +71,17 @@ def dist(ssim, state, goal_state):
 
 
 def main(args):
-    seed = 42
     encoder = torch.load('artifacts/models/minigrid_ssim.p')
 
-    dataset = make_dataset(rnd_obs(make_env(), seed), args.episodes)
-
-    max_dist = 0
-    total = 0
-    fn = 0
-    tp = 0
+    dataset = make_dataset(rnd_obs(make_env(), args.seed), args.episodes)
     thd = args.thd
 
-    for key in dataset:
-        if len(dataset[key]) < 1:
+    # same state distances
+    total, max_dist, fn, tp = 0, 0, 0, 0
+    for key, value in dataset.items():
+        if not value:
             continue
-        for first, second in zip(dataset[key][:-1], dataset[key][1:]):
+        for first, second in zip(value[:-1], value[1:]):
             d = dist(encoder, first, second)
             if d > thd:
                 fn += 1
@@ -98,16 +94,16 @@ def main(args):
     logger.info(f'true positives {tp / total :.3f}, false negatives {fn / total :.3f}')
     logger.info(f'same fig max_dist {max_dist :.3f}')
 
+    # different state distances
     min_dist = np.inf
-    keys = list(dataset.keys())
-    count_fails = 0
-    total = 0
-    fp = 0
-    tn = 0
-    for i in trange(len(keys)):
-        first = dataset[keys[i]][0]
-        for j in range(i + 1, len(keys)):
-            for second in dataset[keys[j]]:
+    total, count_fails, fp, tn = 0, 0, 0, 0
+    for first_key, first_value in tqdm(dataset.items()):
+        first = first_value[0]
+        for second_key, second_value in dataset.items():
+            if first_key <= second_key:
+                continue
+
+            for second in second_value:
                 total += 1
                 d = dist(encoder, second, first)
                 if d <= thd:
@@ -116,8 +112,8 @@ def main(args):
                     tn += 1
                 if d < min_dist:
                     min_dist = d
-
                 count_fails += d < 1e-9
+
     logger.info(f'true negatives {tn / total :.3f}, false positives {fp / total :.3f}')
     logger.info(f'diff fig min_dist: {min_dist :.3f}')
     logger.info(f'dist < 1 count: {count_fails} / {total}')
@@ -125,6 +121,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+    parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--thd', default=0.5, type=float)
     parser.add_argument('--episodes', default=1000, type=int)
     args = parser.parse_args()
