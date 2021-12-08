@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import torch
 
+from argparse import ArgumentParser
 from collections import defaultdict
 from tqdm import trange
 
@@ -66,20 +67,20 @@ def dist(ssim, state, goal_state):
     with torch.no_grad():
         s1 = torch.from_numpy(np.array([state]))
         s2 = torch.from_numpy(np.array([goal_state]))
-        return 1 - ssim.similarity(s1, s2)
+        return (1 - ssim.similarity(s1, s2)).item()
 
 
-def main():
+def main(args):
     seed = 42
     encoder = torch.load('artifacts/models/minigrid_ssim.p')
 
-    dataset = make_dataset(rnd_obs(make_env(), seed), 1000)
+    dataset = make_dataset(rnd_obs(make_env(), seed), args.episodes)
 
     max_dist = 0
     total = 0
     fn = 0
     tp = 0
-    thd = 0.15
+    thd = args.thd
 
     for key in dataset:
         if len(dataset[key]) < 1:
@@ -94,8 +95,8 @@ def main():
             if d > max_dist:
                 max_dist = d
 
-    logger.info(f'true positives {tp / total}, false negatives {fn / total}')
-    logger.info('same fig max_dist', max_dist)
+    logger.info(f'true positives {tp / total :.3f}, false negatives {fn / total :.3f}')
+    logger.info(f'same fig max_dist {max_dist :.3f}')
 
     min_dist = np.inf
     keys = list(dataset.keys())
@@ -117,11 +118,16 @@ def main():
                     min_dist = d
 
                 count_fails += d < 1e-9
-    logger.info(f'true negatives {tn / total}, false positives {fp / total}')
-    logger.info('diff fig min_dist', min_dist.item())
-    logger.info(f'dist < 1 count: {count_fails.item()} / {total}')
+    logger.info(f'true negatives {tn / total :.3f}, false positives {fp / total :.3f}')
+    logger.info(f'diff fig min_dist: {min_dist :.3f}')
+    logger.info(f'dist < 1 count: {count_fails} / {total}')
 
 
 if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument('--thd', default=0.5, type=float)
+    parser.add_argument('--episodes', default=1000, type=int)
+    args = parser.parse_args()
+
     init_logger(__name__)
-    main()
+    main(args)

@@ -14,13 +14,7 @@ from rllr.utils.logger import init_logger
 logger = logging.getLogger(__name__)
 
 
-def main():
-    parser = ArgumentParser()
-    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker', 'direct_ppo'])
-    parser.add_argument('--viz', action='store_true')
-    parser.add_argument('--episodes', default=100, type=int)
-    args = parser.parse_args()
-
+def main(args):
     if args.mode == 'master':
         from train_master import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_second_step.hocon')
@@ -80,5 +74,11 @@ def main():
 
 
 if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker', 'direct_ppo'])
+    parser.add_argument('--viz', action='store_true')
+    parser.add_argument('--episodes', default=100, type=int)
+    args = parser.parse_args()
+
     init_logger(__name__)
-    main()
+    main(args)
