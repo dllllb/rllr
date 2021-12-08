@@ -8,9 +8,11 @@
     tile_size: 4,
     goal_type: from_buffer,
     from_buffer_choice_params: {
-        buffer_size: 100000,
         warmup_steps: 1000,
-    }
+        buffer_size: 100000,
+        unachieved_prob: 0.5
+        unachieved_buffer_size: 100,
+    },
     random_network_distillation_reward: {
       device: "cpu",
       gamma: 0.999,
@@ -33,7 +35,7 @@
         }
       }
     },
-    goal_achieving_criterion: state_similarity,
+    goal_achieving_criterion: position,
     ssim_network_params: {
         path: artifacts/models/minigrid_ssim.p,
         device: "cpu",

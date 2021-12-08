@@ -49,7 +49,7 @@ class NavigationGoalWrapper(gym.Wrapper):
         return state
 
     def step(self, action):
-        next_state, reward, done, info = self.env.step(action)
+        next_state, _, done, info = self.env.step(action)
         self.is_goal_achieved = self._goal_achieved(next_state)
         reward = int(self.is_goal_achieved)
 
@@ -79,16 +79,33 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
     def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
         self.buffer_size = conf['buffer_size']
         self.buffer = deque(maxlen=self.buffer_size)
+
+        if 'unachieved_prob' in conf:
+            self.unachieved_prob = conf['unachieved_prob']
+            self.unachieved_buffer_size = conf['unachieved_buffer_size']
+            self.unachieved_buffer = deque(maxlen=self.unachieved_buffer_size)
+
         self.verbose = verbose
         self.warmup_steps = conf['warmup_steps']
         super().__init__(env, goal_achieving_criterion)
 
+    def reset(self):
+        if not self.is_goal_achieved and self.goal_state is not None:
+            self.unachieved_buffer.append(self.goal_state)
+
+        return super().reset()
+
     def reset_buffer(self):
         self.buffer = deque(maxlen=self.buffer_size)
+        self.unachieved_buffer = deque(maxlen=self.unachieved_buffer_size)
 
     def buffer_random_choice(self):
-        choice = np.random.choice(np.arange(len(self.buffer)))
-        goal_state = self.buffer[choice]
+        if self.unachieved_buffer and np.random.rand() < self.unachieved_prob:
+            choice = np.random.choice(np.arange(len(self.unachieved_buffer)))
+            goal_state = self.unachieved_buffer[choice]
+        else:
+            choice = np.random.choice(np.arange(len(self.buffer)))
+            goal_state = self.buffer[choice]
 
         return goal_state
 
