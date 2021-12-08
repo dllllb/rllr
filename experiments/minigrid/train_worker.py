@@ -11,7 +11,7 @@ from rllr.models.ppo import ActorCriticNetwork
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
 from rllr.models import SameStatesCriterion, ActorNetwork, StateEmbedder, SSIMCriterion
 from rllr.models.encoders import GoalStateEncoder
-from rllr.models import encoders as minigrid_encoders
+from rllr.models import encoders
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
 from rllr.utils import train_ppo
@@ -92,8 +92,8 @@ def gen_navigation_env(conf, env=None, verbose=False, goal_achieving_criterion=N
 
         if conf['env_type'] == 'gym_minigrid':
             grid_size = conf['grid_size'] * conf.get('tile_size', 1)
-            target_network = minigrid_encoders.get_encoder(grid_size, reward_conf['target'])
-            predictor_network = minigrid_encoders.get_encoder(grid_size, reward_conf['predictor'])
+            target_network = encoders.get_encoder(grid_size, reward_conf['target'])
+            predictor_network = encoders.get_encoder(grid_size, reward_conf['predictor'])
         else:
             raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
@@ -113,8 +113,8 @@ def get_encoders(conf):
     if conf['env.env_type'] == 'gym_minigrid':
         init_logger('rllr.env.gym_minigrid_navigation.environments')
         grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-        state_encoder = minigrid_encoders.get_encoder(grid_size, conf['worker'])
-        goal_state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
+        state_encoder = encoders.get_encoder(grid_size, conf['worker'])
+        goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
         return state_encoder, goal_state_encoder
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")

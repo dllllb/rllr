@@ -58,12 +58,13 @@ class SimpleCNN(nn.Module):
             conf['n_channels'],
             conf['kernel_sizes'],
             conf['max_pools'] if conf.get('max_pools', False) else [1] * len(conf['n_channels']),
-            conf['strides'] if conf.get('strides', False) else [1] * len(conf['n_channels'])
+            conf['strides'] if conf.get('strides', False) else [1] * len(conf['n_channels']),
+            conf['paddings'] if conf.get('paddings', False) else [0] * len(conf['n_channels']),
         )
-        for n_channels, kernel_size, max_pool, stride in conv_params:
-            conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size, stride))
+        for n_channels, kernel_size, max_pool, stride, padding in conv_params:
+            conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size, stride, padding))
             conv_layers.append(nn.ReLU(inplace=True))
-            cnn_output_size += -1 * kernel_size + stride
+            cnn_output_size += -1 * kernel_size + stride + 2 * padding
             cnn_output_size //= stride
             cur_channels = n_channels
             if max_pool > 1:
@@ -169,10 +170,9 @@ class DummyRawStateEncoder(nn.Module):
         agent_pos = (x[:, :, :, 0] == 10)
         directions = x[agent_pos][:, -1:]
 
-        agent_pos = agent_pos.flatten(start_dim=1).float()
         directions = torch.eq(directions, torch.arange(4, device=x.device)).float()
 
-        return torch.cat([agent_pos, directions], dim=1)
+        return torch.cat([x[:, :, :, 0].flatten(start_dim=1), directions], dim=1)
 
 
 class DummyImageStateEncoder(nn.Module):
@@ -214,6 +214,18 @@ class GoalStateEncoder(nn.Module):
             goal_encoding = self.goal_state_encoder.forward(states_and_goals['goal_state'])
         state_encoding = self.state_encoder.forward(states_and_goals['state'])
         return torch.cat([state_encoding, goal_encoding], dim=1)
+
+
+class RemoveOuterWalls(nn.Module):
+    def __init__(self, model, tile_size):
+        super().__init__()
+        self.tile_size = tile_size
+        self.model = model
+        if hasattr(model, 'output_size'):
+            self.output_size = model.output_size
+
+    def forward(self, x):
+        return self.model(x[:, self.tile_size: -self.tile_size, self.tile_size: -self.tile_size])
 
 
 class NormEncoder(nn.Module):

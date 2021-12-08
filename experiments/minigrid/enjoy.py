@@ -12,7 +12,7 @@ from argparse import ArgumentParser
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker'])
+    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker', 'direct_ppo'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()
@@ -21,18 +21,26 @@ if __name__ == '__main__':
         from train_master import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_second_step.hocon')
         agent_path = 'artifacts/models/minigrid_master.p'
+
     elif args.mode == 'ssim_master':
         from train_master import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_second_step_ssim.hocon')
         agent_path = 'artifacts/models/minigrid_master_ssim.p'
+
     elif args.mode == 'ssim_worker':
         from train_worker import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_first_step_ssim.hocon')
         agent_path = 'artifacts/models/minigrid_worker_ssim.p'
+
     elif args.mode == 'worker':
         from train_worker import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_first_step.hocon')
         agent_path = 'artifacts/models/minigrid_worker.p'
+
+    elif args.mode == 'direct_ppo':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_direct_ppo.hocon')
+        agent_path = 'artifacts/models/minigrid_direct_ppo.p'
 
     agent = torch.load(agent_path)
 
