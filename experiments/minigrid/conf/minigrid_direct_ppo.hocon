@@ -3,19 +3,34 @@
     env_type: gym_minigrid,
     env_task: MiniGrid-Dynamic-Obstacles,
     grid_size: 8,
-    action_size: 3,
+    action_size: 4,
     rgb_image: true,
     tile_size: 4,
-    video_path: artifacts/video/,
-    num_processes: 16
+    random_network_distillation_reward: {
+      device: "cpu",
+      gamma: 0.999,
+      target: {
+        state_encoder_type: simple_cnn,
+        n_channels: [16],
+        kernel_sizes: [4],
+        strides: [4],
+        head: {
+            hidden_size: 64
+        }
+      },
+      predictor: {
+        state_encoder_type: simple_cnn,
+        n_channels: [16],
+        kernel_sizes: [4],
+        strides: [4],
+        head: {
+            hidden_size: 64
+        }
+      }
+    },
   },
 
-  worker_agent: {
-    path: "artifacts/models/minigrid_worker_ssim.p",
-    device: "cpu"
-  }
-
-  master: {
+  encoder: {
     state_encoder_type: simple_cnn,
     n_channels: [16, 16],
     kernel_sizes: [4, 3],
@@ -24,7 +39,7 @@
     head: {
         hidden_size: 64
     }
-  }
+  },
 
   agent: {
     device: "cpu",
@@ -38,11 +53,11 @@
     max_grad_norm: 0.5,
     gamma: 0.99,
     gae_lambda: 0.95
-  }
+  },
 
   training: {
-    n_env_steps: 200000,
-    worker_n_steps: 5
+    reward: fair_goal_achievement,
+    n_env_steps: 2000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
@@ -51,6 +66,6 @@
   seed: 42,
 
   outputs: {
-      path: artifacts/models/minigrid_master_ssim.p,
+    path: artifacts/models/minigrid_direct_ppo.p,
   }
 }

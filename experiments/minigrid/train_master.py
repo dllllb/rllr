@@ -1,23 +1,20 @@
 import logging
 import os
 import pickle
+import numpy as np
 import torch
 
+from experiments.minigrid.train_worker import gen_env, rnd_wrapper
 from rllr.algo import PPO
 from rllr.utils import train_ppo
 from rllr.models.ppo import ActorCriticNetwork
-from experiments.minigrid.train_worker import gen_env
 from rllr.env.vec_wrappers import make_vec_envs
+from rllr.models import StateEmbedder
 from rllr.buffer.rollout import RolloutStorage
-from rllr.env.wrappers import HierarchicalWrapper, EpisodeInfoWrapper
-
+from rllr.env.wrappers import HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward
 from rllr.models import encoders as minigrid_encoders
-
 from rllr.utils import get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
-
-import numpy as np
-
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +52,20 @@ def gen_env_with_seed(conf, seed):
     worker_agent = torch.load(conf['worker_agent.path'], map_location='cpu').to(conf['worker_agent.device'])
     emb_size = worker_agent.actor_critic.actor.state_encoder.goal_state_encoder.output_size
 
+    env = gen_env(conf['env'])
+
+    if conf['env'].get('random_network_distillation_reward', False):
+        env = rnd_wrapper(env, conf['env'])
+
+    if conf['env'].get('intrinsic_episodic_reward', False):
+        encoder = worker_agent.actor_critic.actor.state_encoder.state_encoder
+        device = torch.device(conf['worker_agent.device'])
+        embedder = StateEmbedder(encoder, device)
+        env = IntrinsicEpisodicReward(env, embedder, conf['env.intrinsic_episodic_reward.gamma'])
+
+    env = EpisodeInfoWrapper(env)
     return HierarchicalWrapper(
-        EpisodeInfoWrapper(gen_env(conf['env'])),
-        worker_agent, (emb_size,), n_steps=1
+        env, worker_agent, (emb_size,), n_steps=conf['training'].get('worker_n_steps', 1)
     )
 
 
