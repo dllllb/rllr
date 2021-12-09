@@ -54,7 +54,7 @@ def gen_env(conf, verbose=False):
     return env
 
 
-def gen_navigation_env(conf, env=None, verbose=False, goal_achieving_criterion=None):
+def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=None):
     if not env:
         env = gen_env(conf=conf, verbose=verbose)
 

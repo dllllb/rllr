@@ -10,37 +10,10 @@
     from_buffer_choice_params: {
         warmup_steps: 1000,
         buffer_size: 100000,
-        unachieved_prob: 0.5
         unachieved_buffer_size: 100,
+        unachieved_prob: 0.5,
     },
-    random_network_distillation_reward: {
-      device: "cpu",
-      gamma: 0.999,
-      target: {
-        state_encoder_type: simple_cnn,
-        n_channels: [16],
-        kernel_sizes: [4],
-        strides: [4],
-        head: {
-            hidden_size: 64
-        }
-      },
-      predictor: {
-        state_encoder_type: simple_cnn,
-        n_channels: [16],
-        kernel_sizes: [4],
-        strides: [4],
-        head: {
-            hidden_size: 64
-        }
-      }
-    },
-    goal_achieving_criterion: position,
-    ssim_network_params: {
-        path: artifacts/models/minigrid_ssim.p,
-        device: "cpu",
-        threshold: 0.35
-    },
+    goal_achieving_criterion: position_and_direction,
     video_path: artifacts/video/
   },
 
@@ -83,8 +56,8 @@
 
   training: {
     reward: fair_goal_achievement,
-    n_env_steps: 2000000,
-    n_steps: 128,
+    n_env_steps: 5000000,
+    n_steps: 1000,
     n_processes: 16,
     verbose: 1,
   },

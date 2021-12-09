@@ -76,7 +76,7 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
     """
     Wrapper for setting goal from buffer
     """
-    def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
+    def __init__(self, env, goal_achieving_criterion, conf, verbose=False, seed=0):
         self.buffer_size = conf['buffer_size']
         self.buffer = deque(maxlen=self.buffer_size)
 
@@ -89,7 +89,26 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         self.warmup_steps = conf['warmup_steps']
         super().__init__(env, goal_achieving_criterion)
 
+        self.count = 0
+        self.flag = 0
+        self.verbose = 200
+        self.seed = seed
+        np.random.seed(seed)
+        self.count = np.random.randint(0, self.verbose)
+
     def reset(self):
+
+        return super().reset()
+
+    def gen_goal(self, state):
+        super().gen_goal(state)
+
+        if self.count % self.verbose == 0 and self.goal_state is not None:
+            print(self.seed, self.goal_state['position'], self.flag)
+
+    def reset(self):
+        self.count += 1
+
         if not self.is_goal_achieved and self.goal_state is not None:
             self.unachieved_buffer.append(self.goal_state)
 
@@ -103,9 +122,11 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         if self.unachieved_buffer and np.random.rand() < self.unachieved_prob:
             choice = np.random.choice(np.arange(len(self.unachieved_buffer)))
             goal_state = self.unachieved_buffer[choice]
+            self.flag = 1
         else:
             choice = np.random.choice(np.arange(len(self.buffer)))
             goal_state = self.buffer[choice]
+            self.flag = 0
 
         return goal_state
 
@@ -183,7 +204,8 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
             env,
             goal_achieving_criterion,
             conf['from_buffer_choice_params'],
-            verbose=verbose)
+            verbose=verbose,
+            seed=conf['seed'])
     else:
         raise AttributeError(f"unknown goal_type '{goal_type}'")
 

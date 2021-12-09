@@ -17,9 +17,10 @@
 
   master: {
     state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
+    n_channels: [16, 16],
     kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    strides: [4, 1],
+    paddings: [0, 1],
     head: {
         hidden_size: 64
     }
