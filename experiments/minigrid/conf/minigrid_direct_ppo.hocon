@@ -4,25 +4,25 @@
     env_task: MiniGrid-Dynamic-Obstacles,
     grid_size: 8,
     action_size: 4,
-    rgb_image: false,
-    tile_size: 1,
+    rgb_image: true,
+    tile_size: 4,
     random_network_distillation_reward: {
       device: "cpu",
       gamma: 0.999,
       target: {
         state_encoder_type: simple_cnn,
-        n_channels: [6, 16],
-        kernel_sizes: [4, 3],
-        max_pools: [4, 1],
+        n_channels: [16],
+        kernel_sizes: [4],
+        strides: [4],
         head: {
             hidden_size: 64
         }
       },
       predictor: {
         state_encoder_type: simple_cnn,
-        n_channels: [6, 16],
-        kernel_sizes: [4, 3],
-        max_pools: [4, 1],
+        n_channels: [16],
+        kernel_sizes: [4],
+        strides: [4],
         head: {
             hidden_size: 64
         }
@@ -32,9 +32,10 @@
 
   encoder: {
     state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
+    n_channels: [16, 16],
     kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    strides: [4, 1],
+    paddings: [0, 1],
     head: {
         hidden_size: 64
     }

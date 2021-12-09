@@ -1,6 +1,7 @@
 import logging
 import torch
 
+from experiments.minigrid.train_worker import rnd_wrapper
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
 from rllr.utils import train_ppo
 from rllr.env.vec_wrappers import make_vec_envs
@@ -19,24 +20,8 @@ def gen_wrapped_env(conf):
     env = minigrid_envs.gen_wrapped_env(conf)
 
     if conf.get('random_network_distillation_reward', False):
-        reward_conf = conf['random_network_distillation_reward']
-        device = torch.device(reward_conf['device'])
+        env = rnd_wrapper(env, conf)
 
-        if conf['env_type'] == 'gym_minigrid':
-            grid_size = conf['grid_size'] * conf.get('tile_size', 1)
-            target_network = encoders.get_encoder(grid_size, reward_conf['target'])
-            predictor_network = encoders.get_encoder(grid_size, reward_conf['predictor'])
-        else:
-            raise AttributeError(f"unknown env_type '{conf['env_type']}'")
-
-        env = environments.RandomNetworkDistillationReward(
-            env,
-            target_network,
-            predictor_network,
-            device,
-            use_extrinsic_reward=True,
-            gamma=reward_conf['gamma']
-        )
     return env
 
 
