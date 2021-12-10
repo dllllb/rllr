@@ -7,8 +7,7 @@ from argparse import ArgumentParser
 from pyhocon.config_parser import ConfigFactory
 from tqdm import trange
 
-
-from rllr.env.vec_wrappers import make_vec_envs
+from rllr.env import make_vec_envs
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
@@ -16,27 +15,27 @@ logger = logging.getLogger(__name__)
 
 def main(args):
     if args.mode == 'master':
-        from train_master import gen_env_with_seed
+        from experiments.minigrid.train_master import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_second_step.hocon')
         agent_path = 'artifacts/models/minigrid_master.p'
 
     elif args.mode == 'ssim_master':
-        from train_master import gen_env_with_seed
+        from experiments.minigrid.train_master import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_second_step_ssim.hocon')
         agent_path = 'artifacts/models/minigrid_master_ssim.p'
 
     elif args.mode == 'ssim_worker':
-        from train_worker import gen_env_with_seed
+        from experiments.minigrid.train_worker import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_first_step_ssim.hocon')
         agent_path = 'artifacts/models/minigrid_worker_ssim.p'
 
     elif args.mode == 'worker':
-        from train_worker import gen_env_with_seed
+        from experiments.minigrid.train_worker import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_first_step.hocon')
         agent_path = 'artifacts/models/minigrid_worker.p'
 
     elif args.mode == 'direct_ppo':
-        from train_direct_ppo import gen_env_with_seed
+        from experiments.minigrid.train_direct_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_direct_ppo.hocon')
         agent_path = 'artifacts/models/minigrid_direct_ppo.p'
 
