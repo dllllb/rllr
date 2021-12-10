@@ -53,7 +53,7 @@ class NavigationGoalWrapper(gym.Wrapper):
         self.is_goal_achieved = self._goal_achieved(next_state)
         reward = int(self.is_goal_achieved)
 
-        if self.is_goal_achieved:
+        if self.is_goal_achieved and not done:
             self.gen_goal(next_state)
 
         return next_state, reward, done, info
@@ -168,24 +168,6 @@ class GoalObsWrapper(gym.core.ObservationWrapper):
             goal_obs = goal_obs['image']
 
         return {'state': obs, 'goal_state': goal_obs}
-
-
-class SetRewardWrapper(gym.Wrapper):
-    def __init__(self, env, reward_function):
-        self.reward_function = reward_function
-        self.pos_reward = hasattr(reward_function, 'is_pos_reward') and reward_function.is_pos_reward
-        super().__init__(env)
-
-    def step(self, action):
-        state = self.env.observation(self.unwrapped.gen_obs())
-        next_state, _, done, info = self.env.step(action)
-
-        if self.pos_reward:
-            reward = self.reward_function(state['position'], next_state['position'], self.goal_state['position'])
-        else:
-            reward = self.reward_function(state['image'], next_state['image'], self.goal_state['image'])
-
-        return next_state, reward, done, info
 
 
 def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generator=None, verbose=False):
