@@ -1,19 +1,11 @@
 import logging
-import os
-import pickle
-import numpy as np
 import torch
 
 from experiments.minigrid.train_worker import gen_env, rnd_wrapper
 from rllr.algo import PPO
-from rllr.utils import train_ppo
-from rllr.models.ppo import ActorCriticNetwork
-from rllr.env.vec_wrappers import make_vec_envs
-from rllr.models import StateEmbedder
-from rllr.buffer.rollout import RolloutStorage
-from rllr.env.wrappers import HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward
-from rllr.models import encoders as minigrid_encoders
-from rllr.utils import get_conf, switch_reproducibility_on
+from rllr.env import make_vec_envs, HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward
+from rllr.models import encoders, ActorCriticNetwork, StateEmbedder
+from rllr.utils import train_ppo, get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
@@ -22,8 +14,8 @@ logger = logging.getLogger(__name__)
 def get_master_agent(env, conf):
     if conf['env.env_type'] == 'gym_minigrid':
         grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-        state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
-        goal_state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
+        state_encoder = encoders.get_encoder(grid_size, conf['master'])
+        goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
