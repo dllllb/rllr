@@ -38,7 +38,7 @@ def gen_wrapped_env(conf, verbose=False):
     else:
         raise AttributeError(f"unknown env_task '{conf['env_task']}'")
 
-    env = gym.make(env_name)
+    env = gym.make(env_name, agent_start_pos=conf.get('agent_start_pos', (1, 1)))
 
     if conf.get('action_size', None) and conf['action_size'] != env.action_space.n:
         env = ChangeActionSizeWrapper(env, conf['action_size'])

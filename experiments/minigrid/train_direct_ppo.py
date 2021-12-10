@@ -1,7 +1,5 @@
 import logging
-import torch
 
-from experiments.minigrid.train_worker import rnd_wrapper
 from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
 from rllr.utils import train_ppo
 from rllr.env.vec_wrappers import make_vec_envs
@@ -11,17 +9,12 @@ from rllr.models import encoders
 from rllr.models.ppo import ActorCriticNetwork
 from rllr.algo import PPO
 from rllr.utils.logger import init_logger
-import rllr.env as environments
 
 logger = logging.getLogger(__name__)
 
 
 def gen_wrapped_env(conf):
     env = minigrid_envs.gen_wrapped_env(conf)
-
-    if conf.get('random_network_distillation_reward', False):
-        env = rnd_wrapper(env, conf)
-
     return env
 
 

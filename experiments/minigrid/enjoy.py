@@ -38,6 +38,7 @@ def main(args):
     elif args.mode == 'direct_ppo':
         from train_direct_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_direct_ppo.hocon')
+        config['env']['agent_start_pos'] = (1, 1)
         agent_path = 'artifacts/models/minigrid_direct_ppo.p'
 
     agent = torch.load(agent_path)
