@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 from collections import defaultdict
 from tqdm import trange, tqdm
 
-from rllr.env.gym_minigrid_navigation.environments import RGBImgObsWrapper, PosObsWrapper
+from rllr.env.gym_minigrid_navigation.environments import RGBImgObsWrapper, PosObsWrapper, RandomStartPointWrapper
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 def make_env():
     env = gym.make('MiniGrid-Dynamic-Obstacles-8x8-v0')
+    env = RandomStartPointWrapper(env, {})
     env = RGBImgObsWrapper(env, tile_size=4)
     env = PosObsWrapper(env)
     return env
@@ -23,37 +24,7 @@ def make_env():
 def rnd_obs(env, seed):
     env.seed(seed)
     while True:
-        env.reset()
-        goal_pos = np.random.randint(1, 6, 2)
-        goal_dir = np.random.randint(0, 4)
-        env.unwrapped.agent_pos = goal_pos
-        env.unwrapped.agent_dir = goal_dir
-        yield env.observation(env.unwrapped.gen_obs())
-
-
-def pos_to_obs(env, seed):
-    env.seed(seed)
-
-    def f(pos):
-        dir = np.random.randint(0, 4)
-        env.unwrapped.agent_pos = pos
-        env.unwrapped.agent_dir = dir
-        return env.observation(env.unwrapped.gen_obs())
-
-    return f
-
-
-def gen_grid():
-    from itertools import product
-    xs = range(1, 7)
-    ys = range(1, 7)
-    pos = product(xs, ys)
-    return pos
-
-
-def gen_obs(env, pos, seed):
-    obs = map(lambda p: pos_to_obs(env, seed)(p), pos)
-    return enumerate(obs)
+        yield env.reset()
 
 
 def make_dataset(generator, total_size=100000):

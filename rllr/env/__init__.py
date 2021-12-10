@@ -1,7 +1,6 @@
 from .wrappers import NavigationGoalWrapper
 from .wrappers import RandomGoalWrapper
 from .wrappers import FromBufferGoalWrapper
-from .wrappers import SetRewardWrapper
 from .wrappers import FullyRenderWrapper
 from .wrappers import IntrinsicEpisodicReward
 from .wrappers import RandomNetworkDistillationReward
