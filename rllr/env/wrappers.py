@@ -90,19 +90,17 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         self.seed = seed
         np.random.seed(seed)
         self.count = np.random.randint(0, self.verbose)
-
-    def reset(self):
-
-        return super().reset()
+        self.verbose_episode = False
 
     def gen_goal(self, state):
         super().gen_goal(state)
 
-        if self.count % self.verbose == 0 and self.goal_state is not None:
+        if self.verbose_episode:
             print(self.seed, self.goal_state['position'], self.flag)
 
     def reset(self):
         self.count += 1
+        self.verbose_episode = self.count % self.verbose == 0 and self.goal_state is not None
 
         if not self.is_goal_achieved and self.goal_state is not None:
             self.unachieved_buffer.append(self.goal_state)

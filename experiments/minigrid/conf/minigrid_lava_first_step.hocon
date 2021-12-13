@@ -1,0 +1,76 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-LavaGap,
+    s_size: 5,
+    action_size: 3,
+    fully_observed: false,
+    grid_size: 7,
+    fix_reset_seed: true,
+    reset_seed: 42,
+    rgb_image: true,
+    tile_size: 4,
+    goal_patch: true,
+    goal_type: from_buffer,
+    random_goal_seed: 42,
+    from_buffer_choice_params: {
+        warmup_steps: 1000,
+        buffer_size: 100000,
+        unachieved_buffer_size: 100,
+        unachieved_prob: 0.5,
+    },
+    goal_achieving_criterion: position_and_direction,
+    video_path: artifacts/video/
+  },
+
+  worker: {
+    state_encoder_type: simple_cnn,
+    n_channels: [16, 16],
+    kernel_sizes: [4, 3],
+    strides: [4, 1],
+    paddings: [0, 1],
+    head: {
+        hidden_size: 64
+    }
+  },
+
+  master: {
+    state_encoder_type: simple_cnn,
+    n_channels: [16, 16],
+    kernel_sizes: [4, 3],
+    strides: [4, 1],
+    paddings: [0, 1],
+    head: {
+        hidden_size: []
+    },
+    emb_size: 32
+  },
+
+  agent: {
+    device: "cpu",
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.01,
+    lr: 0.001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.99,
+    gae_lambda: 0.95
+  },
+
+  training: {
+    reward: fair_goal_achievement,
+    n_env_steps: 3000000,
+    n_steps: 1000,
+    n_processes: 16,
+    verbose: 1,
+  },
+
+  seed: 42,
+
+  outputs: {
+    path: artifacts/models/minigrid_lava_worker.p,
+  }
+}
