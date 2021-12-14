@@ -2,11 +2,11 @@
   env: {
     env_type: gym_minigrid,
     env_task: MiniGrid-LavaGap,
-    s_size: 5,
+    s_size: 7,
     action_size: 3,
     fully_observed: false,
     grid_size: 7,
-    fix_reset_seed: true,
+    fix_reset_seed: false,
     reset_seed: 42,
     rgb_image: true,
     tile_size: 4,
