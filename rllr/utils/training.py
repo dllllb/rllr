@@ -50,6 +50,7 @@ def train_ppo(env, agent, conf):
         rollouts.compute_returns(next_value, conf['agent.gamma'], conf['agent.gae_lambda'])
 
         value_loss, action_loss, dist_entropy = agent.update(rollouts)
+        rollouts.after_update()
 
         if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
             total_num_steps = (j + 1) * conf['training.n_processes'] * conf['training.n_steps']
