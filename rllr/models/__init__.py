@@ -8,3 +8,4 @@ from .models import StateSimilarityNetwork
 from .models import SSIMCriterion
 from .rnd import RNDModel
 from .ppo import ActorCriticNetwork
+from .vae import VAE, VarEmbedding
