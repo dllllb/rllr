@@ -15,18 +15,14 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
         param_group['lr'] = lr
 
 
-def init_obs_rms(env, agent):
+def init_obs_rms(env, conf):
     obs_rms = RunningMeanStd(shape=env.observation_space.shape)
     states = []
     obs = env.reset()
 
-    for j in trange(128):
+    for j in trange(conf['training.n_steps']):
         action = torch.tensor([[env.action_space.sample()] for _ in range(obs.shape[0])])
         obs, reward, done, infos = env.step(action)
-
-        int_reward = agent.compute_intrinsic_reward(
-            ((obs - obs_rms.mean) / np.sqrt(obs_rms.var)).clip(-5, 5))
-
         states.append(obs)
 
     obs_rms.update(torch.stack(states))
@@ -38,7 +34,7 @@ def im_train_ppo(env, agent, conf):
     Runs a series of episode and collect statistics
     """
     reward_rms = RunningMeanStd()
-    obs_rms = init_obs_rms(env, agent)
+    obs_rms = init_obs_rms(env, conf)
 
     # training starts
     rollouts = IMRolloutStorage(
@@ -59,11 +55,11 @@ def im_train_ppo(env, agent, conf):
 
         for step in range(conf['training.n_steps']):
             # Sample actions
-            (value, int_value), action, action_log_prob = agent.act(obs)
+            (value, im_value), action, action_log_prob = agent.act(obs)
             obs, reward, done, infos = env.step(action)
             obs_rms.update(obs)
 
-            int_reward = agent.compute_intrinsic_reward(
+            im_reward = agent.compute_intrinsic_reward(
                 ((obs - obs_rms.mean) / np.sqrt(obs_rms.var)).clip(-5, 5))
 
             for info in infos:
@@ -72,26 +68,25 @@ def im_train_ppo(env, agent, conf):
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
-            rollouts.insert(obs, action, action_log_prob, value, int_value, reward, int_reward, masks)
+            rollouts.insert(obs, action, action_log_prob, value, im_value, reward, im_reward, masks)
 
 
-        intret = torch.zeros((129, 16))
-        for i, ret in enumerate(rollouts.int_rewards):
-            intret[i + 1] = conf['agent.int_gamma'] * intret[i] + ret.view(-1)
-        intret = intret[1:]
+        im_ret = torch.zeros((conf['training.n_steps'] + 1, conf['training.n_processes']))
+        for i, rew in enumerate(rollouts.im_rewards):
+            im_ret[i + 1] = conf['agent.im_gamma'] * im_ret[i] + rew.view(-1)
+        im_ret = im_ret[1:]
 
-        mean, std, count = torch.mean(intret), torch.std(intret), len(intret)
-        reward_rms.update_from_moments(mean, std ** 2, count)
-        print(mean, std, count)
+        mean, var, count = torch.mean(im_ret), torch.var(im_ret), len(im_ret)
+        reward_rms.update_from_moments(mean, var, count)
 
         obs_rms.update(rollouts.obs)
 
-        rollouts.int_rewards /= torch.sqrt(reward_rms.var)
-        next_value, next_int_value = agent.get_value(rollouts.get_last_obs())
+        rollouts.im_rewards /= torch.sqrt(reward_rms.var)
+        next_value, next_im_value = agent.get_value(rollouts.get_last_obs())
         rollouts.compute_returns(next_value, conf['agent.gamma'], conf['agent.gae_lambda'])
-        rollouts.compute_int_returns(next_int_value, conf['agent.int_gamma'], conf['agent.gae_lambda'])
+        rollouts.compute_im_returns(next_im_value, conf['agent.im_gamma'], conf['agent.gae_lambda'])
 
-        value_loss, int_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
+        value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
         rollouts.after_update()
 
 
@@ -106,7 +101,7 @@ def im_train_ppo(env, agent, conf):
                   f'min/max reward {np.min(episode_rewards):.2f}/{np.max(episode_rewards):.2f}\n'
                   f'dist_entropy {dist_entropy:.2f}, '
                   f'value_loss {value_loss:.2f}, '
-                  f'int_value_loss {int_value_loss:.2f}, '
+                  f'im_value_loss {im_value_loss:.2f}, '
                   f'action_loss {action_loss:.2f}'
                 )
 

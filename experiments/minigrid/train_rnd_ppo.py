@@ -44,6 +44,8 @@ def get_agent(env, config):
     return IMPPO(
         policy,
         rnd,
+        config['agent.ext_coef'],
+        config['agent.im_coef'],
         config['agent.clip_param'],
         config['agent.ppo_epoch'],
         config['agent.num_mini_batch'],

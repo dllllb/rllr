@@ -18,17 +18,14 @@ class IMRolloutStorage(object):
         else:
             self.actions = torch.zeros(num_steps, num_processes, action_space.shape[0])
 
-        self.next_obs_ids = torch.tensor(list(range(1, num_steps + 1)) * num_processes).reshape(num_processes, num_steps).T.reshape(-1)
-        print(self.next_obs_ids)
-
         self.rewards = torch.zeros(num_steps, num_processes, 1)
-        self.int_rewards = torch.zeros(num_steps, num_processes, 1)
+        self.im_rewards = torch.zeros(num_steps, num_processes, 1)
 
         self.value_preds = torch.zeros(num_steps + 1, num_processes, 1)
-        self.int_value_preds = torch.zeros(num_steps + 1, num_processes, 1)
+        self.im_value_preds = torch.zeros(num_steps + 1, num_processes, 1)
 
         self.returns = torch.zeros(num_steps + 1, num_processes, 1)
-        self.int_returns = torch.zeros(num_steps + 1, num_processes, 1)
+        self.im_returns = torch.zeros(num_steps + 1, num_processes, 1)
 
         self.action_log_probs = torch.zeros(num_steps, num_processes, 1)
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
@@ -59,32 +56,30 @@ class IMRolloutStorage(object):
         else:
             self.obs = self.obs.to(device)
 
-        self.next_obs_ids = self.next_obs_ids.to(device)
-
         self.rewards = self.rewards.to(device)
-        self.int_rewards = self.int_rewards.to(device)
+        self.im_rewards = self.im_rewards.to(device)
 
         self.value_preds = self.value_preds.to(device)
-        self.int_value_preds = self.int_value_preds.to(device)
+        self.im_value_preds = self.im_value_preds.to(device)
 
         self.returns = self.returns.to(device)
-        self.int_returns = self.int_returns.to(device)
+        self.im_returns = self.im_returns.to(device)
 
         self.action_log_probs = self.action_log_probs.to(device)
         self.actions = self.actions.to(device)
         self.masks = self.masks.to(device)
 
-    def insert(self, obs, actions, action_log_probs, value_preds, int_value_preds, rewards, int_rewards, masks):
+    def insert(self, obs, actions, action_log_probs, value_preds, im_value_preds, rewards, im_rewards, masks):
         self.copy_obs(obs, self.step + 1)
 
         self.actions[self.step].copy_(actions)
         self.action_log_probs[self.step].copy_(action_log_probs)
 
         self.value_preds[self.step].copy_(value_preds)
-        self.int_value_preds[self.step].copy_(int_value_preds)
+        self.im_value_preds[self.step].copy_(im_value_preds)
 
         self.rewards[self.step].copy_(rewards)
-        self.int_rewards[self.step].copy_(int_rewards.view(-1, 1))
+        self.im_rewards[self.step].copy_(im_rewards.view(-1, 1))
 
         self.masks[self.step + 1].copy_(masks)
 
@@ -102,16 +97,16 @@ class IMRolloutStorage(object):
             gae = delta + gamma * gae_lambda * self.masks[step + 1] * gae
             self.returns[step] = gae + self.value_preds[step]
 
-    def compute_int_returns(self, next_int_value, gamma, gae_lambda):
+    def compute_im_returns(self, next_im_value, gamma, gae_lambda):
         """
         intrinsic returns are non-episodic -> masks == 1
         """
-        self.int_value_preds[-1] = next_int_value
+        self.im_value_preds[-1] = next_im_value
         gae = 0
-        for step in reversed(range(self.int_rewards.size(0))):
-            delta = self.int_rewards[step] + gamma * self.int_value_preds[step + 1] - self.int_value_preds[step]
+        for step in reversed(range(self.im_rewards.size(0))):
+            delta = self.im_rewards[step] + gamma * self.im_value_preds[step + 1] - self.im_value_preds[step]
             gae = delta + gamma * gae_lambda * gae
-            self.int_returns[step] = gae + self.int_value_preds[step]
+            self.im_returns[step] = gae + self.im_value_preds[step]
 
     def feed_forward_generator(self,
                                advantages,
@@ -142,10 +137,10 @@ class IMRolloutStorage(object):
 
             actions_batch = self.actions.view(-1, self.actions.size(-1))[indices]
             value_preds_batch = self.value_preds[:-1].view(-1, 1)[indices]
-            int_value_preds_batch = self.int_value_preds[:-1].view(-1, 1)[indices]
+            im_value_preds_batch = self.im_value_preds[:-1].view(-1, 1)[indices]
 
             return_batch = self.returns[:-1].view(-1, 1)[indices]
-            int_return_batch = self.int_returns[:-1].view(-1, 1)[indices]
+            im_return_batch = self.im_returns[:-1].view(-1, 1)[indices]
 
             masks_batch = self.masks[:-1].view(-1, 1)[indices]
             old_action_log_probs_batch = self.action_log_probs.view(-1, 1)[indices]
@@ -153,7 +148,7 @@ class IMRolloutStorage(object):
             adv_targ = advantages.view(-1, 1)[indices]
 
             yield obs_batch, next_obs_batch, actions_batch, \
-                value_preds_batch, int_value_preds_batch, \
-                return_batch, int_return_batch,\
+                value_preds_batch, im_value_preds_batch, \
+                return_batch, im_return_batch,\
                 masks_batch, old_action_log_probs_batch, \
                 adv_targ
