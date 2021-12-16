@@ -4,6 +4,26 @@ from torch import nn as nn
 from torch.nn import functional as F
 
 
+def make_mlp(input_size, hidden_size, output_size):
+    fc_layers = []
+    if type(hidden_size) == int:
+        fc_layers += [
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(inplace=False),
+            nn.Linear(hidden_size, output_size)
+        ]
+    elif type(hidden_size) == list:
+        for hs in hidden_size:
+            fc_layers.append(nn.Linear(input_size, hs))
+            fc_layers.append(nn.ReLU(inplace=False))
+            input_size = hs
+        fc_layers.append(nn.Linear(input_size, output_size))
+    else:
+        AttributeError(f"unknown type of {hidden_size} parameter")
+
+    return nn.Sequential(*fc_layers)
+
+
 class FixedCategorical(torch.distributions.Categorical):
     def sample(self):
         return super().sample().unsqueeze(-1)
@@ -42,23 +62,7 @@ class DiscreteActorNetwork(nn.Module):
         super().__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
-        fc_layers = []
-        if type(hidden_size) == int:
-            fc_layers += [
-                nn.Linear(input_size, hidden_size),
-                nn.ReLU(inplace=False),
-                nn.Linear(hidden_size, action_size)
-            ]
-        elif type(hidden_size) == list:
-            for hs in hidden_size:
-                fc_layers.append(nn.Linear(input_size, hs))
-                fc_layers.append(nn.ReLU(inplace=False))
-                input_size = hs
-            fc_layers.append(nn.Linear(input_size, action_size))
-        else:
-            AttributeError(f"unknown type of {hidden_size} parameter")
-
-        self.logits = nn.Sequential(*fc_layers)
+        self.logits = make_mlp(input_size, hidden_size, action_size)
         self.output_size = action_size
 
     def forward(self, states):
@@ -77,23 +81,7 @@ class ContiniousActorNetwork(nn.Module):
         super().__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
-        fc_layers = []
-        if type(hidden_size) == int:
-            fc_layers += [
-                nn.Linear(input_size, hidden_size),
-                nn.ReLU(inplace=False),
-                nn.Linear(hidden_size, action_size)
-            ]
-        elif type(hidden_size) == list:
-            for hs in hidden_size:
-                fc_layers.append(nn.Linear(input_size, hs))
-                fc_layers.append(nn.ReLU(inplace=False))
-                input_size = hs
-            fc_layers.append(nn.Linear(input_size, action_size))
-        else:
-            AttributeError(f"unknown type of {hidden_size} parameter")
-
-        self.fc = nn.Sequential(*fc_layers)
+        self.fc = make_mlp(input_size, hidden_size, action_size)
         self.logstd = nn.Parameter(torch.zeros((action_size,)))
         self.output_size = action_size
 
@@ -113,26 +101,28 @@ class CriticNetwork(nn.Module):
         super(CriticNetwork, self).__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
-        fc_layers = []
-        if type(hidden_size) == int:
-            fc_layers += [
-                nn.Linear(input_size, hidden_size),
-                nn.ReLU(inplace=False),
-                nn.Linear(hidden_size, 1)
-            ]
-        elif type(hidden_size) == list:
-            for hs in hidden_size:
-                fc_layers.append(nn.Linear(input_size, hs))
-                fc_layers.append(nn.ReLU(inplace=False))
-                input_size = hs
-            fc_layers.append(nn.Linear(input_size, 1))
-        else:
-            AttributeError(f"unknown type of {hidden_size} parameter")
-        self.fc = nn.Sequential(*fc_layers)
+        self.fc = make_mlp(input_size, hidden_size, 1)
 
     def forward(self, states):
         x = self.state_encoder(states)
         return self.fc(x)
+
+
+class IMCriticNetwork(nn.Module):
+    """
+    Critic network estimates external and internal expected returns
+    """
+
+    def __init__(self, state_encoder, hidden_size):
+        super(IMCriticNetwork, self).__init__()
+        self.state_encoder = state_encoder
+        input_size = state_encoder.output_size
+        self.ext_head = make_mlp(input_size, hidden_size, 1)
+        self.int_head = make_mlp(input_size, hidden_size, 1)
+
+    def forward(self, states):
+        x = self.state_encoder(states)
+        return self.ext_head(x), self.int_head(x)
 
 
 class ActorCriticNetwork(nn.Module):
@@ -140,7 +130,8 @@ class ActorCriticNetwork(nn.Module):
     Actor-critic model
     """
 
-    def __init__(self, action_space, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size):
+    def __init__(self, action_space, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size,
+                 use_intrinsic_motivation=False):
         super(ActorCriticNetwork, self).__init__()
         if type(action_space) == gym.spaces.Box:
             self.actor = ContiniousActorNetwork(action_space.shape[0], actor_state_encoder, actor_hidden_size)
@@ -148,7 +139,11 @@ class ActorCriticNetwork(nn.Module):
             self.actor = DiscreteActorNetwork(action_space.n, actor_state_encoder, actor_hidden_size)
         else:
             raise NotImplementedError(f'{action_space} not supported')
-        self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size)
+
+        if use_intrinsic_motivation:
+            self.critic = IMCriticNetwork(critic_state_encoder, critic_hidden_size)
+        else:
+            self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size)
 
         def init_params(m):
             classname = m.__class__.__name__
