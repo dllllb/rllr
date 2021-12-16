@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 def get_master_agent(env, conf):
     if conf['env.env_type'] == 'gym_minigrid':
-        grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+        if conf['env'].get('fully_observed', True):
+            grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+        else:
+            grid_size = 7 * conf['env'].get('tile_size', 1)
         state_encoder = encoders.get_encoder(grid_size, conf['master'])
         goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
     else:

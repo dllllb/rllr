@@ -109,7 +109,11 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
 def get_encoders(conf):
     if conf['env.env_type'] == 'gym_minigrid':
         init_logger('rllr.env.gym_minigrid_navigation.environments')
-        grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+        if conf['env'].get('fully_observed', True):
+            grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+        else:
+            grid_size = 7 * conf['env'].get('tile_size', 1)
+
         state_encoder = encoders.get_encoder(grid_size, conf['worker'])
         goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
         return state_encoder, goal_state_encoder
@@ -118,9 +122,7 @@ def get_encoders(conf):
 
 
 def get_hindsight_state_encoder(state_encoder, goal_state_encoder, config):
-    hidden_size_worker = config['worker']['head.hidden_size']
     hidden_size_master = config['master']['head.hidden_size']
-    action_size = config['env.action_size']
     emb_size = config['master']['emb_size']
     # FIXME: DDPG's actor looks strange here
     goal_state_encoder = ActorNetwork(emb_size, goal_state_encoder, hidden_size_master)

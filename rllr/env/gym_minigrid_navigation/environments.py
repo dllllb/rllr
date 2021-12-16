@@ -36,7 +36,6 @@ class RandomStartPointWrapper(gym.Wrapper):
     def reset(self):
         super().reset()
 
-        # goal_pos = np.array((self.grid_size - 2, self.grid_size - 2))
         goal_pos = np.random.randint(1, self.grid_size - 1, 2)
         goal_dir = np.random.randint(0, 4)
         if self.verbose:
