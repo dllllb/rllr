@@ -37,7 +37,13 @@ def main(args):
     elif args.mode == 'direct_ppo':
         from experiments.minigrid.train_direct_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_direct_ppo.hocon')
+        config['env']['agent_start_pos'] = (1, 1)
         agent_path = 'artifacts/models/minigrid_direct_ppo.p'
+
+    elif args.mode == 'rnd_ppo':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo.hocon')
+        agent_path = 'artifacts/models/minigrid_rnd_ppo.p'
 
     agent = torch.load(agent_path)
 
@@ -74,7 +80,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker', 'direct_ppo'])
+    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker', 'direct_ppo', 'rnd_ppo'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()

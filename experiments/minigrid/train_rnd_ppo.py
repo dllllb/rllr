@@ -1,13 +1,15 @@
 import logging
 
-from experiments.minigrid.train_worker import rnd_wrapper
-
-from rllr.env import EpisodeInfoWrapper, make_vec_envs, minigrid_envs
-from rllr.models import encoders, ActorCriticNetwork
-from rllr.algo import PPO
-from rllr.utils.logger import init_logger
-from rllr.utils import train_ppo
+from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
+from rllr.utils import im_train_ppo
+from rllr.env.vec_wrappers import make_vec_envs
 from rllr.utils import switch_reproducibility_on, get_conf
+from rllr.env.wrappers import EpisodeInfoWrapper
+from rllr.models import encoders
+from rllr.models.ppo import ActorCriticNetwork
+from rllr.algo import IMPPO
+from rllr.models import RNDModel
+from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +28,24 @@ def gen_env_with_seed(conf, seed):
 def get_agent(env, config):
     state_conf = config['encoder']
     hidden_size = state_conf['head']['hidden_size']
-    if config['env'].get('fully_observed', True):
-        grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
-    else:
-        grid_size = 7 * config['env'].get('tile_size', 1)
+    grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
     state_encoder = encoders.get_encoder(grid_size, config['encoder'])
-    policy = ActorCriticNetwork(env.action_space, state_encoder, state_encoder, hidden_size, hidden_size)
+    policy = ActorCriticNetwork(
+        env.action_space, state_encoder,
+        state_encoder, hidden_size,
+        hidden_size, use_intrinsic_motivation=True
+    )
 
-    return PPO(
+    rnd = RNDModel(
+        encoders.get_encoder(grid_size, config['encoder']),
+        encoders.get_encoder(grid_size, config['encoder']),
+        config['agent.device'])
+
+    return IMPPO(
         policy,
+        rnd,
+        config['agent.ext_coef'],
+        config['agent.im_coef'],
         config['agent.clip_param'],
         config['agent.ppo_epoch'],
         config['agent.num_mini_batch'],
@@ -60,7 +71,7 @@ def main(args=None):
     agent.to(config['agent.device'])
 
     logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
-    train_ppo(
+    im_train_ppo(
         env=env,
         agent=agent,
         conf=config,
