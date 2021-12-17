@@ -1,14 +1,10 @@
 import logging
 
-from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
-from rllr.utils import im_train_ppo
-from rllr.env.vec_wrappers import make_vec_envs
-from rllr.utils import switch_reproducibility_on, get_conf
-from rllr.env.wrappers import EpisodeInfoWrapper
-from rllr.models import encoders
-from rllr.models.ppo import ActorCriticNetwork
 from rllr.algo import IMPPO
-from rllr.models import RNDModel
+from rllr.env import EpisodeInfoWrapper, make_vec_envs, minigrid_envs
+from rllr.models import encoders, ActorCriticNetwork, RNDModel
+from rllr.utils import im_train_ppo
+from rllr.utils import switch_reproducibility_on, get_conf
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
