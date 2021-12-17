@@ -4,7 +4,7 @@ import torch
 import rllr.env as environments
 
 from rllr.algo import PPO
-from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper, RandomNetworkDistillationReward
+from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper
 from rllr.models import encoders, ActorCriticNetwork, ActorNetwork, \
     GoalStateEncoder, SameStatesCriterion, StateEmbedder, SSIMCriterion
 from rllr.utils import train_ppo, get_conf, switch_reproducibility_on
@@ -46,28 +46,6 @@ def gen_env(conf, verbose=False):
     return env
 
 
-def rnd_wrapper(env, conf):
-    reward_conf = conf['random_network_distillation_reward']
-    device = torch.device(reward_conf['device'])
-
-    if conf['env_type'] == 'gym_minigrid':
-        grid_size = conf['grid_size'] * conf.get('tile_size', 1)
-        target_network = encoders.get_encoder(grid_size, reward_conf['target'])
-        predictor_network = encoders.get_encoder(grid_size, reward_conf['predictor'])
-    else:
-        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
-
-    env = RandomNetworkDistillationReward(
-        env,
-        target_network,
-        predictor_network,
-        device,
-        use_extrinsic_reward=True,
-        gamma=reward_conf['gamma']
-    )
-    return env
-
-
 def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=None):
     if not env:
         env = gen_env(conf=conf, verbose=verbose)
@@ -99,9 +77,6 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
 
     if conf.get('intrinsic_episodic_reward', False):
         env = environments.IntrinsicEpisodicReward(env, embedder)
-
-    if conf.get('random_network_distillation_reward', False):
-        env = rnd_wrapper(env, conf)
 
     return env
 

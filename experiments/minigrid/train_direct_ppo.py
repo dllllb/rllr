@@ -1,7 +1,5 @@
 import logging
 
-from experiments.minigrid.train_worker import rnd_wrapper
-
 from rllr.env import EpisodeInfoWrapper, make_vec_envs, minigrid_envs
 from rllr.models import encoders, ActorCriticNetwork
 from rllr.algo import PPO
