@@ -2,12 +2,12 @@ import logging
 import torch
 
 import rllr.env as environments
+import rllr.models as models
 
-from rllr.algo import PPO
+from rllr.algo import PPO, IMPPO
 from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper
-from rllr.models import encoders, ActorCriticNetwork, ActorNetwork, \
-    GoalStateEncoder, SameStatesCriterion, StateEmbedder, SSIMCriterion
-from rllr.utils import train_ppo, get_conf, switch_reproducibility_on
+from rllr.models import encoders
+from rllr.utils import train_ppo, im_train_ppo, get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
 
 
@@ -19,21 +19,24 @@ def get_goal_achieving_criterion(config):
         def position_achievement(state, goal_state):
             return (state['position'] == goal_state['position']).all()
         return position_achievement
+
     elif config['goal_achieving_criterion'] == 'position':
         def position_achievement(state, goal_state):
             return (state['position'][:-1] == goal_state['position'][:-1]).all()
         return position_achievement
+
     elif config['goal_achieving_criterion'] == 'state_distance_network':
         encoder = torch.load(config['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(config['state_distance_network_params.device'])
         encoder.to(device)
         threshold = config['state_distance_network_params.threshold']
-        return SameStatesCriterion(encoder, device, threshold)
+        return models.SameStatesCriterion(encoder, device, threshold)
+
     elif config['goal_achieving_criterion'] == 'state_similarity':
         ssim = torch.load(config['ssim_network_params.path'])
         device = torch.device(config['ssim_network_params.device'])
         threshold = config['ssim_network_params.threshold']
-        return SSIMCriterion(ssim.ssim_network, device, threshold)
+        return models.SSIMCriterion(ssim.ssim_network, device, threshold)
     else:
         raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
 
@@ -56,7 +59,7 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
     if conf.get('state_distance_network_params', {}).get('path', False):
         encoder = torch.load(conf['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(conf['state_distance_network_params.device'])
-        embedder = StateEmbedder(encoder, device)
+        embedder = models.StateEmbedder(encoder, device)
     else:
         embedder = None
 
@@ -100,25 +103,65 @@ def get_hindsight_state_encoder(state_encoder, goal_state_encoder, config):
     hidden_size_master = config['master']['head.hidden_size']
     emb_size = config['master']['emb_size']
     # FIXME: DDPG's actor looks strange here
-    goal_state_encoder = ActorNetwork(emb_size, goal_state_encoder, hidden_size_master)
-    return GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=goal_state_encoder)
+    goal_state_encoder = models.ActorNetwork(emb_size, goal_state_encoder, hidden_size_master)
+    return models.GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=goal_state_encoder)
 
 
-def get_worker_agent(env, conf):
-    hindsight_encoder = get_hindsight_state_encoder(*get_encoders(conf), conf)
-    hidden_size = conf['worker.head.hidden_size']
-    policy = ActorCriticNetwork(env.action_space, hindsight_encoder, hindsight_encoder, hidden_size, hidden_size)
+def get_ppo_worker_agent(env, config):
+    hindsight_encoder = get_hindsight_state_encoder(*get_encoders(config), config)
+    hidden_size = config['worker.head.hidden_size']
+    policy = models.ActorCriticNetwork(env.action_space, hindsight_encoder, hindsight_encoder, hidden_size, hidden_size)
 
     return PPO(
         policy,
-        conf['agent.clip_param'],
-        conf['agent.ppo_epoch'],
-        conf['agent.num_mini_batch'],
-        conf['agent.value_loss_coef'],
-        conf['agent.entropy_coef'],
-        conf['agent.lr'],
-        conf['agent.eps'],
-        conf['agent.max_grad_norm']
+        config['agent.clip_param'],
+        config['agent.ppo_epoch'],
+        config['agent.num_mini_batch'],
+        config['agent.value_loss_coef'],
+        config['agent.entropy_coef'],
+        config['agent.lr'],
+        config['agent.eps'],
+        config['agent.max_grad_norm']
+    )
+
+
+def get_rnd_model(config):
+    if config['env'].get('fully_observed', True):
+        grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
+    else:
+        grid_size = 7 * config['env'].get('tile_size', 1)
+    rnd = models.RNDModel(
+        encoders.get_encoder(grid_size, config['encoder']),
+        encoders.get_encoder(grid_size, config['encoder']),
+        config['agent.device'])
+
+    return rnd
+
+
+def get_imppo_worker_agent(env, config):
+    hindsight_encoder = get_hindsight_state_encoder(*get_encoders(config), config)
+    hidden_size = config['worker.head.hidden_size']
+    policy = models.ActorCriticNetwork(
+        env.action_space, hindsight_encoder,
+        hindsight_encoder, hidden_size,
+        hidden_size, use_intrinsic_motivation=True
+    )
+
+    rnd = get_rnd_model(config)
+
+    return IMPPO(
+        policy,
+        rnd,
+        config['agent.ext_coef'],
+        config['agent.im_coef'],
+        config['agent.clip_param'],
+        config['agent.ppo_epoch'],
+        config['agent.num_mini_batch'],
+        config['agent.value_loss_coef'],
+        config['agent.entropy_coef'],
+        config['agent.lr'],
+        config['agent.eps'],
+        config['agent.max_grad_norm']
     )
 
 
@@ -138,15 +181,31 @@ def main(args=None):
         config['agent.device']
     )
 
-    agent = get_worker_agent(env, config)
-    agent.to(config['agent.device'])
+    if config['training'].get('algorithm', 'ppo'):
+        agent = get_ppo_worker_agent(env, config)
+        agent.to(config['agent.device'])
 
-    logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
-    train_ppo(
-        env=env,
-        agent=agent,
-        conf=config,
-    )
+        logger.info(f"Running PPO agent training: {config['training.n_steps'] * config['training.n_processes']} steps")
+        train_ppo(
+            env=env,
+            agent=agent,
+            conf=config,
+        )
+
+    elif config['training.algorithm'] == 'imppo':
+        agent = get_imppo_worker_agent(env, config)
+        agent.to(config['agent.device'])
+
+        steps = config['training.n_steps'] * config['training.n_processes']
+        logger.info(f"Running {config['training.algorithm']} agent training: {steps} steps")
+        im_train_ppo(
+            env=env,
+            agent=agent,
+            conf=config,
+        )
+
+    else:
+        raise AttributeError(f"unknown algorithm '{config['training.algorithm']}'")
 
 
 if __name__ == '__main__':
