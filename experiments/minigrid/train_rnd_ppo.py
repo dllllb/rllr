@@ -39,7 +39,7 @@ def get_agent(env, config):
     rnd = RNDModel(
         encoders.get_encoder(grid_size, config['encoder']),
         encoders.get_encoder(grid_size, config['encoder']),
-        'cpu')
+        config['agent.device'])
 
     return IMPPO(
         policy,

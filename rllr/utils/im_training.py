@@ -16,7 +16,7 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
 
 
 def init_obs_rms(env, conf):
-    obs_rms = RunningMeanStd(shape=env.observation_space.shape)
+    obs_rms = RunningMeanStd(shape=env.observation_space.shape, device=conf['agent.device'])
     states = []
     obs = env.reset()
 
@@ -33,7 +33,7 @@ def im_train_ppo(env, agent, conf):
     """
     Runs a series of episode and collect statistics
     """
-    reward_rms = RunningMeanStd()
+    reward_rms = RunningMeanStd(device=conf['agent.device'])
     obs_rms = init_obs_rms(env, conf)
 
     # training starts
@@ -60,7 +60,7 @@ def im_train_ppo(env, agent, conf):
             obs_rms.update(obs)
 
             im_reward = agent.compute_intrinsic_reward(
-                ((obs - obs_rms.mean) / np.sqrt(obs_rms.var)).clip(-5, 5))
+                ((obs - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5))
 
             for info in infos:
                 if 'episode' in info.keys():
@@ -71,7 +71,7 @@ def im_train_ppo(env, agent, conf):
             rollouts.insert(obs, action, action_log_prob, value, im_value, reward, im_reward, masks)
 
 
-        im_ret = torch.zeros((conf['training.n_steps'] + 1, conf['training.n_processes']))
+        im_ret = torch.zeros((conf['training.n_steps'] + 1, conf['training.n_processes']), device=conf['agent.device'])
         for i, rew in enumerate(rollouts.im_rewards):
             im_ret[i + 1] = conf['agent.im_gamma'] * im_ret[i] + rew.view(-1)
         im_ret = im_ret[1:]

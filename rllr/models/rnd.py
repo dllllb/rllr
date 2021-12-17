@@ -27,7 +27,7 @@ class RNDModel(nn.Module):
             param.requires_grad = False
 
     def forward(self, next_obs):
-        next_obs = torch.FloatTensor(next_obs).to(self.device) * 255.
+        next_obs = next_obs.float() * 255.
 
         target_feature = self.target(next_obs)
         predict_feature = self.predictor(next_obs)
