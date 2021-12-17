@@ -41,7 +41,7 @@ def main(args):
         agent_path = 'artifacts/models/minigrid_direct_ppo.p'
 
     elif args.mode == 'rnd_ppo':
-        from train_rnd_ppo import gen_env_with_seed
+        from experiments.minigrid.train_rnd_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo.hocon')
         agent_path = 'artifacts/models/minigrid_rnd_ppo.p'
 
@@ -56,18 +56,17 @@ def main(args):
     rewards, steps, successes = [], [], []
     for _ in trange(args.episodes):
         obs, done, episode_reward = env.reset(), False, 0
-        episode_steps = 0
 
         while not done:
             if args.viz:
                 env.render('human')
             value, action, _ = agent.act(obs, deterministic=True)
             # observation, reward and next obs
-            obs, reward, done, _ = env.step(action)
+            obs, reward, done, infos = env.step(action)
             episode_reward += float(reward)
-            episode_steps += 1
+
         rewards.append(episode_reward)
-        steps.append(episode_steps)
+        steps.append(infos[0]['episode']['steps'])
         successes.append(episode_reward > 0)
         if args.viz:
             input(f'> the end!, reward = {episode_reward}')
