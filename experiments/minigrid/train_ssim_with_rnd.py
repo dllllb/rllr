@@ -9,20 +9,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-from rllr.buffer.rollout import RolloutStorage
-from rllr.utils.training import update_linear_schedule
-from rllr.env.vec_wrappers import make_vec_envs
-from rllr.models import encoders as minigrid_encoders
 from rllr.algo import PPO
-from rllr.models.ppo import ActorCriticNetwork
-from rllr.utils.state_similarity import ContrastiveStateSimilarity
-from rllr.env.wrappers import RandomNetworkDistillationReward
+from rllr.buffer.rollout import RolloutStorage
+from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper, RandomNetworkDistillationReward
+from rllr.models import encoders, ActorCriticNetwork, StateSimilarityNetwork
 from rllr.utils import get_conf, switch_reproducibility_on
-from rllr.env.wrappers import EpisodeInfoWrapper
-from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
-from rllr.models.encoders import get_encoder
+from rllr.utils.state_similarity import ContrastiveStateSimilarity
 from rllr.utils.logger import init_logger
-from rllr.models import StateSimilarityNetwork
+from rllr.utils.training import update_linear_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +31,7 @@ def gen_env(conf, verbose=False):
 
 def get_agent(env, conf):
     grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-    encoder = minigrid_encoders.get_encoder(grid_size, conf['worker'])
+    encoder = encoders.get_encoder(grid_size, conf['worker'])
     hidden_size = conf['worker.head.hidden_size']
     policy = ActorCriticNetwork(env.action_space, encoder, encoder, hidden_size, hidden_size)
 
@@ -56,7 +50,7 @@ def get_agent(env, conf):
 
 def get_ssim(conf):
     grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-    encoder = get_encoder(grid_size, conf['state_similarity'])
+    encoder = encoders.get_encoder(grid_size, conf['state_similarity'])
     ssim_network = StateSimilarityNetwork(encoder, conf['state_similarity.hidden_size'])
     ssim = ContrastiveStateSimilarity(ssim_network,
                                       lr=conf['state_similarity.lr'],
@@ -78,8 +72,8 @@ def gen_env_with_seed(conf, seed):
 
     if conf['env.env_type'] == 'gym_minigrid':
         grid_size = conf['env.grid_size'] * conf.get('env.tile_size', 1)
-        target_network = minigrid_encoders.get_encoder(grid_size, reward_conf['target'])
-        predictor_network = minigrid_encoders.get_encoder(grid_size, reward_conf['predictor'])
+        target_network = encoders.get_encoder(grid_size, reward_conf['target'])
+        predictor_network = encoders.get_encoder(grid_size, reward_conf['predictor'])
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 

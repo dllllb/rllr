@@ -1,22 +1,14 @@
 import logging
-import os
-import pickle
 import torch
 
-from functools import partial
-
 import rllr.env as environments
+
 from rllr.algo import PPO
-from rllr.models.ppo import ActorCriticNetwork
-from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
-from rllr.models import SameStatesCriterion, ActorNetwork, StateEmbedder, SSIMCriterion
-from rllr.models.encoders import GoalStateEncoder
-from rllr.models import encoders
-from rllr.utils import get_conf, switch_reproducibility_on
+from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper, RandomNetworkDistillationReward
+from rllr.models import encoders, ActorCriticNetwork, ActorNetwork, \
+    GoalStateEncoder, SameStatesCriterion, StateEmbedder, SSIMCriterion
+from rllr.utils import train_ppo, get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
-from rllr.utils import train_ppo
-from rllr.env.vec_wrappers import make_vec_envs
-from rllr.env.wrappers import EpisodeInfoWrapper
 
 
 logger = logging.getLogger(__name__)
@@ -65,7 +57,7 @@ def rnd_wrapper(env, conf):
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
-    env = environments.RandomNetworkDistillationReward(
+    env = RandomNetworkDistillationReward(
         env,
         target_network,
         predictor_network,
@@ -117,7 +109,11 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
 def get_encoders(conf):
     if conf['env.env_type'] == 'gym_minigrid':
         init_logger('rllr.env.gym_minigrid_navigation.environments')
-        grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+        if conf['env'].get('fully_observed', True):
+            grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+        else:
+            grid_size = 7 * conf['env'].get('tile_size', 1)
+
         state_encoder = encoders.get_encoder(grid_size, conf['worker'])
         goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
         return state_encoder, goal_state_encoder
@@ -126,9 +122,7 @@ def get_encoders(conf):
 
 
 def get_hindsight_state_encoder(state_encoder, goal_state_encoder, config):
-    hidden_size_worker = config['worker']['head.hidden_size']
     hidden_size_master = config['master']['head.hidden_size']
-    action_size = config['env.action_size']
     emb_size = config['master']['emb_size']
     # FIXME: DDPG's actor looks strange here
     goal_state_encoder = ActorNetwork(emb_size, goal_state_encoder, hidden_size_master)
