@@ -1,7 +1,7 @@
 import logging
 import torch
 
-from experiments.minigrid.train_worker import gen_env, rnd_wrapper
+from experiments.minigrid.train_worker import gen_env
 from rllr.algo import PPO
 from rllr.env import make_vec_envs, HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward
 from rllr.models import encoders, ActorCriticNetwork, StateEmbedder
@@ -48,9 +48,6 @@ def gen_env_with_seed(conf, seed):
     emb_size = worker_agent.actor_critic.actor.state_encoder.goal_state_encoder.output_size
 
     env = gen_env(conf['env'])
-
-    if conf['env'].get('random_network_distillation_reward', False):
-        env = rnd_wrapper(env, conf['env'])
 
     if conf['env'].get('intrinsic_episodic_reward', False):
         encoder = worker_agent.actor_critic.actor.state_encoder.state_encoder
