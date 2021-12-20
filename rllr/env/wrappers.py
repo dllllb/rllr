@@ -280,3 +280,9 @@ class HierarchicalWrapper(gym.Wrapper):
             cum_reward += reward
             step += 1
         return self.state, cum_reward, done, info
+
+
+class ZeroRewardWrapper(gym.Wrapper):
+    def step(self, action):
+        state, reward, done, info = self.env.step(action)
+        return state, 0, done, info

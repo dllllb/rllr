@@ -5,6 +5,7 @@ from .wrappers import FullyRenderWrapper
 from .wrappers import IntrinsicEpisodicReward
 from .wrappers import EpisodeInfoWrapper
 from .wrappers import HierarchicalWrapper
+from .wrappers import ZeroRewardWrapper
 from .rnd import RandomNetworkDistillationReward
 
 from .rewards import ExplicitPosReward

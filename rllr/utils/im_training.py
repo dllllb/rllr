@@ -29,7 +29,7 @@ def init_obs_rms(env, conf):
     return obs_rms
 
 
-def im_train_ppo(env, agent, conf):
+def im_train_ppo(env, agent, conf, after_epoch_callback=None):
     """
     Runs a series of episode and collect statistics
     """
@@ -70,7 +70,6 @@ def im_train_ppo(env, agent, conf):
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
             rollouts.insert(obs, action, action_log_prob, value, im_value, reward, im_reward, masks)
 
-
         im_ret = torch.zeros((conf['training.n_steps'] + 1, conf['training.n_processes']), device=conf['agent.device'])
         for i, rew in enumerate(rollouts.im_rewards):
             im_ret[i + 1] = conf['agent.im_gamma'] * im_ret[i] + rew.view(-1)
@@ -89,7 +88,6 @@ def im_train_ppo(env, agent, conf):
         value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
         rollouts.after_update()
 
-
         if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
             total_num_steps = (j + 1) * conf['training.n_processes'] * conf['training.n_steps']
             end = time.time()
@@ -102,7 +100,11 @@ def im_train_ppo(env, agent, conf):
                   f'dist_entropy {dist_entropy:.2f}, '
                   f'value_loss {value_loss:.2f}, '
                   f'im_value_loss {im_value_loss:.2f}, '
-                  f'action_loss {action_loss:.2f}'
-                )
+                  f'action_loss {action_loss:.2f}')
 
             torch.save(agent, conf['outputs.path'])
+
+        if after_epoch_callback is not None:
+            loss = after_epoch_callback(rollouts)
+            if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
+                print(f'loss: {loss:.2f}')
