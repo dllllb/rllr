@@ -48,12 +48,15 @@ class NavigationGoalWrapper(gym.Wrapper):
         return state
 
     def step(self, action):
-        next_state, _, done, info = self.env.step(action)
+        next_state, env_reward, done, info = self.env.step(action)
         self.is_goal_achieved = self._goal_achieved(next_state)
         reward = int(self.is_goal_achieved)
 
         if self.is_goal_achieved and not done:
             self.gen_goal(next_state)
+
+        if env_reward > 0 and done:
+            done = False
 
         return next_state, reward, done, info
 
@@ -362,7 +365,7 @@ class HierarchicalWrapper(gym.Wrapper):
         return torch.from_numpy(self.state)
 
     def step(self, action):
-        cum_reward, step, done = 0, 0, False
+        cum_reward, step, done, info = 0, 0, False, {}
         while not done and step < self.n_steps:
             _, low_action, _ = self.policy.act({
                 'state': torch.from_numpy(self.state).unsqueeze(dim=0),
