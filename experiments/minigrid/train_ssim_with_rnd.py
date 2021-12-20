@@ -141,7 +141,7 @@ def train_ssim_with_rnd(env, agent, ssim, conf):
                         episode_rewards.append(info['episode']['r'])
 
             # If done then clean the history of observations.
-            masks = torch.FloatTensor(dones)
+            masks = torch.FloatTensor([[0.0] if done else [1.0] for done in dones])
             rollouts.insert(obs, action, action_log_prob, value, reward, masks)
 
         next_value = agent.get_value(rollouts.get_last_obs())

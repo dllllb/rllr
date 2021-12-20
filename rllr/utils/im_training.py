@@ -29,7 +29,7 @@ def init_obs_rms(env, conf):
     return obs_rms
 
 
-def im_train_ppo(env, agent, conf):
+def im_train_ppo(env, agent, conf, after_epoch_callback=None):
     """
     Runs a series of episode and collect statistics
     """
@@ -131,3 +131,8 @@ def im_train_ppo(env, agent, conf):
                 )
 
             torch.save(agent, conf['outputs.path'])
+
+        if after_epoch_callback is not None:
+            loss = after_epoch_callback(rollouts)
+            if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
+                print(f'loss: {loss:.2f}')
