@@ -4,7 +4,8 @@ from collections import deque
 import torch
 import numpy as np
 
-from rllr.buffer.rollout import RolloutStorage
+from rllr.buffer.im_rollout import IMRolloutStorage
+from rllr.utils.common import RunningMeanStd
 
 
 def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
@@ -14,13 +15,32 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
         param_group['lr'] = lr
 
 
-def train_ppo(env, agent, conf):
+def init_obs_rms(env, conf):
+    obs_rms = RunningMeanStd(shape=env.observation_space.shape, device=conf['agent.device'])
+    states = []
+    obs = env.reset()
+
+    for j in trange(conf['training.n_steps']):
+        action = torch.tensor([[env.action_space.sample()] for _ in range(obs.shape[0])])
+        obs, reward, done, infos = env.step(action)
+        states.append(obs)
+
+    obs_rms.update(torch.stack(states))
+    return obs_rms
+
+
+def im_train_ppo(env, agent, conf, after_epoch_callback=None):
     """
     Runs a series of episode and collect statistics
     """
-    rollouts = RolloutStorage(
+    reward_rms = RunningMeanStd(device=conf['agent.device'])
+    obs_rms = init_obs_rms(env, conf)
+
+    # training starts
+    rollouts = IMRolloutStorage(
         conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space
     )
+
     obs = env.reset()
     rollouts.set_first_obs(obs)
     rollouts.to(conf['agent.device'])
@@ -35,8 +55,12 @@ def train_ppo(env, agent, conf):
 
         for step in range(conf['training.n_steps']):
             # Sample actions
-            value, action, action_log_prob = agent.act(obs)
+            (value, im_value), action, action_log_prob = agent.act(obs)
             obs, reward, done, infos = env.step(action)
+            obs_rms.update(obs)
+
+            im_reward = agent.compute_intrinsic_reward(
+                ((obs - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5))
 
             for info in infos:
                 if 'episode' in info.keys():
@@ -44,12 +68,24 @@ def train_ppo(env, agent, conf):
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
-            rollouts.insert(obs, action, action_log_prob, value, reward, masks)
+            rollouts.insert(obs, action, action_log_prob, value, im_value, reward, im_reward, masks)
 
-        next_value = agent.get_value(rollouts.get_last_obs())
+        im_ret = torch.zeros((conf['training.n_steps'] + 1, conf['training.n_processes']), device=conf['agent.device'])
+        for i, rew in enumerate(rollouts.im_rewards):
+            im_ret[i + 1] = conf['agent.im_gamma'] * im_ret[i] + rew.view(-1)
+        im_ret = im_ret[1:]
+
+        mean, var, count = torch.mean(im_ret), torch.var(im_ret), len(im_ret)
+        reward_rms.update_from_moments(mean, var, count)
+
+        obs_rms.update(rollouts.obs)
+
+        rollouts.im_rewards /= torch.sqrt(reward_rms.var)
+        next_value, next_im_value = agent.get_value(rollouts.get_last_obs())
         rollouts.compute_returns(next_value, conf['agent.gamma'], conf['agent.gae_lambda'])
+        rollouts.compute_im_returns(next_im_value, conf['agent.im_gamma'], conf['agent.gae_lambda'])
 
-        value_loss, action_loss, dist_entropy = agent.update(rollouts)
+        value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
         rollouts.after_update()
 
         if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
@@ -63,6 +99,12 @@ def train_ppo(env, agent, conf):
                   f'min/max reward {np.min(episode_rewards):.2f}/{np.max(episode_rewards):.2f}\n'
                   f'dist_entropy {dist_entropy:.2f}, '
                   f'value_loss {value_loss:.2f}, '
+                  f'im_value_loss {im_value_loss:.2f}, '
                   f'action_loss {action_loss:.2f}')
 
             torch.save(agent, conf['outputs.path'])
+
+        if after_epoch_callback is not None:
+            loss = after_epoch_callback(rollouts)
+            if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
+                print(f'loss: {loss:.2f}')

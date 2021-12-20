@@ -1,19 +1,11 @@
 import logging
-import os
-import pickle
-import numpy as np
 import torch
 
-from experiments.minigrid.train_worker import gen_env, rnd_wrapper
+from experiments.minigrid.train_worker import gen_env
 from rllr.algo import PPO
-from rllr.utils import train_ppo
-from rllr.models.ppo import ActorCriticNetwork
-from rllr.env.vec_wrappers import make_vec_envs
-from rllr.models import StateEmbedder
-from rllr.buffer.rollout import RolloutStorage
-from rllr.env.wrappers import HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward
-from rllr.models import encoders as minigrid_encoders
-from rllr.utils import get_conf, switch_reproducibility_on
+from rllr.env import make_vec_envs, HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward
+from rllr.models import encoders, ActorCriticNetwork, StateEmbedder
+from rllr.utils import train_ppo, get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
@@ -21,9 +13,12 @@ logger = logging.getLogger(__name__)
 
 def get_master_agent(env, conf):
     if conf['env.env_type'] == 'gym_minigrid':
-        grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-        state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
-        goal_state_encoder = minigrid_encoders.get_encoder(grid_size, conf['master'])
+        if conf['env'].get('fully_observed', True):
+            grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+        else:
+            grid_size = 7 * conf['env'].get('tile_size', 1)
+        state_encoder = encoders.get_encoder(grid_size, conf['master'])
+        goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
     else:
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
@@ -53,9 +48,6 @@ def gen_env_with_seed(conf, seed):
     emb_size = worker_agent.actor_critic.actor.state_encoder.goal_state_encoder.output_size
 
     env = gen_env(conf['env'])
-
-    if conf['env'].get('random_network_distillation_reward', False):
-        env = rnd_wrapper(env, conf['env'])
 
     if conf['env'].get('intrinsic_episodic_reward', False):
         encoder = worker_agent.actor_critic.actor.state_encoder.state_encoder

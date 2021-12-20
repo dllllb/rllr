@@ -1,15 +1,25 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Dynamic-Obstacles,
-    grid_size: 8,
+    env_task: MiniGrid-LavaGap,
+    s_size: 7,
     action_size: 3,
+    fully_observed: false,
+    grid_size: 7,
+    fix_reset_seed: false,
+    reset_seed: 42,
     rgb_image: true,
     tile_size: 4,
-    agent_start_pos: null,
+    video_path: artifacts/video/,
+    num_processes: 16
   },
 
-  encoder: {
+  worker_agent: {
+    path: "artifacts/models/minigrid_lava_worker.p",
+    device: "cpu"
+  }
+
+  master: {
     state_encoder_type: simple_cnn,
     n_channels: [16, 16],
     kernel_sizes: [4, 3],
@@ -18,7 +28,7 @@
     head: {
         hidden_size: 64
     }
-  },
+  }
 
   agent: {
     device: "cpu",
@@ -26,17 +36,17 @@
     ppo_epoch: 4,
     num_mini_batch: 4,
     value_loss_coef: 0.5,
-    entropy_coef: 0.1,
-    lr: 0.0001,
+    entropy_coef: 0.01,
+    lr: 0.001,
     eps: 1e-5,
     max_grad_norm: 0.5,
-    gamma: 0.999,
+    gamma: 0.99,
     gae_lambda: 0.95
-  },
+  }
 
   training: {
-    reward: fair_goal_achievement,
-    n_env_steps: 2500000,
+    n_env_steps: 1000000,
+    worker_n_steps: 1,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
@@ -45,6 +55,6 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_direct_ppo.p,
+      path: artifacts/models/minigrid_lava_master.p,
   }
 }

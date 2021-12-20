@@ -1,10 +1,12 @@
 from .wrappers import NavigationGoalWrapper
 from .wrappers import RandomGoalWrapper
 from .wrappers import FromBufferGoalWrapper
-from .wrappers import SetRewardWrapper
 from .wrappers import FullyRenderWrapper
 from .wrappers import IntrinsicEpisodicReward
-from .wrappers import RandomNetworkDistillationReward
+from .wrappers import EpisodeInfoWrapper
+from .wrappers import HierarchicalWrapper
+from .wrappers import ZeroRewardWrapper
+from .rnd import RandomNetworkDistillationReward
 
 from .rewards import ExplicitPosReward
 from .rewards import SparsePosReward
@@ -16,3 +18,4 @@ from .wrappers import visualisation_wrapper
 from .vec_wrappers import make_vec_envs
 
 from .rewards import get_reward_function
+from .gym_minigrid_navigation import environments as minigrid_envs

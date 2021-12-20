@@ -6,10 +6,27 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    agent_start_pos: null,
+    video_path: artifacts/video/,
   },
 
-  encoder: {
+  state_similarity: {
+    state_encoder_type: simple_cnn,
+    n_channels: [16, 16],
+    kernel_sizes: [4, 3],
+    strides: [4, 1],
+    paddings: [0, 1],
+    head: {
+        hidden_size: 64
+    },
+    hidden_size: [128, 128],
+    lr: 1e-3,
+    radius: 3,
+    n_updates: 5,
+    epochs: 5,
+    verbose: 100,
+  }
+
+  worker: {
     state_encoder_type: simple_cnn,
     n_channels: [16, 16],
     kernel_sizes: [4, 3],
@@ -22,6 +39,8 @@
 
   agent: {
     device: "cpu",
+    ext_coef: 2.0,
+    im_coef: 1.0,
     clip_param: 0.2,
     ppo_epoch: 4,
     num_mini_batch: 4,
@@ -31,12 +50,12 @@
     eps: 1e-5,
     max_grad_norm: 0.5,
     gamma: 0.999,
+    im_gamma: 0.99,
     gae_lambda: 0.95
   },
 
   training: {
-    reward: fair_goal_achievement,
-    n_env_steps: 2500000,
+    n_env_steps: 1000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
@@ -45,6 +64,6 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_direct_ppo.p,
+    path: artifacts/models/minigrid_ssim.p
   }
 }
