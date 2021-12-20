@@ -3,11 +3,10 @@ import logging
 import numpy as np
 import torch
 
-from collections import deque
+from collections import deque, defaultdict
 from gym.wrappers import Monitor
-from scipy.stats import norm
 import torch.nn.functional as F
-from collections import Counter
+from rllr.models import encoders
 
 from ..buffer import ReplayBuffer
 from ..exploration import EpisodicMemory
@@ -143,6 +142,82 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
         return next_state, reward, done, info
 
 
+class RNDBufferWrapper(NavigationGoalWrapper):
+
+    def __init__(self, env, goal_achieving_criterion, conf, grid_size, device, verbose=1):
+
+        super().__init__(env, goal_achieving_criterion)
+        self.verbose = verbose
+        self.device = device
+        self.warmup_steps = conf['warmup_steps']
+        goal_buffer_size = conf['goal_buffer_size']
+        replay_buffer_size = conf['replay_buffer_size']
+        self.goal_buffer = deque(maxlen=goal_buffer_size)
+        learning_rate = conf['learning_rate']
+        batch_size = conf['batch_size']
+        update_step = conf['update_step']
+        target_network = encoders.get_encoder(grid_size, conf['target'])
+        predictor_network = encoders.get_encoder(grid_size, conf['predictor'])
+        self.target = target_network.to(device)
+        self.predictor = predictor_network.to(device)
+
+        self.optimizer = torch.optim.Adam(self.predictor.parameters(), lr=learning_rate)
+        self.replay_buffer = ReplayBuffer(buffer_size=replay_buffer_size, batch_size=batch_size, device=device)
+        self.steps_count = 0
+        self.update_step = update_step
+        self.explore_steps = conf.get('replay_buffer_size', 10)
+
+    def _learn(self):
+        states = list(self.replay_buffer.sample())[0]
+        with torch.no_grad():
+            targets = self.target(states)
+        outputs = self.predictor(states)
+        self.optimizer.zero_grad()
+        loss = F.mse_loss(outputs, targets)
+        loss.backward()
+        self.optimizer.step()
+
+    def gen_goal_(self, state, scores=None):
+        if len(self.goal_buffer) >= self.warmup_steps:
+            if scores is None:
+                scores = self._get_scores()
+            choice = np.random.choice(np.arange(len(self.goal_buffer)), p=scores)
+            self.goal_state = self.goal_buffer[choice]
+        else:
+            self.goal_state = None
+
+    def gen_goal(self, state):
+        scores = self._get_scores()
+        while True:
+            # loop enforces goal_state != current state
+            self.gen_goal_(state, scores)
+            if not self._goal_achieved(state):
+                break
+
+    def _get_scores(self):
+        if len(self.goal_buffer) == 0:
+            return None
+        states = convert_to_torch([state['image'] for state in self.goal_buffer])
+        with torch.no_grad():
+            rnd_scores = (self.target(states) - self.predictor(states)).abs().pow(2).sum(1)
+        scores = rnd_scores.numpy()
+        return scores/sum(scores)
+
+    def step(self, action):
+        state, reward, done, info = super().step(action)
+        self.goal_buffer.append(state)
+        self.replay_buffer.add(state['image'], )
+        self.steps_count += 1
+        if (self.steps_count % self.update_step) == 0:
+            self.steps_count = 0
+            if self.replay_buffer.is_enough():
+                self._learn()
+        return state, reward, done, info
+
+    def reset(self):
+        return super().reset()
+
+
 class GoalObsWrapper(gym.core.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -206,6 +281,18 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
             conf['from_buffer_choice_params'],
             verbose=verbose,
             seed=conf['seed'])
+    elif goal_type == 'rnd_buffer':
+        device = conf['device']
+        if conf['env_type'] == 'gym_minigrid':
+            grid_size = conf['grid_size'] * conf.get('tile_size', 1)
+        else:
+            raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+        env = RNDBufferWrapper(env,
+                               goal_achieving_criterion,
+                               conf['rnd_buffer_params'],
+                               grid_size,
+                               device,
+                               verbose=verbose)
     else:
         raise AttributeError(f"unknown goal_type '{goal_type}'")
 

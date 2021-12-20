@@ -13,18 +13,20 @@
       device: "cpu",
       target: {
         state_encoder_type: simple_cnn,
-        n_channels: [6, 16],
+        n_channels: [16, 16],
         kernel_sizes: [4, 3],
-        max_pools: [4, 1],
+        strides: [4, 1],
+        paddings: [0, 1],
         head: {
             hidden_size: 64
         }
       },
       predictor: {
         state_encoder_type: simple_cnn,
-        n_channels: [6, 16],
+        n_channels: [16, 16],
         kernel_sizes: [4, 3],
-        max_pools: [4, 1],
+        strides: [4, 1],
+        paddings: [0, 1],
         head: {
             hidden_size: 64
         }
@@ -34,9 +36,10 @@
 
   state_similarity: {
     state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
+    n_channels: [16, 16],
     kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    strides: [4, 1],
+    paddings: [0, 1],
     head: {
         hidden_size: 64
      },
@@ -44,15 +47,16 @@
     lr: 1e-3,
     radius: 3,
     n_updates: 5,
-    epochs: 5,
+    epochs: 10,
     verbose: 100,
   }
 
   worker: {
     state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
+    n_channels: [16, 16],
     kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    strides: [4, 1],
+    paddings: [0, 1],
     head: {
         hidden_size: 64
     }
@@ -60,9 +64,10 @@
 
   master: {
     state_encoder_type: simple_cnn,
-    n_channels: [6, 16],
+    n_channels: [16, 16],
     kernel_sizes: [4, 3],
-    max_pools: [4, 1],
+    strides: [4, 1],
+    paddings: [0, 1],
     head: {
         hidden_size: []
     },
