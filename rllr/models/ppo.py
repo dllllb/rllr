@@ -58,17 +58,22 @@ class DiscreteActorNetwork(nn.Module):
     probability of action given state or sample an action
     """
 
-    def __init__(self, action_size, state_encoder, hidden_size):
+    def __init__(self, action_size, state_encoder, hidden_size, is_recurrent):
         super().__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
         self.logits = make_mlp(input_size, hidden_size, action_size)
         self.output_size = action_size
+        self.is_recurrent = is_recurrent
 
-    def forward(self, states):
-        states_encoding = self.state_encoder(states)
+    def forward(self, states, rnn_hxs, masks):
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
         logits = self.logits(states_encoding)
-        return FixedCategorical(logits=F.log_softmax(logits, dim=1))
+        return FixedCategorical(logits=F.log_softmax(logits, dim=1)), rnn_hxs
 
 
 class ContiniousActorNetwork(nn.Module):
@@ -77,19 +82,24 @@ class ContiniousActorNetwork(nn.Module):
     probability of action given state or sample an action
     """
 
-    def __init__(self, action_size, state_encoder, hidden_size):
+    def __init__(self, action_size, state_encoder, hidden_size, is_recurrent):
         super().__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
         self.fc = make_mlp(input_size, hidden_size, action_size)
         self.logstd = nn.Parameter(torch.zeros((action_size,)))
         self.output_size = action_size
+        self.is_recurrent = is_recurrent
 
-    def forward(self, states):
-        states_encoding = self.state_encoder(states)
+    def forward(self, states, rnn_hxs, masks):
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
         mu = self.fc(states_encoding)
         std = self.logstd.exp()
-        return FixedNormal(mu, std)
+        return FixedNormal(mu, std), rnn_hxs
 
 
 class CriticNetwork(nn.Module):
@@ -97,15 +107,20 @@ class CriticNetwork(nn.Module):
     Critic network estimates value function
     """
 
-    def __init__(self, state_encoder, hidden_size):
+    def __init__(self, state_encoder, hidden_size, is_recurrent):
         super(CriticNetwork, self).__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
         self.fc = make_mlp(input_size, hidden_size, 1)
+        self.is_recurrent = is_recurrent
 
-    def forward(self, states):
-        x = self.state_encoder(states)
-        return self.fc(x)
+    def forward(self, states, rnn_hxs, masks):
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
+        return self.fc(states_encoding)
 
 
 class IMCriticNetwork(nn.Module):
@@ -113,16 +128,22 @@ class IMCriticNetwork(nn.Module):
     Critic network estimates external and internal expected returns
     """
 
-    def __init__(self, state_encoder, hidden_size):
+    def __init__(self, state_encoder, hidden_size, is_recurrent):
         super(IMCriticNetwork, self).__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
         self.ext_head = make_mlp(input_size, hidden_size, 1)
         self.int_head = make_mlp(input_size, hidden_size, 1)
 
-    def forward(self, states):
-        x = self.state_encoder(states)
-        return self.ext_head(x), self.int_head(x)
+        self.is_recurrent = is_recurrent
+
+    def forward(self, states, rnn_hxs, masks):
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
+        return self.ext_head(states_encoding), self.int_head(states_encoding)
 
 
 class ActorCriticNetwork(nn.Module):
@@ -131,19 +152,19 @@ class ActorCriticNetwork(nn.Module):
     """
 
     def __init__(self, action_space, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size,
-                 use_intrinsic_motivation=False):
+                 use_intrinsic_motivation=False, is_recurrent=False):
         super(ActorCriticNetwork, self).__init__()
         if type(action_space) == gym.spaces.Box:
-            self.actor = ContiniousActorNetwork(action_space.shape[0], actor_state_encoder, actor_hidden_size)
+            self.actor = ContiniousActorNetwork(action_space.shape[0], actor_state_encoder, actor_hidden_size, is_recurrent)
         elif type(action_space) == gym.spaces.Discrete:
-            self.actor = DiscreteActorNetwork(action_space.n, actor_state_encoder, actor_hidden_size)
+            self.actor = DiscreteActorNetwork(action_space.n, actor_state_encoder, actor_hidden_size, is_recurrent)
         else:
             raise NotImplementedError(f'{action_space} not supported')
 
         if use_intrinsic_motivation:
-            self.critic = IMCriticNetwork(critic_state_encoder, critic_hidden_size)
+            self.critic = IMCriticNetwork(critic_state_encoder, critic_hidden_size, is_recurrent)
         else:
-            self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size)
+            self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size, is_recurrent)
 
         def init_params(m):
             classname = m.__class__.__name__
@@ -151,22 +172,31 @@ class ActorCriticNetwork(nn.Module):
                 m.weight.data.normal_(0, 1)
                 m.weight.data *= 1 / torch.sqrt(m.weight.data.pow(2).sum(1, keepdim=True))
                 if m.bias is not None:
-                    m.bias.data.fill_(0)
+                    nn.init.constant_(m.bias, 0)
+            if classname.find("GRU") != -1:
+                for name, param in m.named_parameters():
+                    if 'bias' in name:
+                        nn.init.constant_(param, 0)
+                    elif 'weight' in name:
+                        nn.init.orthogonal_(param)
+            if classname.find('Conv2d') != -1:
+                nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('relu'))
+                nn.init.constant_(m.bias, 0)
 
         self.apply(init_params)
 
-    def act(self, states, deterministic=False):
-        dist = self.actor.forward(states)
+    def act(self, states, rnn_hxs, masks, deterministic=False):
+        dist, actor_rnn_hxs = self.actor.forward(states, rnn_hxs, masks)
         if deterministic:
             action = dist.mode()
         else:
             action = dist.sample()
-        return self.critic.forward(states), action, dist.log_probs(action)
+        return self.critic.forward(states, rnn_hxs, masks), action, dist.log_probs(action), actor_rnn_hxs
 
-    def get_value(self, states):
-        return self.critic.forward(states)
+    def get_value(self, states, rnn_hxs, masks):
+        return self.critic.forward(states, rnn_hxs, masks)
 
-    def evaluate_actions(self, states, actions):
-        dist = self.actor.forward(states)
-        values = self.critic.forward(states)
-        return values, dist.log_probs(actions), dist.entropy().mean()
+    def evaluate_actions(self, states, actions, rnn_hxs, masks):
+        dist, rnn_hxs = self.actor.forward(states, rnn_hxs, masks)
+        values = self.critic.forward(states, rnn_hxs, masks)
+        return values, dist.log_probs(actions), dist.entropy().mean(), rnn_hxs

@@ -35,7 +35,7 @@ def train_ppo(env, agent, conf):
 
         for step in range(conf['training.n_steps']):
             # Sample actions
-            value, action, action_log_prob = agent.act(obs)
+            value, action, action_log_prob, _ = agent.act(obs)
             obs, reward, done, infos = env.step(action)
 
             for info in infos:
