@@ -17,7 +17,7 @@ class PosObsWrapper(gym.core.ObservationWrapper):
         return obs
 
 
-class ImageObsWrapper(gym.core.ObservationWrapper):
+class ImageObsWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = self.observation_space.spaces['image']
@@ -118,9 +118,11 @@ def get_env_name(conf):
 
     return env_name
 
+
 def gen_wrapped_env(conf, verbose=False):
     env_name = get_env_name(conf)
-    if conf.get('agent_start_pos', None) is not None:
+
+    if 'agent_start_pos' in conf:
         env = gym.make(env_name, agent_start_pos=conf['agent_start_pos'])
     else:
         env = gym.make(env_name)

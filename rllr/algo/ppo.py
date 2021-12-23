@@ -33,13 +33,13 @@ class PPO:
         self.actor_critic = self.actor_critic.to(device)
         return self
 
-    def act(self, state, deterministic=False):
+    def act(self, state, rnn_hxs=None, masks=None, deterministic=False):
         with torch.no_grad():
-            return self.actor_critic.act(state, deterministic)
+            return self.actor_critic.act(state, rnn_hxs, masks, deterministic)
 
-    def get_value(self, state):
+    def get_value(self, state, rnn_hxs=None, masks=None):
         with torch.no_grad():
-            return self.actor_critic.get_value(state)
+            return self.actor_critic.get_value(state, rnn_hxs, masks)
 
     def update(self, rollouts):
         advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
@@ -57,7 +57,8 @@ class PPO:
                     old_action_log_probs_batch, adv_targ = sample
 
                 # Reshape to do in a single forward pass for all steps
-                values, action_log_probs, dist_entropy = self.actor_critic.evaluate_actions(obs_batch, actions_batch)
+                values, action_log_probs, dist_entropy, _ = self.actor_critic.evaluate_actions(
+                    obs_batch, actions_batch, None, None)
 
                 ratio = torch.exp(action_log_probs - old_action_log_probs_batch)
                 surr1 = ratio * adv_targ

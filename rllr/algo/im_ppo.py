@@ -40,13 +40,13 @@ class IMPPO:
         self.actor_critic = self.actor_critic.to(device)
         return self
 
-    def act(self, state, deterministic=False):
+    def act(self, state, rnn_hxs, masks, deterministic=False):
         with torch.no_grad():
-            return self.actor_critic.act(state, deterministic)
+            return self.actor_critic.act(state, rnn_hxs, masks, deterministic)
 
-    def get_value(self, state):
+    def get_value(self, state, rnn_hxs, masks):
         with torch.no_grad():
-            return self.actor_critic.get_value(state)
+            return self.actor_critic.get_value(state, rnn_hxs, masks)
 
     def compute_intrinsic_reward(self, next_obs):
         with torch.no_grad():
@@ -65,10 +65,11 @@ class IMPPO:
         dist_entropy_epoch = 0
 
         for e in range(self.ppo_epoch):
-            data_generator = rollouts.feed_forward_generator(advantages, self.num_mini_batch)
+            # data_generator = rollouts.feed_forward_generator(advantages, self.num_mini_batch)
+            data_generator = rollouts.recurrent_generator(advantages, self.num_mini_batch)
 
             for sample in data_generator:
-                obs_batch, next_obs_batch, actions_batch, value_preds_batch, im_value_preds_batch, \
+                obs_batch, next_obs_batch, recurrent_hidden_states_batch, actions_batch, value_preds_batch, im_value_preds_batch, \
                     return_batch, im_return_batch, masks_batch, \
                     old_action_log_probs_batch, adv_targ = sample
 
@@ -76,7 +77,9 @@ class IMPPO:
                 im_loss = self.im_model.compute_loss(next_obs_batch)
 
                 # Reshape to do in a single forward pass for all steps
-                (values, im_values), action_log_probs, dist_entropy = self.actor_critic.evaluate_actions(obs_batch, actions_batch)
+                (values, im_values), action_log_probs, dist_entropy, rnn_rhs = self.actor_critic.evaluate_actions(
+                    obs_batch, actions_batch, recurrent_hidden_states_batch, masks_batch
+                )
 
                 ratio = torch.exp(action_log_probs - old_action_log_probs_batch)
                 surr1 = ratio * adv_targ
@@ -102,6 +105,7 @@ class IMPPO:
                 self.optimizer.zero_grad()
                 (critic_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef + im_loss).backward()
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
+                nn.utils.clip_grad_norm_(self.im_model.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 
                 value_loss_epoch += value_loss.item()
