@@ -16,13 +16,12 @@ class PosObsWrapper(gym.core.ObservationWrapper):
         return obs
 
 
-class ImageObsWrapper(gym.core.ObservationWrapper):
+class ImageObsWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = self.observation_space.spaces['image']
 
     def observation(self, obs):
-        obs = self.env.observation(obs)
         return obs['image']
 
 
@@ -48,10 +47,10 @@ def gen_wrapped_env(conf, verbose=False):
         env.action_space.np_random.seed(seed)
         env.seed(seed)
 
-    if not conf.get('rgb_image', False):
-        env = FullyObsWrapper(env)  # Fully observable gridworld using a compact grid encoding
-    else:
+    if conf.get('rgb_image', False):
         env = RGBImgObsWrapper(env, tile_size=conf['tile_size'])  # Fully observed RGB image
+    else:
+        env = FullyObsWrapper(env)  # Fully observable gridworld using a compact grid encoding
 
     if conf.get('goal_achieving_criterion', None) in {'position_and_direction', 'position'} or verbose:
         env = PosObsWrapper(env)

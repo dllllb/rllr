@@ -65,10 +65,10 @@ class DiscreteActorNetwork(nn.Module):
         self.logits = make_mlp(input_size, hidden_size, action_size)
         self.output_size = action_size
 
-    def forward(self, states):
-        states_encoding = self.state_encoder(states)
+    def forward(self, states, rnn_hxs, masks):
+        states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
         logits = self.logits(states_encoding)
-        return FixedCategorical(logits=F.log_softmax(logits, dim=1))
+        return FixedCategorical(logits=F.log_softmax(logits, dim=1)), rnn_hxs
 
 
 class ContiniousActorNetwork(nn.Module):
@@ -85,11 +85,11 @@ class ContiniousActorNetwork(nn.Module):
         self.logstd = nn.Parameter(torch.zeros((action_size,)))
         self.output_size = action_size
 
-    def forward(self, states):
-        states_encoding = self.state_encoder(states)
+    def forward(self, states, rnn_hxs, masks):
+        states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
         mu = self.fc(states_encoding)
         std = self.logstd.exp()
-        return FixedNormal(mu, std)
+        return FixedNormal(mu, std), rnn_hxs
 
 
 class CriticNetwork(nn.Module):
@@ -103,9 +103,9 @@ class CriticNetwork(nn.Module):
         input_size = state_encoder.output_size
         self.fc = make_mlp(input_size, hidden_size, 1)
 
-    def forward(self, states):
-        x = self.state_encoder(states)
-        return self.fc(x)
+    def forward(self, states, rnn_hxs, masks):
+        states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        return self.fc(states_encoding)
 
 
 class IMCriticNetwork(nn.Module):
@@ -120,9 +120,9 @@ class IMCriticNetwork(nn.Module):
         self.ext_head = make_mlp(input_size, hidden_size, 1)
         self.int_head = make_mlp(input_size, hidden_size, 1)
 
-    def forward(self, states):
-        x = self.state_encoder(states)
-        return self.ext_head(x), self.int_head(x)
+    def forward(self, states, rnn_hxs, masks):
+        states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        return self.ext_head(states_encoding), self.int_head(states_encoding)
 
 
 class ActorCriticNetwork(nn.Module):
@@ -151,22 +151,31 @@ class ActorCriticNetwork(nn.Module):
                 m.weight.data.normal_(0, 1)
                 m.weight.data *= 1 / torch.sqrt(m.weight.data.pow(2).sum(1, keepdim=True))
                 if m.bias is not None:
-                    m.bias.data.fill_(0)
+                    nn.init.constant_(m.bias, 0)
+            if classname.find("GRU") != -1:
+                for name, param in m.named_parameters():
+                    if 'bias' in name:
+                        nn.init.constant_(param, 0)
+                    elif 'weight' in name:
+                        nn.init.orthogonal_(param)
+            if classname.find('Conv2d') != -1:
+                nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('relu'))
+                nn.init.constant_(m.bias, 0)
 
         self.apply(init_params)
 
-    def act(self, states, deterministic=False):
-        dist = self.actor.forward(states)
+    def act(self, states, rnn_hxs, masks, deterministic=False):
+        dist, actor_rnn_hxs = self.actor.forward(states, rnn_hxs, masks)
         if deterministic:
             action = dist.mode()
         else:
             action = dist.sample()
-        return self.critic.forward(states), action, dist.log_probs(action)
+        return self.critic.forward(states, rnn_hxs, masks), action, dist.log_probs(action), actor_rnn_hxs
 
-    def get_value(self, states):
-        return self.critic.forward(states)
+    def get_value(self, states, rnn_hxs, masks):
+        return self.critic.forward(states, rnn_hxs, masks)
 
-    def evaluate_actions(self, states, actions):
-        dist = self.actor.forward(states)
-        values = self.critic.forward(states)
-        return values, dist.log_probs(actions), dist.entropy().mean()
+    def evaluate_actions(self, states, actions, rnn_hxs, masks):
+        dist, rnn_hxs = self.actor.forward(states, rnn_hxs, masks)
+        values = self.critic.forward(states, rnn_hxs, masks)
+        return values, dist.log_probs(actions), dist.entropy().mean(), rnn_hxs

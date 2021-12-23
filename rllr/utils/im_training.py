@@ -38,7 +38,8 @@ def im_train_ppo(env, agent, conf):
 
     # training starts
     rollouts = IMRolloutStorage(
-        conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space
+        conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space,
+        conf['encoder.recurrent_hidden_size']
     )
 
     obs = env.reset()
@@ -55,7 +56,12 @@ def im_train_ppo(env, agent, conf):
 
         for step in range(conf['training.n_steps']):
             # Sample actions
-            (value, im_value), action, action_log_prob = agent.act(obs)
+            (value, im_value), action, action_log_prob, rnn_rhs = agent.act(
+                rollouts.obs[step],
+                rollouts.recurrent_hidden_states[step],
+                rollouts.masks[step]
+            )
+
             obs, reward, done, infos = env.step(action)
             obs_rms.update(obs)
 
@@ -68,8 +74,7 @@ def im_train_ppo(env, agent, conf):
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
-            rollouts.insert(obs, action, action_log_prob, value, im_value, reward, im_reward, masks)
-
+            rollouts.insert(obs, rnn_rhs, action, action_log_prob, value, im_value, reward, im_reward, masks)
 
         im_ret = torch.zeros((conf['training.n_steps'] + 1, conf['training.n_processes']), device=conf['agent.device'])
         for i, rew in enumerate(rollouts.im_rewards):
@@ -82,13 +87,18 @@ def im_train_ppo(env, agent, conf):
         obs_rms.update(rollouts.obs)
 
         rollouts.im_rewards /= torch.sqrt(reward_rms.var)
-        next_value, next_im_value = agent.get_value(rollouts.get_last_obs())
+
+        next_value, next_im_value = agent.get_value(
+            rollouts.get_last_obs(),
+            rollouts.recurrent_hidden_states[-1],
+            rollouts.masks[-1]
+        )
+
         rollouts.compute_returns(next_value, conf['agent.gamma'], conf['agent.gae_lambda'])
         rollouts.compute_im_returns(next_im_value, conf['agent.im_gamma'], conf['agent.gae_lambda'])
 
         value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
         rollouts.after_update()
-
 
         if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
             total_num_steps = (j + 1) * conf['training.n_processes'] * conf['training.n_steps']

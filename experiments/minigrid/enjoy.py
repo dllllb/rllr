@@ -42,7 +42,7 @@ def main(args):
         agent_path = 'artifacts/models/minigrid_direct_ppo.p'
 
     elif args.mode == 'rnd_ppo':
-        from train_rnd_ppo import gen_env_with_seed
+        from train_rnd_gru_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo.hocon')
         agent_path = 'artifacts/models/minigrid_rnd_ppo.p'
 
@@ -58,11 +58,15 @@ def main(args):
     for _ in trange(args.episodes):
         obs, done, episode_reward = env.reset(), False, 0
         episode_steps = 0
+        rnn_hxs = torch.zeros((1, 16))
+        masks = torch.zeros((1, 16))
 
         while not done:
             if args.viz:
                 env.render('human')
-            value, action, _ = agent.act(obs, deterministic=True)
+            print(rnn_hxs, obs.shape)
+            value, action, _, rnn_hxs = agent.act(obs, rnn_hxs, masks, deterministic=False)
+            print(action, env.action_space.n)
             # observation, reward and next obs
             obs, reward, done, _ = env.step(action)
             episode_reward += float(reward)
