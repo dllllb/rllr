@@ -1,6 +1,6 @@
 from tqdm import trange
 import time
-from collections import deque
+from collections import deque, defaultdict
 import torch
 import numpy as np
 
@@ -49,7 +49,8 @@ def im_train_ppo(env, agent, conf):
     start = time.time()
     num_updates = int(conf['training.n_env_steps'] // conf['training.n_steps'] // conf['training.n_processes'])
 
-    episode_rewards = deque(maxlen=10)
+    episode_rewards = defaultdict(lambda: deque(maxlen=10))
+    episode_steps = defaultdict(lambda: deque(maxlen=10))
 
     for j in trange(num_updates):
         update_linear_schedule(agent.optimizer, j, num_updates, conf['agent.lr'])
@@ -70,7 +71,9 @@ def im_train_ppo(env, agent, conf):
 
             for info in infos:
                 if 'episode' in info.keys():
-                    episode_rewards.append(info['episode']['r'])
+                    task = info['episode'].get('task', 'unk')
+                    episode_rewards[task].append(info['episode']['r'])
+                    episode_steps[task].append(info['episode']['steps'])
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -100,19 +103,24 @@ def im_train_ppo(env, agent, conf):
         value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
         rollouts.after_update()
 
-        if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
+        if j % conf['training.verbose'] == 0:
             total_num_steps = (j + 1) * conf['training.n_processes'] * conf['training.n_steps']
             end = time.time()
             print(f'Updates {j}, '
                   f'num timesteps {total_num_steps}, '
                   f'FPS {int(total_num_steps / (end - start))} \n'
-                  f'Last {len(episode_rewards)} training episodes: '
-                  f'mean/median reward {np.mean(episode_rewards):.2f}/{np.median(episode_rewards):.2f}, '
-                  f'min/max reward {np.min(episode_rewards):.2f}/{np.max(episode_rewards):.2f}\n'
                   f'dist_entropy {dist_entropy:.2f}, '
                   f'value_loss {value_loss:.2f}, '
                   f'im_value_loss {im_value_loss:.2f}, '
                   f'action_loss {action_loss:.2f}'
+                )
+            for task in episode_rewards:
+                print(
+                    f'Task {task}, last {len(episode_rewards[task])} training episodes: '
+                    f'mean/median reward {np.mean(episode_rewards[task]):.2f}/{np.median(episode_rewards[task]):.2f}, '
+                    f'min/max reward {np.min(episode_rewards[task]):.2f}/{np.max(episode_rewards[task]):.2f}\n'
+                    f'mean/median steps {np.mean(episode_steps[task]):.2f}/{np.median(episode_steps[task]):.2f}, '
+                    f'min/max steps {np.min(episode_steps[task]):.2f}/{np.max(episode_steps[task]):.2f}\n'
                 )
 
             torch.save(agent, conf['outputs.path'])

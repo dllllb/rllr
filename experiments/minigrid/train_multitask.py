@@ -12,29 +12,65 @@ from rllr.models import RNDModel
 from rllr.utils.logger import init_logger
 import gym
 from gym_minigrid.wrappers import RGBImgPartialObsWrapper
-from rllr.env.gym_minigrid_navigation.environments import ImageObsWrapper
+from rllr.env.gym_minigrid_navigation.environments import ImageObsWrapper, ChangeActionSizeWrapper
+import numpy as np
 
 
 logger = logging.getLogger(__name__)
 
 
-def gen_wrapped_env(conf):
-    env_name = f"{conf['env_task']}-{conf['grid_size']}x{conf['grid_size']}-v0"
-    # env_name = 'MiniGrid-MultiRoom-N2-S4-v0'
-    env = ImageObsWrapper(RGBImgPartialObsWrapper(gym.make(env_name), tile_size=8))
+class MultitaskMinigridEnv(gym.Wrapper):
+    def __init__(self, tasks, tile_size):
+        self.tasks = [
+            ImageObsWrapper(RGBImgPartialObsWrapper(gym.make(env_name), tile_size=tile_size)) for env_name in tasks
+        ]
 
-    if conf.get('deterministic', True):
-        seed = conf.get('seed', 42)
-        env.action_space.np_random.seed(seed)
-        env.seed(seed)
+        self.action_space = gym.spaces.Discrete(max([t.action_space.n for t in self.tasks]))
+        self.observation_space = self.tasks[0].observation_space
+        self.metadata = self.tasks[0].metadata
 
-    return env
+        self.reward_range = [np.inf, -np.inf]
+        for t in self.tasks:
+            self.reward_range[0] = min(self.reward_range[0], t.reward_range[0])
+            self.reward_range[1] = max(self.reward_range[1], t.reward_range[1])
+
+        self.task_names = {i: task for i, task in enumerate(tasks)}
+
+        self.env_id = None
+        self.env = None
+        self.episode_reward = None
+        self.episode_steps = None
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self.episode_reward += reward
+        self.episode_steps += 1
+        if done:
+            info['episode'] = {
+                'r': self.episode_reward,
+                'steps': self.episode_steps,
+                'task': self.task_names[self.env_id]
+            }
+        return obs, reward, done, info
+
+    def reset(self, **kwargs):
+        self.env_id = np.random.randint(len(self.tasks))
+        self.env = self.tasks[self.env_id]
+        self.episode_reward = 0
+        self.episode_steps = 0
+        return self.env.reset(**kwargs)
+
+    def seed(self, value):
+        for t in self.tasks:
+            t.seed(value)
 
 
 def gen_env_with_seed(conf, seed):
-    conf['env.deterministic'] = True
-    conf['env']['seed'] = seed
-    return EpisodeInfoWrapper(gen_wrapped_env(conf['env']))
+    env = MultitaskMinigridEnv(conf['env.tasks'], conf['env.tile_size'])
+    env.action_space.np_random.seed(seed)
+    env.seed(seed)
+
+    return env
 
 
 def get_agent(env, config):
@@ -52,8 +88,6 @@ def get_agent(env, config):
         encoders.get_encoder(grid_size, config['rnd_encoder']),
         encoders.get_encoder(grid_size, config['rnd_encoder']),
         config['agent.device'])
-
-    print(policy)
 
     return IMPPO(
         policy,
