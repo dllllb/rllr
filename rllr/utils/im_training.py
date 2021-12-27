@@ -51,6 +51,7 @@ def im_train_ppo(env, agent, conf):
 
     episode_rewards = defaultdict(lambda: deque(maxlen=10))
     episode_steps = defaultdict(lambda: deque(maxlen=10))
+    episode_rooms = defaultdict(lambda: deque(maxlen=10))
 
     for j in trange(num_updates):
         update_linear_schedule(agent.optimizer, j, num_updates, conf['agent.lr'])
@@ -74,6 +75,7 @@ def im_train_ppo(env, agent, conf):
                     task = info['episode'].get('task', 'unk')
                     episode_rewards[task].append(info['episode']['r'])
                     episode_steps[task].append(info['episode']['steps'])
+                    episode_rooms[task].append(info['episode']['visited_rooms'])
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -116,11 +118,16 @@ def im_train_ppo(env, agent, conf):
                 )
             for task in episode_rewards:
                 print(
-                    f'Task {task}, last {len(episode_rewards[task])} training episodes: '
+                    f'Task {task}, last {len(episode_rewards[task])} training episodes:\n'                    
+                    
                     f'mean/median reward {np.mean(episode_rewards[task]):.2f}/{np.median(episode_rewards[task]):.2f}, '
                     f'min/max reward {np.min(episode_rewards[task]):.2f}/{np.max(episode_rewards[task]):.2f}\n'
+                   
                     f'mean/median steps {np.mean(episode_steps[task]):.2f}/{np.median(episode_steps[task]):.2f}, '
                     f'min/max steps {np.min(episode_steps[task]):.2f}/{np.max(episode_steps[task]):.2f}\n'
+
+                    f'mean/median rooms {np.mean(episode_rooms[task]):.2f}/{np.median(episode_rooms[task]):.2f}, '
+                    f'min/max rooms {np.min(episode_rooms[task]):.2f}/{np.max(episode_rooms[task]):.2f}\n'
                 )
 
             torch.save(agent, conf['outputs.path'])

@@ -46,10 +46,14 @@ def main(args):
         config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo.hocon')
         agent_path = 'artifacts/models/minigrid_rnd_ppo.p'
 
-    agent = torch.load(agent_path)
+    elif args.mode == 'multi':
+        from train_multitask import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_multitask.hocon')
+
+    agent = torch.load(config['outputs.path'], map_location='cpu')
 
     env = make_vec_envs(
-        lambda env_id: lambda: gen_env_with_seed(config, env_id),
+        lambda env_id: lambda: gen_env_with_seed(config, 11),
         num_processes=1,
         device='cpu'
     )
@@ -58,14 +62,14 @@ def main(args):
     for _ in trange(args.episodes):
         obs, done, episode_reward = env.reset(), False, 0
         episode_steps = 0
-        rnn_hxs = torch.zeros((1, 16))
-        masks = torch.zeros((1, 16))
+        rnn_hxs = torch.zeros((1, 256))
+        masks = torch.zeros((1, 256))
 
         while not done:
             if args.viz:
                 env.render('human')
             print(rnn_hxs, obs.shape)
-            value, action, _, rnn_hxs = agent.act(obs, rnn_hxs, masks, deterministic=False)
+            value, action, _, rnn_hxs = agent.act(obs, rnn_hxs, masks, deterministic=True)
             print(action, env.action_space.n)
             # observation, reward and next obs
             obs, reward, done, _ = env.step(action)
@@ -85,7 +89,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker', 'direct_ppo', 'rnd_ppo'])
+    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker', 'direct_ppo', 'rnd_ppo', 'multi'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()
