@@ -22,6 +22,17 @@
     video_path: artifacts/video/
   },
 
+  rnd: {
+    state_encoder_type: simple_cnn,
+    n_channels: [16, 16],
+    kernel_sizes: [4, 3],
+    strides: [4, 1],
+    paddings: [0, 1],
+    head: {
+        hidden_size: 64
+    }
+  },
+
   worker: {
     state_encoder_type: simple_cnn,
     n_channels: [16, 16],
@@ -64,8 +75,8 @@
 
   training: {
     algorithm: imppo,
-    n_env_steps: 4000000,
-    n_steps: 1000,
+    n_env_steps: 1000000,
+    n_steps: 128,
     n_processes: 16,
     verbose: 1,
   },
