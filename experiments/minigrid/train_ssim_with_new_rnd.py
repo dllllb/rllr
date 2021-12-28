@@ -19,8 +19,20 @@ def gen_env(conf, verbose=False):
     return env
 
 
+def calculate_grid_size(config):
+    if config['env.env_type'] == 'gym_minigrid':
+        init_logger('rllr.env.gym_minigrid_navigation.environments')
+        if config['env'].get('fully_observed', True):
+            grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
+        else:
+            grid_size = 7 * config['env'].get('tile_size', 1)
+    else:
+        raise AttributeError(f"unknown env_type '{config['env_type']}'")
+    return grid_size
+
+
 def get_agent(env, config):
-    grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
+    grid_size = calculate_grid_size(config)
     encoder = encoders.get_encoder(grid_size, config['worker'])
     hidden_size = config['worker.head.hidden_size']
     policy = ActorCriticNetwork(
@@ -51,7 +63,7 @@ def get_agent(env, config):
 
 
 def get_ssim(conf):
-    grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
+    grid_size = calculate_grid_size(conf)
     encoder = encoders.get_encoder(grid_size, conf['state_similarity'])
     ssim_network = StateSimilarityNetwork(encoder, conf['state_similarity.hidden_size'])
     ssim = ContrastiveStateSimilarity(ssim_network,

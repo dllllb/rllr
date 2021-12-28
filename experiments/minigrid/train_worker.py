@@ -131,8 +131,8 @@ def get_rnd_model(config):
     else:
         grid_size = 7 * config['env'].get('tile_size', 1)
     rnd = models.RNDModel(
-        encoders.get_encoder(grid_size, config['encoder']),
-        encoders.get_encoder(grid_size, config['encoder']),
+        encoders.get_encoder(grid_size, config['rnd']),
+        encoders.get_encoder(grid_size, config['rnd']),
         config['agent.device'])
 
     return rnd
@@ -181,7 +181,7 @@ def main(args=None):
         config['agent.device']
     )
 
-    if config['training'].get('algorithm', 'ppo'):
+    if config['training.algorithm'] == 'ppo':
         agent = get_ppo_worker_agent(env, config)
         agent.to(config['agent.device'])
 
