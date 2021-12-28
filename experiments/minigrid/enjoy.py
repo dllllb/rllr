@@ -34,6 +34,11 @@ def main(args):
         config = ConfigFactory.parse_file('conf/minigrid_second_step_ssim.hocon')
         agent_path = 'artifacts/models/minigrid_master_ssim.p'
 
+    elif args.mode == 'ssim_master_lava':
+        from experiments.minigrid.train_master import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_lava_second_step_ssim.hocon')
+        agent_path = 'artifacts/models/minigrid_lava_master_ssim.p'
+
     elif args.mode == 'direct_ppo':
         from experiments.minigrid.train_direct_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_direct_ppo.hocon')
@@ -79,7 +84,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_worker', 'direct_ppo', 'rnd_ppo'])
+    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_master_lava',
+                                           'ssim_worker', 'direct_ppo', 'rnd_ppo'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()

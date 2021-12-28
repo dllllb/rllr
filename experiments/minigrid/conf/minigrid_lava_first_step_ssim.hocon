@@ -1,8 +1,10 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Dynamic-Obstacles,
-    grid_size: 8,
+    env_task: MiniGrid-LavaGap,
+    s_size: 5,
+    fully_observed: false,
+    grid_size: 7,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
@@ -15,7 +17,7 @@
     },
     goal_achieving_criterion: state_similarity,
     ssim_network_params: {
-        path: artifacts/models/minigrid_ssim.p,
+        path: artifacts/models/minigrid_lava_ssim.p,
         device: "cpu",
         threshold: 0.65
     },
@@ -81,6 +83,6 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_worker_ssim.p,
+    path: artifacts/models/minigrid_lava_worker_ssim.p,
   }
 }

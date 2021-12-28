@@ -181,7 +181,7 @@ def main(args=None):
         config['agent.device']
     )
 
-    if config['training'].get('algorithm', 'ppo') == 'ppo':
+    if config['training.algorithm'] == 'ppo':
         agent = get_ppo_worker_agent(env, config)
         agent.to(config['agent.device'])
 
