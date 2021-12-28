@@ -30,6 +30,7 @@ class MontezumaInfoWrapper(gym.Wrapper):
 
         self.episode_reward = 0
         self.episode_steps = 0
+        self.last_action = 0
 
     def get_current_room(self):
         ram = self.unwrapped.ale.getRAM()
@@ -37,6 +38,10 @@ class MontezumaInfoWrapper(gym.Wrapper):
         return int(ram[self.room_address])
 
     def step(self, action):
+        if np.random.rand() < 0.25:
+            action = self.last_action
+
+        self.last_action = action
         obs, rew, done, info = self.env.step(action)
         self.episode_reward += rew
         self.episode_steps += 1
@@ -56,6 +61,7 @@ class MontezumaInfoWrapper(gym.Wrapper):
     def reset(self):
         self.episode_reward = 0
         self.episode_steps = 0
+        self.last_action = 0
         return self.observation(self.env.reset())
 
     def observation(self, t):
@@ -85,7 +91,7 @@ class Encoder(nn.Module):
     def forward(self, t):
         t = rearrange(t, 'b h w c -> b c h w')
         x =  self.feature(t)
-        return x.view(t.shape[0], -1)
+        return rearrange(x, 'b c h w -> b (c h w)')
 
 
 def get_agent(env, config):
