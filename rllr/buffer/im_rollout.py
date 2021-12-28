@@ -38,7 +38,7 @@ class IMRolloutStorage(object):
 
     def copy_obs(self, value, idx):
         if self.obs.__class__.__name__ == 'dict':
-            for key in array:
+            for key in self.obs:
                 self.obs[key][idx].copy_(value[key])
         else:
             self.obs[idx].copy_(value)
@@ -93,7 +93,7 @@ class IMRolloutStorage(object):
         self.step = (self.step + 1) % self.num_steps
 
     def after_update(self):
-        self.copy_obs(self.obs[-1], 0)
+        self.copy_obs(self.get_last_obs(), 0)
         self.recurrent_hidden_states[0].copy_(self.recurrent_hidden_states[-1])
         self.masks[0].copy_(self.masks[-1])
 
