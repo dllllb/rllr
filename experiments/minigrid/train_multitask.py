@@ -17,18 +17,21 @@ import numpy as np
 import torch.nn as nn
 from rllr.models.encoders import RNNEncoder
 import torch
-
+from gym_minigrid.minigrid import MiniGridEnv
 
 logger = logging.getLogger(__name__)
 
 
 class MultitaskMinigridEnv(gym.Wrapper):
-    def __init__(self, tasks, tile_size):
+    def __init__(self, tasks, tile_size, actions=('left', 'right', 'forward', 'toggle')):
         self.tasks = [
             ImageObsWrapper(RGBImgPartialObsWrapper(gym.make(env_name), tile_size=tile_size)) for env_name in tasks
         ]
 
-        self.action_space = gym.spaces.Discrete(max([t.action_space.n for t in self.tasks]))
+        action_names = {v.name: int(v) for v in MiniGridEnv.Actions}
+        self.action_ids = [action_names[name] for name in actions]
+
+        self.action_space = gym.spaces.Discrete(len(actions))
         self.observation_space = gym.spaces.Dict({
             'state': self.tasks[0].observation_space,
             'last_action': gym.spaces.Discrete(self.action_space.n)
@@ -49,7 +52,9 @@ class MultitaskMinigridEnv(gym.Wrapper):
         self.episode_steps = None
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        action = int(action)
+        action_id = self.action_ids[action]
+        obs, reward, done, info = self.env.step(action_id)
         self.episode_reward += reward
         self.episode_steps += 1
         if done:

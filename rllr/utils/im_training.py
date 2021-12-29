@@ -125,7 +125,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
                   f'action_loss {action_loss:.2f}'
                 )
             for task in episode_stats:
-                print(f'Task {task}, last {len(episode_stats[task])} training episodes:')
+                print(f'Task {task}:')
                 task_stats = episode_stats[task]
                 for key, value in task_stats.items():
                     print(
