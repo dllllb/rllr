@@ -17,10 +17,8 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
 
 def get_state(obs):
     if obs.__class__.__name__ == 'dict':
-        state = obs["state"]
-    else:
-        state = obs
-    return state
+        return obs["state"]
+    return obs
 
 
 def init_obs_rms(env, conf):
@@ -62,9 +60,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
     start = time.time()
     num_updates = int(conf['training.n_env_steps'] // conf['training.n_steps'] // conf['training.n_processes'])
 
-    episode_rewards = defaultdict(lambda: deque(maxlen=10))
-    episode_steps = defaultdict(lambda: deque(maxlen=10))
-    episode_rooms = defaultdict(lambda: deque(maxlen=10))
+    episode_stats = defaultdict(lambda: defaultdict(lambda: deque(maxlen=10)))
 
     for j in trange(num_updates):
         update_linear_schedule(agent.optimizer, j, num_updates, conf['agent.lr'])
@@ -72,7 +68,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
         for step in range(conf['training.n_steps']):
             # Sample actions
             (value, im_value), action, action_log_prob, rnn_rhs = agent.act(
-                rollouts.obs[step],
+                obs,
                 rollouts.recurrent_hidden_states[step],
                 rollouts.masks[step]
             )
@@ -86,9 +82,8 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
             for info in infos:
                 if 'episode' in info.keys():
                     task = info['episode'].get('task', 'unk')
-                    episode_rewards[task].append(info['episode']['r'])
-                    episode_steps[task].append(info['episode']['steps'])
-                    episode_rooms[task].append(info['episode']['visited_rooms'])
+                    for info_key, info_value in filter(lambda kv: kv[0] != 'task', info['episode'].items()):
+                        episode_stats[task][info_key].append(info_value)
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -129,23 +124,18 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
                   f'im_value_loss {im_value_loss:.2f}, '
                   f'action_loss {action_loss:.2f}'
                 )
-            for task in episode_rewards:
-                print(
-                    f'Task {task}, last {len(episode_rewards[task])} training episodes:\n'                    
-                    
-                    f'mean/median reward {np.mean(episode_rewards[task]):.2f}/{np.median(episode_rewards[task]):.2f}, '
-                    f'min/max reward {np.min(episode_rewards[task]):.2f}/{np.max(episode_rewards[task]):.2f}\n'
-                   
-                    f'mean/median steps {np.mean(episode_steps[task]):.2f}/{np.median(episode_steps[task]):.2f}, '
-                    f'min/max steps {np.min(episode_steps[task]):.2f}/{np.max(episode_steps[task]):.2f}\n'
-
-                    f'mean/median rooms {np.mean(episode_rooms[task]):.2f}/{np.median(episode_rooms[task]):.2f}, '
-                    f'min/max rooms {np.min(episode_rooms[task]):.2f}/{np.max(episode_rooms[task]):.2f}\n'
-                )
+            for task in episode_stats:
+                print(f'Task {task}, last {len(episode_stats[task])} training episodes:')
+                task_stats = episode_stats[task]
+                for key, value in task_stats.items():
+                    print(
+                        f'mean/median {key} {np.mean(value):.2f}/{np.median(value):.2f}, '
+                        f'min/max {key} {np.min(value):.2f}/{np.max(value):.2f}'
+                    )
+                print()
 
             torch.save(agent, conf['outputs.path'])
 
-        if after_epoch_callback is not None:
-            loss = after_epoch_callback(rollouts)
-            if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
+            if after_epoch_callback is not None:
+                loss = after_epoch_callback(rollouts)
                 print(f'loss: {loss:.2f}')

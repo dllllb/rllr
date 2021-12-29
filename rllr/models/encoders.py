@@ -240,7 +240,7 @@ class RNNEncoder(nn.Module):
         self.model = model
         self.output_size = recurrent_hidden_size
         self.recurrent_hidden_size = recurrent_hidden_size
-        self.gru = nn.GRU(5184, recurrent_hidden_size) # 6400
+        self.gru = nn.GRU(6400, recurrent_hidden_size)
 
     def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
         out = self.model(out)
@@ -324,8 +324,5 @@ def get_encoder(grid_size, config):
 
     if config.get('normalize', False):
         state_encoder = NormEncoder(state_encoder)
-
-    if config.get('gru', False):
-        state_encoder = RNNEncoder(state_encoder, config['recurrent_hidden_size'])
 
     return state_encoder

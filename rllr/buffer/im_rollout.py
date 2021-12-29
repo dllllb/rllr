@@ -1,8 +1,11 @@
 import torch
+from collections import defaultdict
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 
 
 def _flatten_helper(T, N, _tensor):
+    if _tensor.__class__.__name__ == 'dict':
+        return {key: _tensor[key].view(T * N, *_tensor[key].size()[2:]) for key in _tensor}
     return _tensor.view(T * N, *_tensor.size()[2:])
 
 
@@ -170,8 +173,12 @@ class IMRolloutStorage(object):
         num_envs_per_batch = num_processes // num_mini_batch
         perm = torch.randperm(num_processes)
         for start_ind in range(0, num_processes, num_envs_per_batch):
-            obs_batch = []
-            next_obs_batch = []
+            if self.obs.__class__.__name__ == 'dict':
+                obs_batch = defaultdict(list)
+                next_obs_batch = defaultdict(list)
+            else:
+                obs_batch = []
+                next_obs_batch = []
             recurrent_hidden_states_batch = []
             actions_batch = []
             value_preds_batch = []
@@ -184,8 +191,13 @@ class IMRolloutStorage(object):
 
             for offset in range(num_envs_per_batch):
                 ind = perm[start_ind + offset]
-                obs_batch.append(self.obs[:-1, ind])
-                next_obs_batch.append(self.obs[1:, ind])
+                if self.obs.__class__.__name__ == 'dict':
+                    for key in self.obs:
+                        obs_batch[key].append(self.obs[key][:-1, ind])
+                        next_obs_batch[key].append(self.obs[key][1:, ind])
+                else:
+                    obs_batch.append(self.obs[:-1, ind])
+                    next_obs_batch.append(self.obs[1:, ind])
                 recurrent_hidden_states_batch.append(
                     self.recurrent_hidden_states[0:1, ind])
                 actions_batch.append(self.actions[:, ind])
@@ -200,8 +212,13 @@ class IMRolloutStorage(object):
 
             T, N = self.num_steps, num_envs_per_batch
             # These are all tensors of size (T, N, -1)
-            obs_batch = torch.stack(obs_batch, 1)
-            next_obs_batch = torch.stack(next_obs_batch, 1)
+            if self.obs.__class__.__name__ == 'dict':
+                obs_batch = {key: torch.stack(obs_batch[key], 1) for key in self.obs}
+                next_obs_batch = {key: torch.stack(next_obs_batch[key], 1) for key in self.obs}
+            else:
+                obs_batch = torch.stack(obs_batch, 1)
+                next_obs_batch = torch.stack(next_obs_batch, 1)
+
             actions_batch = torch.stack(actions_batch, 1)
             value_preds_batch = torch.stack(value_preds_batch, 1)
             im_value_preds_batch = torch.stack(im_value_preds_batch, 1)

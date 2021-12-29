@@ -14,6 +14,9 @@ import gym
 from gym_minigrid.wrappers import RGBImgPartialObsWrapper
 from rllr.env.gym_minigrid_navigation.environments import ImageObsWrapper, ChangeActionSizeWrapper
 import numpy as np
+import torch.nn as nn
+from rllr.models.encoders import RNNEncoder
+import torch
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +29,11 @@ class MultitaskMinigridEnv(gym.Wrapper):
         ]
 
         self.action_space = gym.spaces.Discrete(max([t.action_space.n for t in self.tasks]))
-        self.observation_space = self.tasks[0].observation_space
+        self.observation_space = gym.spaces.Dict({
+            'state': self.tasks[0].observation_space,
+            'last_action': gym.spaces.Discrete(self.action_space.n)
+        })
+
         self.metadata = self.tasks[0].metadata
 
         self.reward_range = [np.inf, -np.inf]
@@ -47,18 +54,18 @@ class MultitaskMinigridEnv(gym.Wrapper):
         self.episode_steps += 1
         if done:
             info['episode'] = {
-                'r': self.episode_reward,
+                'reward': self.episode_reward,
                 'steps': self.episode_steps,
                 'task': self.task_names[self.env_id]
             }
-        return obs, reward, done, info
+        return {'state': obs, 'last_action': action}, reward, done, info
 
     def reset(self, **kwargs):
         self.env_id = np.random.randint(len(self.tasks))
         self.env = self.tasks[self.env_id]
         self.episode_reward = 0
         self.episode_steps = 0
-        return self.env.reset(**kwargs)
+        return {'state': self.env.reset(**kwargs), 'last_action': 0}
 
     def seed(self, value):
         for t in self.tasks:
@@ -73,11 +80,29 @@ def gen_env_with_seed(conf, seed):
     return env
 
 
+class Encoder(nn.Module):
+    def __init__(self, enc, n_actions):
+        super().__init__()
+        self.state_enc = enc
+        self.act_enc = nn.Embedding(n_actions, embedding_dim=16)
+        self.output_size = enc.output_size + 16
+
+    def forward(self, t, *args):
+        state_enc, rnn_hxs = self.state_enc(t['state'], *args)
+        act_enc = self.act_enc(t['last_action'].long())
+        return torch.cat([state_enc, act_enc], dim=1), rnn_hxs
+
+
 def get_agent(env, config):
     state_conf = config['encoder']
     hidden_size = state_conf['head']['hidden_size']
     grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
-    state_encoder = encoders.get_encoder(grid_size, config['encoder'])
+    state_encoder = Encoder(RNNEncoder(
+        encoders.get_encoder(
+            grid_size,
+            config['encoder']),
+        state_conf['recurrent_hidden_size']
+    ), env.action_space.n)
     policy = ActorCriticNetwork(
         env.action_space, state_encoder,
         state_encoder, hidden_size,
@@ -116,7 +141,6 @@ def main(args=None):
     )
 
     obs = env.reset()
-    print(obs.shape)
 
     agent = get_agent(env, config)
     agent.to(config['agent.device'])
