@@ -234,6 +234,19 @@ class NormEncoder(nn.Module):
         return out / (out.pow(2).sum(dim=1) + self.eps).pow(0.5).unsqueeze(-1).expand(*out.size())
 
 
+class LastActionEncoder(nn.Module):
+    def __init__(self, enc, n_actions):
+        super().__init__()
+        self.state_enc = enc
+        self.act_enc = nn.Embedding(n_actions, embedding_dim=16)
+        self.output_size = enc.output_size + 16
+
+    def forward(self, t, *args):
+        state_enc, rnn_hxs = self.state_enc(t['state'], *args)
+        act_enc = self.act_enc(t['last_action'].long())
+        return torch.cat([state_enc, act_enc], dim=1), rnn_hxs
+
+
 class RNNEncoder(nn.Module):
     def __init__(self, model, recurrent_hidden_size):
         super().__init__()

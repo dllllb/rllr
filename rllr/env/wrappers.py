@@ -367,10 +367,10 @@ class HierarchicalWrapper(gym.Wrapper):
     def step(self, action):
         cum_reward, step, done, info = 0, 0, False, {}
         while not done and step < self.n_steps:
-            _, low_action, _ = self.policy.act({
+            _, low_action, _, _ = self.policy.act({
                 'state': torch.from_numpy(self.state).unsqueeze(dim=0),
                 'goal_emb': torch.from_numpy(action).unsqueeze(dim=0)
-            }, deterministic=True)
+            }, None, None, deterministic=True)
             self.state, reward, done, info = self.env.step(low_action)
             cum_reward += reward
             step += 1

@@ -58,15 +58,20 @@ class DiscreteActorNetwork(nn.Module):
     probability of action given state or sample an action
     """
 
-    def __init__(self, action_size, state_encoder, hidden_size):
+    def __init__(self, action_size, state_encoder, hidden_size, is_recurrent):
         super().__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
         self.logits = make_mlp(input_size, hidden_size, action_size)
         self.output_size = action_size
+        self.is_recurrent = is_recurrent
 
     def forward(self, states, rnn_hxs, masks):
-        states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
         logits = self.logits(states_encoding)
         return FixedCategorical(logits=F.log_softmax(logits, dim=1)), rnn_hxs
 
@@ -77,16 +82,21 @@ class ContiniousActorNetwork(nn.Module):
     probability of action given state or sample an action
     """
 
-    def __init__(self, action_size, state_encoder, hidden_size):
+    def __init__(self, action_size, state_encoder, hidden_size, is_recurrent):
         super().__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
         self.fc = make_mlp(input_size, hidden_size, action_size)
         self.logstd = nn.Parameter(torch.zeros((action_size,)))
         self.output_size = action_size
+        self.is_recurrent = is_recurrent
 
     def forward(self, states, rnn_hxs, masks):
-        states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
         mu = self.fc(states_encoding)
         std = self.logstd.exp()
         return FixedNormal(mu, std), rnn_hxs
@@ -97,14 +107,19 @@ class CriticNetwork(nn.Module):
     Critic network estimates value function
     """
 
-    def __init__(self, state_encoder, hidden_size):
+    def __init__(self, state_encoder, hidden_size, is_recurrent):
         super(CriticNetwork, self).__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
         self.fc = make_mlp(input_size, hidden_size, 1)
+        self.is_recurrent = is_recurrent
 
     def forward(self, states, rnn_hxs, masks):
-        states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
         return self.fc(states_encoding)
 
 
@@ -113,15 +128,21 @@ class IMCriticNetwork(nn.Module):
     Critic network estimates external and internal expected returns
     """
 
-    def __init__(self, state_encoder, hidden_size):
+    def __init__(self, state_encoder, hidden_size, is_recurrent):
         super(IMCriticNetwork, self).__init__()
         self.state_encoder = state_encoder
         input_size = state_encoder.output_size
         self.ext_head = make_mlp(input_size, hidden_size, 1)
         self.int_head = make_mlp(input_size, hidden_size, 1)
 
+        self.is_recurrent = is_recurrent
+
     def forward(self, states, rnn_hxs, masks):
-        states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
         return self.ext_head(states_encoding), self.int_head(states_encoding)
 
 
@@ -131,19 +152,19 @@ class ActorCriticNetwork(nn.Module):
     """
 
     def __init__(self, action_space, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size,
-                 use_intrinsic_motivation=False):
+                 use_intrinsic_motivation=False, is_recurrent=False):
         super(ActorCriticNetwork, self).__init__()
         if type(action_space) == gym.spaces.Box:
-            self.actor = ContiniousActorNetwork(action_space.shape[0], actor_state_encoder, actor_hidden_size)
+            self.actor = ContiniousActorNetwork(action_space.shape[0], actor_state_encoder, actor_hidden_size, is_recurrent)
         elif type(action_space) == gym.spaces.Discrete:
-            self.actor = DiscreteActorNetwork(action_space.n, actor_state_encoder, actor_hidden_size)
+            self.actor = DiscreteActorNetwork(action_space.n, actor_state_encoder, actor_hidden_size, is_recurrent)
         else:
             raise NotImplementedError(f'{action_space} not supported')
 
         if use_intrinsic_motivation:
-            self.critic = IMCriticNetwork(critic_state_encoder, critic_hidden_size)
+            self.critic = IMCriticNetwork(critic_state_encoder, critic_hidden_size, is_recurrent)
         else:
-            self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size)
+            self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size, is_recurrent)
 
         def init_params(m):
             classname = m.__class__.__name__

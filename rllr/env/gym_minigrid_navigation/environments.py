@@ -121,7 +121,11 @@ def get_env_name(conf):
 
 def gen_wrapped_env(conf, verbose=False):
     env_name = get_env_name(conf)
-    env = gym.make(env_name)
+
+    if 'agent_start_pos' in conf:
+        env = gym.make(env_name, agent_start_pos=conf['agent_start_pos'])
+    else:
+        env = gym.make(env_name)
 
     if conf.get('fix_reset_seed', False):
         env = FixResetSeedWrapper(env, conf.get('reset_seed', 0))
