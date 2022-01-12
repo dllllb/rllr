@@ -50,7 +50,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
     # training starts
     rollouts = IMRolloutStorage(
         conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space,
-        conf['encoder.recurrent_hidden_size']
+        conf.get('encoder.recurrent_hidden_size', 1)
     )
 
     obs = env.reset()

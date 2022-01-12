@@ -158,8 +158,11 @@ class IMRolloutStorage(object):
 
             adv_targ = advantages.view(-1, 1)[indices]
 
-            yield obs_batch, next_obs_batch, actions_batch, \
-                value_preds_batch, im_value_preds_batch, \
+            recurrent_hidden_states_batch = self.recurrent_hidden_states[:-1].view(
+                -1, self.recurrent_hidden_states.size(-1))[indices] # UNUSED
+
+            yield obs_batch, next_obs_batch, recurrent_hidden_states_batch, \
+                actions_batch, value_preds_batch, im_value_preds_batch, \
                 return_batch, im_return_batch,\
                 masks_batch, old_action_log_probs_batch, \
                 adv_targ
