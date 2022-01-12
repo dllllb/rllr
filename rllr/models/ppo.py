@@ -166,6 +166,8 @@ class ActorCriticNetwork(nn.Module):
         else:
             self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size, is_recurrent)
 
+        self.is_recurrent = is_recurrent
+
         def init_params(m):
             classname = m.__class__.__name__
             if classname.find("Linear") != -1:
