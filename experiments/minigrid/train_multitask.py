@@ -12,7 +12,7 @@ import gym
 from gym_minigrid.wrappers import RGBImgPartialObsWrapper
 from rllr.env.gym_minigrid_navigation.environments import ImageObsWrapper
 import numpy as np
-from rllr.models.encoders import RNNEncoder
+from rllr.models.encoders import RNNEncoder, LastActionEncoder
 from gym_minigrid.minigrid import MiniGridEnv
 
 logger = logging.getLogger(__name__)
