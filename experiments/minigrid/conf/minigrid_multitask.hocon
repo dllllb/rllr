@@ -8,7 +8,7 @@
         MiniGrid-SimpleCrossingS9N2-v0
     ],
     tile_size: 8,
-    grid_size: 4,
+    grid_size: 7,
   },
 
   encoder: {
@@ -36,7 +36,7 @@
   },
 
   agent: {
-    device: "cuda:1",
+    device: "cpu",
     ext_coef: 2.0,
     im_coef: 1.0,
     clip_param: 0.2,
