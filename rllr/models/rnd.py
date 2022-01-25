@@ -26,6 +26,9 @@ class RNDModel(nn.Module):
         for param in self.target.parameters():
             param.requires_grad = False
 
+    def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
+        return self.predictor.parameters(recurse)
+
     def forward(self, next_obs):
         next_obs = next_obs.float() * 255.
 
