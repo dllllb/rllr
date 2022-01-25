@@ -42,14 +42,23 @@ class MontezumaInfoWrapper(gym.Wrapper):
         return int(ram[self.room_address])
 
     def step(self, action):
-        #if np.random.rand() < 0.25:
-        #    action = self.last_action
+        action = int(action)
+
+        # action repeat
+        if np.random.rand() < 0.25:
+            action = self.last_action
 
         self.last_action = action
-        obs, rew, done, info = self.env.step(action)
-        self.episode_reward += rew
-        self.episode_steps += 1
-        self.visited_rooms.add(self.get_current_room())
+
+        # max and skip
+        last_frames = []
+        for t in range(4):
+            obs, rew, done, info = self.env.step(action)
+            self.episode_reward += rew
+            self.episode_steps += 1
+            self.visited_rooms.add(self.get_current_room())
+            last_frames.append(self.observation(obs))
+        obs = np.max(last_frames[-2:], axis=0)
 
         if done:
             info['episode'] = {
@@ -60,21 +69,48 @@ class MontezumaInfoWrapper(gym.Wrapper):
             }
             self.visited_rooms.clear()
 
-        return self.observation(obs), rew, done, info
+        self.states = self.states[1:] + [obs]
+        return np.asarray(self.states), rew, done, info
 
     def reset(self):
         self.episode_reward = 0
         self.episode_steps = 0
         self.last_action = 0
-        self.states = [np.zeros((84, 84), dtype=np.uint8) for _ in range(4)]
-        return self.observation(self.env.reset())
+        self.states = [np.zeros((84, 84), dtype=np.uint8) for _ in range(3)] + [self.observation(self.env.reset())]
+        return np.asarray(self.states)
 
     def observation(self, img):
         img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         img = cv2.resize(img, (84, 84), interpolation=cv2.INTER_AREA)
-        self.states = self.states[1:] + [img]
-        return np.asarray(self.states)
+        return img
+        #self.states = self.states[1:] + [img]
+        #return np.asarray(self.states)
         # return cv2.resize(t, (84, 84))
+
+
+class RepeatActionEnv(gym.Wrapper):
+    def __init__(self, env):
+        gym.Wrapper.__init__(self, env)
+        self.successive_frame = np.zeros((2,) + self.env.observation_space.shape, dtype=np.uint8)
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+
+    def step(self, action):
+        reward, done = 0, False
+        for t in range(4):
+            state, r, done, info = self.env.step(action)
+            if t == 2:
+                self.successive_frame[0] = state
+            elif t == 3:
+                self.successive_frame[1] = state
+            reward += r
+            if done:
+                break
+
+        state = self.successive_frame.max(axis=0)
+        return state, reward, done, info
+
 
 
 def gen_env_with_seed(conf, seed):

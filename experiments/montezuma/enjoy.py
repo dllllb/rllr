@@ -12,6 +12,7 @@ from rllr.env.vec_wrappers import make_vec_envs
 from rllr.utils.logger import init_logger
 import torch.nn as nn
 from einops import rearrange
+from train_rnd_ppo import PolicyModel, TargetModel, PredictorModel
 
 
 logger = logging.getLogger(__name__)
@@ -19,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 def main(args):
     if args.mode == 'rnd_ppo':
-        from train_rnd_gru_ppo import gen_env_with_seed
-        config = ConfigFactory.parse_file('minigrid/conf/minigrid_rnd_ppo.hocon')
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('../montezuma/conf/montezuma_rnd_ppo.hocon')
         agent_path = 'artifacts/models/minigrid_rnd_ppo.p'
 
     agent = torch.load(config['outputs.path'], map_location='cpu')
 
     env = make_vec_envs(
-        lambda env_id: lambda: gen_env_with_seed(config, 11),
+        lambda env_id: lambda: gen_env_with_seed(config, np.random.randint(0, 10000000)),
         num_processes=1,
         device='cpu'
     )
@@ -41,7 +42,7 @@ def main(args):
         while not done:
             if args.viz:
                 env.render('human')
-            value, action, _, rnn_hxs = agent.act(obs, rnn_hxs, masks, deterministic=True)
+            value, action, _, rnn_hxs = agent.act(obs, rnn_hxs, masks, deterministic=False)
             # observation, reward and next obs
             obs, reward, done, _ = env.step(action)
             episode_reward += float(reward)

@@ -16,7 +16,7 @@
   },
 
   agent: {
-    device: "cpu",
+    device: "cuda:0",
     ext_coef: 2.0,
     im_coef: 1.0,
     clip_param: 0.2,
@@ -34,10 +34,10 @@
 
   training: {
     reward: fair_goal_achievement,
-    n_env_steps: 25000000,
+    n_env_steps: 125000000,
     n_steps: 128,
-    n_processes: 16,
-    verbose: 1,
+    n_processes: 32,
+    verbose: 50,
   },
 
   seed: 42,
