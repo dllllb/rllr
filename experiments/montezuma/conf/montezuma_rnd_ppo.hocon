@@ -37,7 +37,7 @@
     n_env_steps: 125000000,
     n_steps: 128,
     n_processes: 32,
-    verbose: 50,
+    verbose: 1,
   },
 
   seed: 42,
