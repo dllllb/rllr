@@ -106,7 +106,7 @@ class MontezumaInfoWrapper(gym.Wrapper):
     def reset(self):
         self.episode_reward = 0
         self.episode_steps = 0
-        self.states = [np.zeros((84, 84)) for _ in range(4)]
+        self.states = [np.zeros((84, 84), dtype=np.uint8) for _ in range(4)]
         return self.observation(self.env.reset())
 
     def observation(self, img):
@@ -311,8 +311,8 @@ def get_agent(env, config):
     policy = PolicyModel(env.observation_space.shape, env.action_space.n)
 
     rnd = RNDModel(
-        TargetModel(env.observation_space.shape),
-        PredictorModel(env.observation_space.shape),
+        TargetModel((1, *env.observation_space.shape[1:])),
+        PredictorModel((1, *env.observation_space.shape[1:])),
         config['agent.device'])
 
     return IMPPO(
