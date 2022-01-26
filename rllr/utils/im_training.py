@@ -28,15 +28,16 @@ def init_obs_rms(env, conf):
         state_shape = env.observation_space.shape
 
     obs_rms = RunningMeanStd(shape=state_shape, device=conf['agent.device'])
-    states = []
     obs = env.reset()
 
-    for _ in trange(conf['training.n_steps']):
-        action = torch.tensor([[env.action_space.sample()] for _ in range(get_state(obs).shape[0])])
-        obs, _, _, _ = env.step(action)
-        states.append(get_state(obs))
+    for _ in range(50):
+        states = []
+        for _ in trange(conf['training.n_steps']):
+            action = torch.tensor([[env.action_space.sample()] for _ in range(get_state(obs).shape[0])])
+            obs, _, _, _ = env.step(action)
+            states.append(get_state(obs))
 
-    obs_rms.update(torch.stack(states))
+        obs_rms.update(torch.stack(states))
     return obs_rms
 
 
