@@ -23,69 +23,24 @@ from rllr.models.ppo import FixedCategorical
 logger = logging.getLogger(__name__)
 
 
-class MontezumaInfoWrapper(gym.Wrapper):
-    def __init__(self, env):
-        super(MontezumaInfoWrapper, self).__init__(env)
-        self.room_address = 3
-        self.visited_rooms = set()
-        self.observation_space = gym.spaces.Box(0, 255, (4, 84, 84), dtype=np.uint8)
 
-        self.episode_reward = 0
-        self.episode_steps = 0
+class StickyActionEnv(gym.Wrapper):
+    def __init__(self, env, p=0.25):
+        super(StickyActionEnv, self).__init__(env)
+        self.p = p
         self.last_action = 0
 
-        self.states = None
-
-    def get_current_room(self):
-        ram = self.unwrapped.ale.getRAM()
-        assert len(ram) == 128
-        return int(ram[self.room_address])
-
     def step(self, action):
-        action = int(action)
-
-        # action repeat
-        if np.random.rand() < 0.25:
+        if np.random.uniform() < self.p:
             action = self.last_action
 
         self.last_action = action
-
-        # max and skip
-        last_frames = []
-        for t in range(4):
-            obs, rew, done, info = self.env.step(action)
-            self.episode_reward += np.sign(rew)
-            self.episode_steps += 1
-            self.visited_rooms.add(self.get_current_room())
-            last_frames.append(self.observation(obs))
-        obs = np.max(last_frames[-2:], axis=0)
-
-        if done:
-            info['episode'] = {
-                'r': self.episode_reward,
-                'steps': self.episode_steps,
-                'task': 'Montezuma',
-                'visited_rooms':  len(self.visited_rooms)
-            }
-            self.visited_rooms.clear()
-
-        self.states = self.states[1:] + [obs]
-        return np.asarray(self.states), rew, done, info
+        return self.env.step(action)
 
     def reset(self):
-        self.episode_reward = 0
-        self.episode_steps = 0
         self.last_action = 0
-        self.states = [np.zeros((84, 84), dtype=np.uint8) for _ in range(3)] + [self.observation(self.env.reset())]
-        return np.asarray(self.states)
+        return self.env.reset()
 
-    def observation(self, img):
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        img = cv2.resize(img, (84, 84), interpolation=cv2.INTER_AREA)
-        return img
-        #self.states = self.states[1:] + [img]
-        #return np.asarray(self.states)
-        # return cv2.resize(t, (84, 84))
 
 
 class RepeatActionEnv(gym.Wrapper):
@@ -112,11 +67,63 @@ class RepeatActionEnv(gym.Wrapper):
         return state, reward, done, info
 
 
+class MontezumaInfoWrapper(gym.Wrapper):
+    def __init__(self, env):
+        super(MontezumaInfoWrapper, self).__init__(env)
+        self.room_address = 3
+        self.visited_rooms = set()
+        self.observation_space = gym.spaces.Box(0, 255, (4, 84, 84), dtype=np.uint8)
+
+        self.episode_reward = 0
+        self.episode_steps = 0
+
+        self.states = None
+
+    def get_current_room(self):
+        ram = self.unwrapped.ale.getRAM()
+        assert len(ram) == 128
+        return int(ram[self.room_address])
+
+    def step(self, action):
+        action = int(action)
+
+        obs, rew, done, info = self.env.step(action)
+        self.episode_reward += np.sign(rew)
+        self.episode_steps += 1
+        self.visited_rooms.add(self.get_current_room())
+
+        if done:
+            info['episode'] = {
+                'r': self.episode_reward,
+                'steps': self.episode_steps,
+                'task': 'Montezuma',
+                'visited_rooms':  len(self.visited_rooms)
+            }
+            self.visited_rooms.clear()
+
+        return self.observation(obs), rew, done, info
+
+    def reset(self):
+        self.episode_reward = 0
+        self.episode_steps = 0
+        self.states = [np.zeros((84, 84)) for _ in range(4)]
+        return self.observation(self.env.reset())
+
+    def observation(self, img):
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        img = cv2.resize(img, (84, 84), interpolation=cv2.INTER_AREA)
+        self.states = self.states[1:] + [img]
+        return np.asarray(self.states)
+        # return cv2.resize(t, (84, 84))
+
 
 def gen_env_with_seed(conf, seed):
     env = gym.make(conf['env.env_id'])
+    env = StickyActionEnv(env)
+    env = RepeatActionEnv(env)
+    env = MontezumaInfoWrapper(env)
     env.seed(seed)
-    return MontezumaInfoWrapper(env)
+    return env
 
 
 
