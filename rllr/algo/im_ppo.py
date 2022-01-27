@@ -89,25 +89,17 @@ class IMPPO:
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * adv_targ
                 action_loss = -torch.min(surr1, surr2).mean()
 
-                # clipped_value_loss:
-                value_pred_clipped = value_preds_batch + \
-                     (values - value_preds_batch).clamp(-self.clip_param, self.clip_param)
-                value_losses = (values - return_batch).pow(2)
-                value_losses_clipped = (value_pred_clipped - return_batch).pow(2)
-                value_loss = torch.max(value_losses, value_losses_clipped).mean()
+                # value_loss:
+                value_loss = (values - return_batch).pow(2).mean()
 
-                # clipped_im_value_loss:
-                im_value_pred_clipped = im_value_preds_batch + \
-                     (im_values - im_value_preds_batch).clamp(-self.clip_param, self.clip_param)
-                im_value_losses = (im_values - im_return_batch).pow(2)
-                im_value_losses_clipped = (im_value_pred_clipped - im_return_batch).pow(2)
-                im_value_loss = torch.max(im_value_losses, im_value_losses_clipped).mean()
+                # im_value_loss:
+                im_value_loss = (im_values - im_return_batch).pow(2).mean()
 
                 critic_loss = value_loss + im_value_loss
 
                 self.optimizer.zero_grad()
                 (critic_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef + im_loss).backward()
-                nn.utils.clip_grad_norm_(self.total_trainable_params, self.max_grad_norm)
+                # nn.utils.clip_grad_norm_(self.total_trainable_params, self.max_grad_norm)
                 self.optimizer.step()
 
                 value_loss_epoch += value_loss.item()
