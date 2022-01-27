@@ -18,6 +18,7 @@ from einops import rearrange
 import cv2
 import numpy as np
 from rllr.models.ppo import FixedCategorical
+from gym.wrappers import TimeLimit
 
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ def gen_env_with_seed(conf, seed):
     env = StickyActionEnv(env)
     env = RepeatActionEnv(env)
     env = MontezumaInfoWrapper(env)
+    env = TimeLimit(env, max_episode_steps=4500)
     env.seed(seed)
     return env
 
