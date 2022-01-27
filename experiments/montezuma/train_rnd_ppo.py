@@ -89,7 +89,8 @@ class MontezumaInfoWrapper(gym.Wrapper):
         action = int(action)
 
         obs, rew, done, info = self.env.step(action)
-        self.episode_reward += np.sign(rew)
+        rew = np.sign(rew)
+        self.episode_reward += rew
         self.episode_steps += 1
         self.visited_rooms.add(self.get_current_room())
 
