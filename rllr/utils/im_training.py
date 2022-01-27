@@ -23,11 +23,11 @@ def get_state(obs):
 
 def init_obs_rms(env, conf):
     if env.observation_space.__class__.__name__ == 'Dict':
-        state_shape = nv.observation_space["state"].shape
+        state_shape = env.observation_space["state"].shape
     else:
         state_shape = env.observation_space.shape
 
-    obs_rms = RunningMeanStd(shape=(1, 84, 84), device=conf['agent.device'])
+    obs_rms = RunningMeanStd(shape=state_shape, device=conf['agent.device'])
     obs = env.reset()
 
     for _ in range(50):
@@ -35,7 +35,7 @@ def init_obs_rms(env, conf):
         for _ in trange(conf['training.n_steps']):
             action = torch.tensor([[env.action_space.sample()] for _ in range(get_state(obs).shape[0])])
             obs, _, _, _ = env.step(action)
-            states.append(get_state(obs)[:, -1:, :, :])
+            states.append(get_state(obs))
 
         obs_rms.update(torch.stack(states))
     return obs_rms
@@ -77,7 +77,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
             obs, reward, done, infos = env.step(action)
 
             im_reward = agent.compute_intrinsic_reward(
-                ((get_state(obs)[:, -1:, :, :] - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5))
+                ((get_state(obs) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5))
 
             for info in infos:
                 if 'episode' in info.keys():
@@ -98,7 +98,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
         mean, var, count = torch.mean(im_ret), torch.var(im_ret), len(im_ret)
         reward_rms.update_from_moments(mean, var, count)
 
-        obs_rms.update(get_state(rollouts.obs)[:, :, -1:, :, :])
+        obs_rms.update(get_state(rollouts.obs))
 
         rollouts.im_rewards /= torch.sqrt(reward_rms.var)
 

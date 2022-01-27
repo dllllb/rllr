@@ -12,11 +12,11 @@
     head: {
         hidden_size: 64
     }
-    recurrent_hidden_size: 400
+    recurrent_hidden_size: 448
   },
 
   agent: {
-    device: "cuda:0",
+    device: "cuda:3",
     ext_coef: 2.0,
     im_coef: 1.0,
     clip_param: 0.1,

@@ -73,12 +73,10 @@ class MontezumaInfoWrapper(gym.Wrapper):
         super(MontezumaInfoWrapper, self).__init__(env)
         self.room_address = 3
         self.visited_rooms = set()
-        self.observation_space = gym.spaces.Box(0, 255, (4, 84, 84), dtype=np.uint8)
+        self.observation_space = gym.spaces.Box(0, 255, (1, 84, 84), dtype=np.uint8)
 
         self.episode_reward = 0
         self.episode_steps = 0
-
-        self.states = None
 
     def get_current_room(self):
         ram = self.unwrapped.ale.getRAM()
@@ -108,14 +106,12 @@ class MontezumaInfoWrapper(gym.Wrapper):
     def reset(self):
         self.episode_reward = 0
         self.episode_steps = 0
-        self.states = [np.zeros((84, 84), dtype=np.uint8) for _ in range(4)]
         return self.observation(self.env.reset())
 
     def observation(self, img):
         img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         img = cv2.resize(img, (84, 84), interpolation=cv2.INTER_AREA)
-        self.states = self.states[1:] + [img]
-        return np.asarray(self.states)
+        return np.stack([img])
         # return cv2.resize(t, (84, 84))
 
 
@@ -134,13 +130,11 @@ def conv_shape(input, kernel_size, stride, padding=0):
     return (input + 2 * padding - kernel_size) // stride + 1
 
 
-class PolicyModel(nn.Module):
-
-    def __init__(self, state_shape, n_actions):
-        super(PolicyModel, self).__init__()
+class Encoder(nn.Module):
+    def __init__(self, state_shape):
+        super(Encoder, self).__init__()
         self.state_shape = state_shape
-        self.n_actions = n_actions
-        self.is_recurrent = False
+        self.output_size = 256
 
         c, w, h = state_shape
         self.conv1 = nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4)
@@ -158,14 +152,6 @@ class PolicyModel(nn.Module):
         flatten_size = conv3_out_w * conv3_out_h * 64
 
         self.fc1 = nn.Linear(in_features=flatten_size, out_features=256)
-        self.fc2 = nn.Linear(in_features=256, out_features=448)
-
-        self.extra_value_fc = nn.Linear(in_features=448, out_features=448)
-        self.extra_policy_fc = nn.Linear(in_features=448, out_features=448)
-
-        self.policy = nn.Linear(in_features=448, out_features=self.n_actions)
-        self.int_value = nn.Linear(in_features=448, out_features=1)
-        self.ext_value = nn.Linear(in_features=448, out_features=1)
 
         for layer in self.modules():
             if isinstance(layer, nn.Conv2d):
@@ -174,8 +160,39 @@ class PolicyModel(nn.Module):
 
         nn.init.orthogonal_(self.fc1.weight, gain=np.sqrt(2))
         self.fc1.bias.data.zero_()
-        nn.init.orthogonal_(self.fc2.weight, gain=np.sqrt(2))
-        self.fc2.bias.data.zero_()
+
+    def forward(self, inputs):
+        x = inputs / 255.
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = x.view(x.size(0), -1)
+        return F.relu(self.fc1(x))
+
+
+class PolicyModel(nn.Module):
+
+    def __init__(self, state_shape, n_actions):
+        super(PolicyModel, self).__init__()
+        self.state_shape = state_shape
+        self.n_actions = n_actions
+        self.is_recurrent = True
+
+        c, w, h = state_shape
+        self.rnn = RNNEncoder(Encoder(state_shape), recurrent_hidden_size=448)
+
+        self.extra_value_fc = nn.Linear(in_features=448, out_features=448)
+        self.extra_policy_fc = nn.Linear(in_features=448, out_features=448)
+
+        self.policy = nn.Linear(in_features=448, out_features=self.n_actions)
+        self.int_value = nn.Linear(in_features=448, out_features=1)
+        self.ext_value = nn.Linear(in_features=448, out_features=1)
+
+        for name, param in self.rnn.named_parameters():
+            if 'bias' in name:
+                nn.init.constant_(param, 0)
+            elif 'weight' in name:
+                nn.init.orthogonal_(param)
 
         nn.init.orthogonal_(self.extra_policy_fc.weight, gain=np.sqrt(0.1))
         self.extra_policy_fc.bias.data.zero_()
@@ -189,14 +206,8 @@ class PolicyModel(nn.Module):
         nn.init.orthogonal_(self.ext_value.weight, gain=np.sqrt(0.01))
         self.ext_value.bias.data.zero_()
 
-    def forward(self, inputs):
-        x = inputs / 255.
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+    def forward(self, inputs, rnn_hxs, masks):
+        x, rnn_hxs = self.rnn(inputs, rnn_hxs, masks)
         x_v = x + F.relu(self.extra_value_fc(x))
         x_pi = x + F.relu(self.extra_policy_fc(x))
         int_value = self.int_value(x_v)
@@ -204,23 +215,23 @@ class PolicyModel(nn.Module):
         logits = self.policy(x_pi)
         dist = FixedCategorical(logits=F.log_softmax(logits, dim=1))
 
-        return dist, int_value, ext_value
+        return dist, int_value, ext_value, rnn_hxs
 
     def act(self, states, rnn_hxs, masks, deterministic=False):
-        dist, int_value, ext_value = self.forward(states)
+        dist, ext_value, int_value, rnn_hxs = self.forward(states, rnn_hxs, masks)
         if deterministic:
             action = dist.mode()
         else:
             action = dist.sample()
-        return (int_value, ext_value), action, dist.log_probs(action), rnn_hxs
+        return (ext_value, int_value), action, dist.log_probs(action), rnn_hxs
 
     def get_value(self, states, rnn_hxs, masks):
-        dist, int_value, ext_value = self.forward(states)
-        return int_value, ext_value
+        dist, ext_value, int_value, rnn_hxs = self.forward(states, rnn_hxs, masks)
+        return ext_value, int_value
 
     def evaluate_actions(self, states, actions, rnn_hxs, masks):
-        dist, int_value, ext_value = self.forward(states)
-        return (int_value, ext_value), dist.log_probs(actions), dist.entropy().mean(), rnn_hxs
+        dist, ext_value, int_value, rnn_hxs = self.forward(states, rnn_hxs, masks)
+        return (ext_value, int_value), dist.log_probs(actions), dist.entropy().mean(), rnn_hxs
 
 class TargetModel(nn.Module):
 
