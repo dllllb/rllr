@@ -13,12 +13,12 @@ from rllr.models import RNDModel
 from rllr.utils.logger import init_logger
 import torch.nn as nn
 from torch.nn import functional as F
-from rllr.models.encoders import RNNEncoder
 from einops import rearrange
 import cv2
 import numpy as np
 from rllr.models.ppo import FixedCategorical
 from gym.wrappers import TimeLimit
+import torch
 
 
 logger = logging.getLogger(__name__)
@@ -151,24 +151,61 @@ class Encoder(nn.Module):
 
         flatten_size = conv3_out_w * conv3_out_h * 64
 
+        self.film = nn.Linear(in_features=448, out_features=64 * 2)
         self.fc1 = nn.Linear(in_features=flatten_size, out_features=256)
 
         for layer in self.modules():
             if isinstance(layer, nn.Conv2d):
                 nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
                 layer.bias.data.zero_()
+            if isinstance(layer, nn.Linear):
+                nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+                layer.bias.data.zero_()
 
-        nn.init.orthogonal_(self.fc1.weight, gain=np.sqrt(2))
-        self.fc1.bias.data.zero_()
-
-    def forward(self, inputs):
+    def forward(self, inputs, rnn_hxs):
         x = inputs / 255.
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
+
+        film_vector = self.film(rnn_hxs).view(inputs.shape[0], 2, 64)
+        beta = film_vector[:, 0, :].view(x.size(0), x.size(1), 1, 1)
+        gamma = film_vector[:, 1, :].view(x.size(0), x.size(1), 1, 1)
+        x = gamma * x + beta
+
         x = x.view(x.size(0), -1)
         return F.relu(self.fc1(x))
 
+
+
+class RNNEncoder(nn.Module):
+    def __init__(self, model, recurrent_hidden_size):
+        super().__init__()
+        self.model = model
+        self.output_size = recurrent_hidden_size
+        self.recurrent_hidden_size = recurrent_hidden_size
+        self.gru = nn.GRUCell(model.output_size, recurrent_hidden_size)
+
+    def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
+        out, rnn_rhs = self._forward_gru(out, rnn_rhs, masks)
+        return out, rnn_rhs
+
+    def _forward_gru(self, x, hxs, masks):
+        if x.size(0) == hxs.size(0):
+            x = self.model(x, hxs)
+            hxs = self.gru(x, (hxs * masks))
+            return hxs, hxs
+
+        N = hxs.shape[0]
+        T = x.shape[0] // N
+        x = x.reshape(T, N, *x.shape[1:])
+        masks = masks.reshape(T, N, *masks.shape[1:])
+        outputs = []
+        for i in range(T):
+            xsub = self.model(x[i], hxs * masks[i])
+            hxs = self.gru(xsub, hxs * masks[i])
+            outputs.append(hxs)
+        return torch.stack(outputs, dim=0).view(T * N, -1), outputs[-1]
 
 class PolicyModel(nn.Module):
 
