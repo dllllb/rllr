@@ -256,7 +256,7 @@ class RNNEncoder(nn.Module):
         self.gru = nn.GRU(model.output_size, recurrent_hidden_size)
 
     def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
-        out = self.model(out, rnn_rhs)
+        out = self.model(out)
         out, rnn_rhs = self._forward_gru(out, rnn_rhs, masks)
         return out, rnn_rhs
 
