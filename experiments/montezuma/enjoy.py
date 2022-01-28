@@ -12,7 +12,7 @@ from rllr.env.vec_wrappers import make_vec_envs
 from rllr.utils.logger import init_logger
 import torch.nn as nn
 from einops import rearrange
-from train_rnd_ppo import PolicyModel, TargetModel, PredictorModel
+from train_rnd_ppo import PolicyModel, TargetModel, PredictorModel, Encoder, RNNEncoder
 
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,6 @@ def main(args):
     if args.mode == 'rnd_ppo':
         from train_rnd_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('../montezuma/conf/montezuma_rnd_ppo.hocon')
-        agent_path = 'artifacts/models/minigrid_rnd_ppo.p'
 
     agent = torch.load(config['outputs.path'], map_location='cpu')
 
@@ -37,7 +36,7 @@ def main(args):
         obs, done, episode_reward = env.reset(), False, 0
         episode_steps = 0
         rnn_hxs = torch.zeros((1, config.get('encoder.recurrent_hidden_size', 1)))
-        masks = torch.zeros((1, 1))
+        masks = torch.ones((1, 1))
 
         while not done:
             if args.viz:

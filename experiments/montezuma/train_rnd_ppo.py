@@ -325,8 +325,8 @@ def get_agent(env, config):
     policy = PolicyModel(env.observation_space.shape, env.action_space.n)
 
     rnd = RNDModel(
-        TargetModel((1, *env.observation_space.shape[1:])),
-        PredictorModel((1, *env.observation_space.shape[1:])),
+        TargetModel(env.observation_space.shape),
+        PredictorModel(env.observation_space.shape),
         config['agent.device'])
 
     return IMPPO(
