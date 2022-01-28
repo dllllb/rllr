@@ -179,7 +179,7 @@ class PolicyModel(nn.Module):
         self.is_recurrent = True
 
         c, w, h = state_shape
-        self.rnn = RNNEncoder(Encoder(state_shape), recurrent_hidden_size=448)
+        self.rnn = RNNEncoder(Encoder(state_shape), output_size=448)
 
         self.extra_value_fc = nn.Linear(in_features=448, out_features=448)
         self.extra_policy_fc = nn.Linear(in_features=448, out_features=448)

@@ -12,7 +12,7 @@
     head: {
         hidden_size: 64
     }
-    recurrent_hidden_size: 448
+    recurrent_hidden_size: 896
   },
 
   agent: {
