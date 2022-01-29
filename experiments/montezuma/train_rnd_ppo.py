@@ -19,6 +19,7 @@ import cv2
 import numpy as np
 from rllr.models.ppo import FixedCategorical
 from gym.wrappers import TimeLimit
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -45,9 +46,10 @@ class StickyActionEnv(gym.Wrapper):
 
 
 class RepeatActionEnv(gym.Wrapper):
-    def __init__(self, env):
+    def __init__(self, env, render):
         gym.Wrapper.__init__(self, env)
         self.successive_frame = np.zeros((2,) + self.env.observation_space.shape, dtype=np.uint8)
+        self.render = render
 
     def reset(self, **kwargs):
         return self.env.reset(**kwargs)
@@ -56,6 +58,10 @@ class RepeatActionEnv(gym.Wrapper):
         reward, done = 0, False
         for t in range(4):
             state, r, done, info = self.env.step(action)
+            if self.render:
+                self.env.render()
+                time.sleep(0.01)
+
             if t == 2:
                 self.successive_frame[0] = state
             elif t == 3:
@@ -115,10 +121,10 @@ class MontezumaInfoWrapper(gym.Wrapper):
         # return cv2.resize(t, (84, 84))
 
 
-def gen_env_with_seed(conf, seed):
+def gen_env_with_seed(conf, seed, render=False):
     env = gym.make(conf['env.env_id'])
     env = StickyActionEnv(env)
-    env = RepeatActionEnv(env)
+    env = RepeatActionEnv(env, render)
     env = MontezumaInfoWrapper(env)
     env = TimeLimit(env, max_episode_steps=4500)
     env.seed(seed)

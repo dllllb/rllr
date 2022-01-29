@@ -26,7 +26,7 @@ def main(args):
     agent = torch.load(config['outputs.path'], map_location='cpu')
 
     env = make_vec_envs(
-        lambda env_id: lambda: gen_env_with_seed(config, np.random.randint(0, 10000000)),
+        lambda env_id: lambda: gen_env_with_seed(config, np.random.randint(0, 10000000), render=args.viz),
         num_processes=1,
         device='cpu'
     )
@@ -39,8 +39,6 @@ def main(args):
         masks = torch.ones((1, 1))
 
         while not done:
-            if args.viz:
-                env.render('human')
             value, action, _, rnn_hxs = agent.act(obs, rnn_hxs, masks, deterministic=False)
             # observation, reward and next obs
             obs, reward, done, _ = env.step(action)
