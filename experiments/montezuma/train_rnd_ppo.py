@@ -68,6 +68,27 @@ class RepeatActionEnv(gym.Wrapper):
         return state, reward, done, info
 
 
+class LifeDone(gym.Wrapper):
+    def __init__(self, env):
+        super(LifeDone, self).__init__(env)
+        self.n_lives = 0
+        self.last_obs = None
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+        if self.n_lives != info['ale.lives']:
+            done = True
+            self.n_lives = info['ale.lives']
+            self.last_obs = obs
+        return obs, rew, done, info
+
+    def reset(self):
+        if self.n_lives == 0:
+            self.n_lives = 6
+            return self.env.reset()
+        return self.last_obs
+
+
 class MontezumaInfoWrapper(gym.Wrapper):
     def __init__(self, env):
         super(MontezumaInfoWrapper, self).__init__(env)
@@ -117,6 +138,7 @@ class MontezumaInfoWrapper(gym.Wrapper):
 
 def gen_env_with_seed(conf, seed):
     env = gym.make(conf['env.env_id'])
+    env = LifeDone(env)
     env = StickyActionEnv(env)
     env = RepeatActionEnv(env)
     env = MontezumaInfoWrapper(env)
