@@ -252,7 +252,6 @@ class RNNEncoder(nn.Module):
         super().__init__()
         self.model = model
         self.output_size = output_size
-        print(self.output_size)
         self.rnn = nn.LSTM(model.output_size, output_size)
 
     def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
