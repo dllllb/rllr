@@ -123,3 +123,15 @@ class IMPPO:
         dist_entropy_epoch /= num_updates
 
         return value_loss_epoch, im_value_loss_epoch, action_loss_epoch, dist_entropy_epoch
+
+    def save(self, path):
+        torch.save({
+            'actor_critic_state_dict': self.actor_critic.state_dict(),
+            'im_model_state_dict': self.im_model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict()
+        }, path)
+
+    def load(self, checkpoint):
+        self.actor_critic.load_state_dict(checkpoint["actor_critic_state_dict"])
+        self.im_model.load_state_dict(checkpoint["im_model_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])

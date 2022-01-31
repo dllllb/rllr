@@ -1,20 +1,15 @@
 import logging
 
 import gym
-from rllr.env.gym_minigrid_navigation import environments as minigrid_envs
 from rllr.utils import im_train_ppo
 from rllr.env.vec_wrappers import make_vec_envs
-from rllr.utils import switch_reproducibility_on, get_conf
-from rllr.env.wrappers import EpisodeInfoWrapper
-from rllr.models import encoders
-from rllr.models.ppo import ActorCriticNetwork
+from rllr.utils import get_conf
 from rllr.algo import IMPPO
 from rllr.models import RNDModel
 from rllr.utils.logger import init_logger
 import torch.nn as nn
 from torch.nn import functional as F
 from rllr.models.encoders import RNNEncoder
-from einops import rearrange
 import cv2
 import numpy as np
 from rllr.models.ppo import FixedCategorical
@@ -23,7 +18,6 @@ import time
 
 
 logger = logging.getLogger(__name__)
-
 
 
 class StickyActionEnv(gym.Wrapper):
@@ -42,7 +36,6 @@ class StickyActionEnv(gym.Wrapper):
     def reset(self):
         self.last_action = 0
         return self.env.reset()
-
 
 
 class RepeatActionEnv(gym.Wrapper):
@@ -93,7 +86,6 @@ class MontezumaInfoWrapper(gym.Wrapper):
         action = int(action)
 
         obs, rew, done, info = self.env.step(action)
-        rew = np.sign(rew)
         self.episode_reward += rew
         self.episode_steps += 1
         self.visited_rooms.add(self.get_current_room())
@@ -107,7 +99,7 @@ class MontezumaInfoWrapper(gym.Wrapper):
             }
             self.visited_rooms.clear()
 
-        return self.observation(obs), rew, done, info
+        return self.observation(obs), np.sign(rew), done, info
 
     def reset(self):
         self.episode_reward = 0
@@ -118,7 +110,6 @@ class MontezumaInfoWrapper(gym.Wrapper):
         img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         img = cv2.resize(img, (84, 84), interpolation=cv2.INTER_AREA)
         return np.stack([img])
-        # return cv2.resize(t, (84, 84))
 
 
 def gen_env_with_seed(conf, seed, render=False):
@@ -129,7 +120,6 @@ def gen_env_with_seed(conf, seed, render=False):
     env = TimeLimit(env, max_episode_steps=4500)
     env.seed(seed)
     return env
-
 
 
 def conv_shape(input, kernel_size, stride, padding=0):

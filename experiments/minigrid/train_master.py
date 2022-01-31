@@ -1,7 +1,7 @@
 import logging
 import torch
 
-from experiments.minigrid.train_worker import gen_env
+from train_worker import gen_env
 from rllr.algo import PPO
 from rllr.env import make_vec_envs, HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward
 from rllr.models import encoders, ActorCriticNetwork, StateEmbedder
