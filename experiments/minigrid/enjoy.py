@@ -59,7 +59,7 @@ def main(args):
     for _ in trange(args.episodes):
         obs, done, episode_reward = env.reset(), False, 0
         rnn_hxs = torch.zeros((1, config.get('encoder.recurrent_hidden_size', 1)))
-        masks = torch.zeros((1, 1))
+        masks = torch.ones((1, 1))
 
         while not done:
             if args.viz:

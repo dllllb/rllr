@@ -248,23 +248,25 @@ class LastActionEncoder(nn.Module):
 
 
 class RNNEncoder(nn.Module):
-    def __init__(self, model, recurrent_hidden_size):
+    def __init__(self, model, output_size):
         super().__init__()
         self.model = model
-        self.output_size = recurrent_hidden_size
-        self.recurrent_hidden_size = recurrent_hidden_size
-        self.gru = nn.GRU(model.output_size, recurrent_hidden_size)
+        self.output_size = output_size
+        self.rnn = nn.LSTM(model.output_size, output_size)
 
     def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
         out = self.model(out)
-        out, rnn_rhs = self._forward_gru(out, rnn_rhs, masks)
+        out, rnn_rhs = self._forward_rnn(out, rnn_rhs, masks)
         return out, rnn_rhs
 
-    def _forward_gru(self, x, hxs, masks):
+    def _forward_rnn(self, x, hxs, masks):
         if x.size(0) == hxs.size(0):
-            x, hxs = self.gru(x.unsqueeze(0), (hxs * masks).unsqueeze(0))
+            hxs = hxs.view(x.size(0), 2, hxs.size(1) // 2)
+            h = hxs[:, 0, :]
+            c = hxs[:, 1, :]
+            x, (h, c) = self.rnn(x.unsqueeze(0), ((h * masks).unsqueeze(0), (c * masks).unsqueeze(0)))
             x = x.squeeze(0)
-            hxs = hxs.squeeze(0)
+            hxs = torch.cat([h.squeeze(0), c.squeeze(0)], dim=1)
         else:
             # x is a (T, N, -1) tensor that has been flatten to (T * N, -1)
             N = hxs.size(0)
@@ -294,7 +296,9 @@ class RNNEncoder(nn.Module):
             # add t=0 and t=T to the list
             has_zeros = [0] + has_zeros + [T]
 
-            hxs = hxs.unsqueeze(0)
+            hxs = hxs.view(N, 2, -1)
+            h = hxs[:, 0, :].unsqueeze(0)
+            c = hxs[:, 1, :].unsqueeze(0)
             outputs = []
             for i in range(len(has_zeros) - 1):
                 # We can now process steps that don't have any zeros in masks together!
@@ -302,9 +306,10 @@ class RNNEncoder(nn.Module):
                 start_idx = has_zeros[i]
                 end_idx = has_zeros[i + 1]
 
-                rnn_scores, hxs = self.gru(
+                rnn_scores, (h, c) = self.rnn(
                     x[start_idx:end_idx],
-                    hxs * masks[start_idx].view(1, -1, 1))
+                    (h * masks[start_idx].view(1, -1, 1), c * masks[start_idx].view(1, -1, 1)),
+                )
 
                 outputs.append(rnn_scores)
 
@@ -313,7 +318,7 @@ class RNNEncoder(nn.Module):
             x = torch.cat(outputs, dim=0)
             # flatten
             x = x.view(T * N, -1)
-            hxs = hxs.squeeze(0)
+            hxs = torch.cat([h.squeeze(0), c.squeeze(0)], dim=1)
 
         return x, hxs
 

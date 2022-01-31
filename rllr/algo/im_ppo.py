@@ -34,7 +34,8 @@ class IMPPO:
 
         self.max_grad_norm = max_grad_norm
 
-        self.optimizer = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
+        self.total_trainable_params = list(self.actor_critic.parameters()) + list(self.im_model.parameters())
+        self.optimizer = optim.Adam(self.total_trainable_params, lr=lr, eps=eps)
 
     def to(self, device):
         self.actor_critic = self.actor_critic.to(device)
@@ -106,8 +107,7 @@ class IMPPO:
 
                 self.optimizer.zero_grad()
                 (critic_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef + im_loss).backward()
-                nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
-                nn.utils.clip_grad_norm_(self.im_model.parameters(), self.max_grad_norm)
+                nn.utils.clip_grad_norm_(self.total_trainable_params, self.max_grad_norm)
                 self.optimizer.step()
 
                 value_loss_epoch += value_loss.item()
