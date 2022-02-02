@@ -88,16 +88,3 @@ class PPO:
         dist_entropy_epoch /= num_updates
 
         return value_loss_epoch, action_loss_epoch, dist_entropy_epoch
-
-    def save(self, path):
-        torch.save({
-            'actor_critic_state_dict': self.actor_critic.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict()
-        }, path)
-
-    def load(self, checkpoint):
-        print(checkpoint['optimizer_state_dict'])
-        print(self.optimizer.state_dict())
-        self.actor_critic.load_state_dict(checkpoint['actor_critic_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
