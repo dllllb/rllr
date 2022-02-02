@@ -44,3 +44,4 @@ jobs:
         cd experiments/minigrid
         pytest enjoy.py
         cd -
+        pytest
