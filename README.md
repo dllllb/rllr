@@ -2,6 +2,11 @@
 
 ## Getting Started
 
+### Install Git LFS
+
+```brew install git-lfs```  
+```git lfs install```
+
 ### Variant 1: pipenv installation
 
 Pipenv is a tool that creates and manages a virtualenv for your projects, and track packages
