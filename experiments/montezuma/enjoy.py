@@ -63,7 +63,7 @@ def play(mode, viz, n_episodes):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--mode', choices=['worker', 'rnd_ppo'])
+    parser.add_argument('--mode', choices=['rnd_ppo'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()
