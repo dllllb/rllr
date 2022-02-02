@@ -92,7 +92,7 @@ def get_agent(env, config):
         encoders.get_encoder(
             grid_size,
             config['encoder']),
-        state_conf['recurrent_hidden_size']
+        state_conf['recurrent_hidden_size'] // 2
     ), env.action_space.n)
     policy = ActorCriticNetwork(
         env.action_space, state_encoder,
