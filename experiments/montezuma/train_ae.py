@@ -11,8 +11,8 @@ from tqdm import trange, tqdm
 
 def rollout(env, agent, config):
     obs, done, info = env.reset(), False, []
-    rnn_hxs = torch.zeros((1, config.get('encoder.recurrent_hidden_size', 1)))
-    masks = torch.ones((1, 1))
+    rnn_hxs = torch.zeros((1, config.get('encoder.recurrent_hidden_size', 1))).to('cuda:0')
+    masks = torch.ones((1, 1)).to('cuda:0')
 
     states = []
     while not done:
@@ -21,7 +21,7 @@ def rollout(env, agent, config):
         obs, reward, done, info = env.step(action)
     states.append(obs)
 
-    return torch.from_numpy(np.concatenate(states, axis=0))
+    return torch.cat(states, dim=0)
 
 
 class AE(nn.Module):
@@ -82,12 +82,12 @@ if __name__ == '__main__':
     env = make_vec_envs(
         lambda env_id: lambda: gen_env_with_seed(config, 0, render=False),
         num_processes=1,
-        device='cpu'
+        device='cuda:0'
     )
 
-    agent = torch.load(config['outputs.path'], map_location='cpu')
-    aenc = AE(env.observation_space.shape)
-    n_epoch = 0
+    agent = torch.load(config['outputs.path'], map_location='cuda:0')
+    aenc = AE(env.observation_space.shape).to('cuda:0')
+    n_epoch = 1000
     batch_size = 32
     loss_f = nn.MSELoss()
     opt = AdamW(aenc.parameters())
@@ -99,6 +99,7 @@ if __name__ == '__main__':
         for _ in range(dat.shape[0] // batch_size):
             ids = torch.randint(0, dat.shape[0], (batch_size,))
             imgs = dat[ids] / 255.
+            imgs = imgs.to('cuda:0')
             rec = aenc(imgs)
 
             opt.zero_grad()
