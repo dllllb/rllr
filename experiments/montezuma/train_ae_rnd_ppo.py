@@ -177,11 +177,11 @@ class AE(nn.Module):
                 layer.bias.data.zero_()
 
     def forward(self, t):
-        return self.enc(t / 255.)
+        return self.enc(t)
 
     def compute_loss(self, t, batch_size):
         ids = torch.randint(0, t.shape[0], (batch_size,))
-        imgs = t[ids]
+        imgs = t[ids] / 255.
         return F.mse_loss(imgs, self.dec(self.forward(imgs)))
 
 
@@ -224,6 +224,7 @@ class PolicyModel(nn.Module):
         self.ext_value.bias.data.zero_()
 
     def forward(self, inputs, rnn_hxs, masks):
+        inputs = inputs / 255.
         x, rnn_hxs = self.rnn(inputs, rnn_hxs, masks)
         x_v = x + F.relu(self.extra_value_fc(x))
         x_pi = x + F.relu(self.extra_policy_fc(x))
