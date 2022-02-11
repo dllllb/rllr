@@ -35,7 +35,7 @@ class IMPPO:
         self.max_grad_norm = max_grad_norm
 
         self.total_trainable_params = list(self.actor_critic.parameters()) + list(self.im_model.parameters())
-        self.optimizer = optim.Adam(self.total_trainable_params, lr=lr, eps=eps)
+        self.optimizer = optim.AdamW(self.total_trainable_params, lr=lr, eps=eps)
 
     def to(self, device):
         self.actor_critic = self.actor_critic.to(device)
