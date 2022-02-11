@@ -111,7 +111,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
         rollouts.compute_returns(next_value, conf['agent.gamma'], conf['agent.gae_lambda'])
         rollouts.compute_im_returns(next_im_value, conf['agent.im_gamma'], conf['agent.gae_lambda'])
 
-        value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
+        value_loss, im_value_loss, action_loss, dist_entropy, aenc_loss = agent.update(rollouts, obs_rms)
         rollouts.after_update()
 
         if j % conf['training.verbose'] == 0:
@@ -123,8 +123,9 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
                   f'dist_entropy {dist_entropy:.2f}, '
                   f'value_loss {value_loss:.2f}, '
                   f'im_value_loss {im_value_loss:.2f}, '
-                  f'action_loss {action_loss:.2f}'
-                )
+                  f'action_loss {action_loss:.2f}, '
+                  f'aenc_loss {aenc_loss:.2f}'
+            )
             for task in episode_stats:
                 print(f'Task {task}:')
                 task_stats = episode_stats[task]

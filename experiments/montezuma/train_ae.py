@@ -115,7 +115,7 @@ def test_ae(env, agent, config):
 
 
 if __name__ == '__main__':
-    device = 'cuda:0'
+    device = 'cpu'
     config = ConfigFactory.parse_file('conf/montezuma_rnd_ppo.hocon')
 
     env = make_vec_envs(
@@ -126,7 +126,7 @@ if __name__ == '__main__':
 
     agent = torch.load(config['outputs.path'], map_location=device)
     aenc = AE(env.observation_space.shape).to(device)
-    train_ae(env, agent, config)
+    #train_ae(env, agent, config)
 
     aenc.load_state_dict(torch.load(open('aenc.p', 'rb'), map_location=device))
     test_ae(env, agent, config)

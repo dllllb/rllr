@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from torch.distributions import RelaxedOneHotCategorical
 
 
 def switch_reproducibility_on(seed=42):
@@ -56,3 +57,31 @@ class RunningMeanStd(object):
         self.mean = new_mean
         self.var = new_var
         self.count = new_count
+
+
+def gumbel_softmax_sample(
+    logits: torch.Tensor,
+    temperature: float = 1.0,
+    training: bool = True,
+    straight_through: bool = False,
+):
+
+    size = logits.size()
+    if not training:
+        indexes = logits.argmax(dim=-1)
+        one_hot = torch.zeros_like(logits).view(-1, size[-1])
+        one_hot.scatter_(1, indexes.view(-1, 1), 1)
+        one_hot = one_hot.view(*size)
+        return one_hot
+
+    sample = RelaxedOneHotCategorical(logits=logits, temperature=temperature).rsample()
+
+    if straight_through:
+        size = sample.size()
+        indexes = sample.argmax(dim=-1)
+        hard_sample = torch.zeros_like(sample).view(-1, size[-1])
+        hard_sample.scatter_(1, indexes.view(-1, 1), 1)
+        hard_sample = hard_sample.view(*size)
+
+        sample = sample + (hard_sample - sample).detach()
+    return sample

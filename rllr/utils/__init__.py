@@ -1,4 +1,4 @@
-from .common import convert_to_torch, switch_reproducibility_on
+from .common import convert_to_torch, switch_reproducibility_on, gumbel_softmax_sample
 from .training import train_ppo
 from .im_training import im_train_ppo
 from .config import get_conf

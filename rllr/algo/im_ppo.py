@@ -17,10 +17,13 @@ class IMPPO:
                  entropy_coef,
                  lr=None,
                  eps=None,
-                 max_grad_norm=None):
+                 max_grad_norm=None,
+                 auto_encoder=None
+                 ):
 
         self.actor_critic = actor_critic
         self.im_model = im_model
+        self.auto_encoder = auto_encoder
 
         self.ext_coef = ext_coef
         self.im_coef = im_coef
@@ -34,7 +37,11 @@ class IMPPO:
 
         self.max_grad_norm = max_grad_norm
 
-        self.total_trainable_params = list(self.actor_critic.parameters()) + list(self.im_model.parameters())
+        self.total_trainable_params = \
+            list(self.actor_critic.parameters()) + \
+            list(self.im_model.parameters()) + \
+            list(self.auto_encoder.parameters()) if self.auto_encoder is not None else list()
+
         self.optimizer = optim.AdamW(self.total_trainable_params, lr=lr, eps=eps)
 
     def to(self, device):
@@ -64,6 +71,7 @@ class IMPPO:
         im_value_loss_epoch = 0
         action_loss_epoch = 0
         dist_entropy_epoch = 0
+        aenc_loss_epoch = 0
 
         for e in range(self.ppo_epoch):
             if self.actor_critic.is_recurrent:
@@ -75,6 +83,15 @@ class IMPPO:
                 obs_batch, next_obs_batch, recurrent_hidden_states_batch, actions_batch, value_preds_batch, im_value_preds_batch, \
                     return_batch, im_return_batch, masks_batch, \
                     old_action_log_probs_batch, adv_targ = sample
+
+                aenc_loss = 0
+                if self.auto_encoder is not None:
+                    obs_shape = rollouts.obs.shape
+                    aenc_loss = self.auto_encoder.compute_loss(
+                        rollouts.obs.view(-1, *obs_shape[2:]),
+                        batch_size=obs_batch.shape[0]
+                    )
+                aenc_loss_epoch += aenc_loss
 
                 next_obs_batch = ((get_state(next_obs_batch) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5)
                 im_loss = self.im_model.compute_loss(next_obs_batch)
@@ -106,7 +123,13 @@ class IMPPO:
                 critic_loss = value_loss + im_value_loss
 
                 self.optimizer.zero_grad()
-                (critic_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef + im_loss).backward()
+                (
+                        critic_loss * self.value_loss_coef +
+                        action_loss -
+                        dist_entropy * self.entropy_coef +
+                        im_loss +
+                        aenc_loss
+                ).backward()
                 nn.utils.clip_grad_norm_(self.total_trainable_params, self.max_grad_norm)
                 self.optimizer.step()
 
@@ -121,5 +144,6 @@ class IMPPO:
         im_value_loss_epoch /= num_updates
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
+        aenc_loss_epoch /= num_updates
 
-        return value_loss_epoch, im_value_loss_epoch, action_loss_epoch, dist_entropy_epoch
+        return value_loss_epoch, im_value_loss_epoch, action_loss_epoch, dist_entropy_epoch, aenc_loss_epoch
