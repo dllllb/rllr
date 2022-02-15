@@ -72,6 +72,8 @@ class IMPPO:
         action_loss_epoch = 0
         dist_entropy_epoch = 0
         aenc_loss_epoch = 0
+        hinge_loss_epoch = 0
+        vqent_epoch = 0.
 
         for e in range(self.ppo_epoch):
             if self.actor_critic.is_recurrent:
@@ -84,13 +86,16 @@ class IMPPO:
                     return_batch, im_return_batch, masks_batch, \
                     old_action_log_probs_batch, adv_targ = sample
 
-                aenc_loss = 0
+                aenc_loss, hinge_loss, vqent = 0., 0., float('nan')
                 if self.auto_encoder is not None:
                     obs_shape = rollouts.obs.shape
-                    aenc_loss = self.auto_encoder.compute_loss(
+                    aenc_loss, vqent, hinge_loss = self.auto_encoder.compute_loss(
                         rollouts.obs.view(-1, *obs_shape[2:]),
                         batch_size=obs_batch.shape[0]
                     )
+
+                vqent_epoch += vqent
+                hinge_loss_epoch += hinge_loss
                 aenc_loss_epoch += aenc_loss
 
                 next_obs_batch = ((get_state(next_obs_batch) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5)
@@ -144,6 +149,9 @@ class IMPPO:
         im_value_loss_epoch /= num_updates
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
-        aenc_loss_epoch /= num_updates
 
-        return value_loss_epoch, im_value_loss_epoch, action_loss_epoch, dist_entropy_epoch, aenc_loss_epoch
+        aenc_loss_epoch /= num_updates
+        vqent_epoch /= num_updates
+        hinge_loss_epoch /= num_updates
+
+        return value_loss_epoch, im_value_loss_epoch, action_loss_epoch, dist_entropy_epoch, aenc_loss_epoch, vqent_epoch, hinge_loss_epoch

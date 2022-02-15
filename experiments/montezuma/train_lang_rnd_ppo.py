@@ -235,7 +235,10 @@ class LangVQVAE(nn.Module):
     def __init__(self, state_shape, sr, ell2_coef=1e-3, beta=0.25):
         super().__init__()
         self.state_shape = state_shape
-        self.sr = sr
+
+        # by default sr is in eval mode for rollout
+        self.sr = sr.eval()
+
         self.output_size = 256
         self.ell2_coef = ell2_coef
         self.beta = beta
@@ -287,7 +290,10 @@ class LangVQVAE(nn.Module):
         feat_t = self.enc(imgs_t)
         feat_d = self.enc(imgs_d)
 
-        recout_t, codes, emb_loss, com_loss = self.sr(feat_t, reduction='sum')
+        # Allow EWMA upadtes to centroids on forward pass thru `sr.vq`
+        self.sr.train()
+        recout_t, codes, emb_loss, com_loss, ent = self.sr(feat_t, reduction='sum')
+        self.sr.eval()
 
         # \log p(d|t) - \log p(t|t)
         loss = torch.einsum('...f, ...f -> ...',
@@ -301,7 +307,9 @@ class LangVQVAE(nn.Module):
         ell2_loss = 0.5 * (ell2_d + ell2_t + ell2_r)
         hinge_loss = F.relu(1 + loss).sum()
 
-        return hinge_loss + self.ell2_coef * ell2_loss + (emb_loss + self.beta * com_loss)
+        return (
+            hinge_loss + self.ell2_coef * ell2_loss + (emb_loss + self.beta * com_loss)
+        ), ent, float(hinge_loss)
 
 class PolicyModel(nn.Module):
 

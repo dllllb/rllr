@@ -1,3 +1,4 @@
+import math
 import torch
 
 from torch import nn
@@ -234,4 +235,8 @@ class SendRecv(nn.Module):
         # receiver `recv : R^{M F} -> X`
         x_hat = self.recv(emb)
 
-        return x_hat, codes, embedding, commitment
+        # compute the enropy of the quantization layer
+        prob = torch.bincount(codes.flatten(), minlength=self.vq.num_embeddings) / codes.numel()
+        ent = - F.kl_div(prob.new_zeros(()), prob, reduction='sum')
+
+        return x_hat, codes, embedding, commitment, float(ent) / math.log(2)
