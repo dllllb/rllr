@@ -1,8 +1,4 @@
 {
-  env: {
-    env_id: MontezumaRevengeNoFrameskip-v4
-  },
-
   encoder: {
     state_encoder_type: simple_cnn,
     n_channels: [16, 16],
