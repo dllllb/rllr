@@ -4,6 +4,7 @@
     env_task: MiniGrid-LavaCrossingS9N3-v0,
     rgb_image: true,
     tile_size: 4,
+    action_size: 3,
   },
 
   encoder: {
