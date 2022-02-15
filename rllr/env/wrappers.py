@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import torch
 
-from collections import deque
+from collections import deque, defaultdict
 from gym.wrappers import Monitor
 import torch.nn.functional as F
 from rllr.models import encoders
@@ -329,26 +329,26 @@ class EpisodeInfoWrapper(gym.Wrapper):
         super(EpisodeInfoWrapper, self).__init__(env)
         self.episode_reward = 0
         self.episode_steps = 0
-        self.visits_stats = dict()
+        self.visits_stats = defaultdict(int)
 
     def reset(self):
         self.episode_reward = 0
         self.episode_steps = 0
-        self.visits_stats = dict()
+        self.visits_stats.clear()
         return self.env.reset()
 
     def step(self, action):
         state, reward, done, info = self.env.step(action)
         self.episode_reward += reward
         self.episode_steps += 1
-        pos = tuple(self.agent_pos)
-        if pos in self.visits_stats:
-            self.visits_stats[pos] += 1
-        else:
-            self.visits_stats[pos] = 1
+        self.visits_stats[tuple(self.agent_pos)] += 1
         info['visit_stats'] = self.visits_stats
         if done:
-            info['episode'] = {'r': self.episode_reward, 'steps': self.episode_steps}
+            info['episode'] = {
+                'task': self.env.unwrapped.spec.id,
+                'r': self.episode_reward,
+                'steps': self.episode_steps
+            }
         return state, reward, done, info
 
 

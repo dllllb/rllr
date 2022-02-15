@@ -74,7 +74,7 @@ class GoalPatch(gym.Wrapper):
 
 def get_env_name(conf):
     if conf['env_task'] in ['MiniGrid-Empty', 'MiniGrid-Dynamic-Obstacles']:
-        env_name = f"{conf['env_task']}-{conf['grid_size']}x{conf['grid_size']}-v0"
+        return f"{conf['env_task']}-{conf['grid_size']}x{conf['grid_size']}-v0"
 
     elif conf['env_task'] == 'MiniGrid-MultiRoom':
         env_names_dict = {
@@ -82,7 +82,7 @@ def get_env_name(conf):
             4: 'MiniGrid-MultiRoom-N4-S5-v0',
             6: 'MiniGrid-MultiRoom-N6-v0'
         }
-        env_name = env_names_dict[conf['num_rooms']]
+        return env_names_dict[conf['num_rooms']]
 
     elif conf['env_task'] == 'MiniGrid-LavaGap':
         env_names_dict = {
@@ -90,7 +90,7 @@ def get_env_name(conf):
             6: 'MiniGrid-LavaGapS6-v0',
             7: 'MiniGrid-LavaGapS7-v0',
         }
-        env_name = env_names_dict[conf['s_size']]
+        return env_names_dict[conf['s_size']]
 
     elif conf['env_task'] == 'MiniGrid-LavaCrossing':
         env_names_dict = {
@@ -99,7 +99,7 @@ def get_env_name(conf):
             3: 'MiniGrid-LavaCrossingS9N3-v0',
             5: 'MiniGrid-LavaCrossingS11N5-v0',
         }
-        env_name = env_names_dict[conf['n_size']]
+        return env_names_dict[conf['n_size']]
 
     elif conf['env_task'] == 'MiniGrid-SimpleCrossing':
         env_names_dict = {
@@ -108,15 +108,9 @@ def get_env_name(conf):
             3: 'MiniGrid-SimpleCrossingS9N3-v0',
             5: 'MiniGrid-SimpleCrossingS11N5-v0',
         }
-        env_name = env_names_dict[conf['n_size']]
+        return env_names_dict[conf['n_size']]
 
-    elif conf['env_task'] == 'MiniGrid-FourRooms':
-        env_name = 'MiniGrid-FourRooms-v0'
-
-    else:
-        raise AttributeError(f"unknown env_task '{conf['env_task']}'")
-
-    return env_name
+    return conf['env_task']
 
 
 def gen_wrapped_env(conf, verbose=False):
