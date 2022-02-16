@@ -22,7 +22,9 @@ def test():
         'ssim_master_lava': (0.95499998, 1.0),
         'ssim_worker': (0, 0),
         'direct_ppo': (0.87695312, 1.0),
+        'direct_ppo_lava': (0.94722223, 1.0),
         'rnd_ppo': (0.30742186, 1.0),
+        'rnd_ppo_lava': (0.86111110, 1.0),
         'multi': (0.77222222, 1.0)
     }
 
@@ -59,9 +61,17 @@ def play(mode, viz, n_episodes):
         config = ConfigFactory.parse_file('conf/minigrid_direct_ppo.hocon')
         config['env']['agent_start_pos'] = (1, 1)
 
+    elif mode == 'direct_ppo_lava':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_direct_ppo_lava.hocon')
+
     elif mode == 'rnd_ppo':
         from train_rnd_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo.hocon')
+
+    elif mode == 'rnd_ppo_lava':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_lava.hocon')
 
     elif mode == 'multi':
         from train_multitask import gen_env_with_seed

@@ -10,24 +10,17 @@ from rllr.utils import switch_reproducibility_on, get_conf
 logger = logging.getLogger(__name__)
 
 
-def gen_wrapped_env(conf):
-    env = minigrid_envs.gen_wrapped_env(conf)
-    return env
-
-
 def gen_env_with_seed(conf, seed):
     conf['env.deterministic'] = True
     conf['env']['seed'] = seed
-    return EpisodeInfoWrapper(gen_wrapped_env(conf['env']))
+    env = minigrid_envs.gen_wrapped_env(conf['env'])
+    return EpisodeInfoWrapper(env)
 
 
 def get_agent(env, config):
     state_conf = config['encoder']
     hidden_size = state_conf['head']['hidden_size']
-    if config['env'].get('fully_observed', True):
-        grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
-    else:
-        grid_size = 7 * config['env'].get('tile_size', 1)
+    grid_size = env.observation_space.shape[0]
     state_encoder = encoders.get_encoder(grid_size, config['encoder'])
     policy = ActorCriticNetwork(env.action_space, state_encoder, state_encoder, hidden_size, hidden_size)
 
