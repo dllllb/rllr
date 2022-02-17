@@ -39,7 +39,7 @@ def play(mode, viz, n_episodes):
         device='cpu'
     )
 
-    agent = torch.load(config['outputs.path'], map_location='cpu')
+    agent = torch.load(config['outputs.model'], map_location='cpu')
 
     rewards, steps, rooms = [], [], []
     for _ in trange(n_episodes):

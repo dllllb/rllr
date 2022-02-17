@@ -51,6 +51,7 @@
   seed: 42,
 
   outputs: {
-      path: artifacts/models/minigrid_master_ssim.p,
+      model: artifacts/models/minigrid_master_ssim.p,
+      logs: artifacts/logs/minigrid_master_ssim
   }
 }

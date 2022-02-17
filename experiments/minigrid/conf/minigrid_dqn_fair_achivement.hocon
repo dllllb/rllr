@@ -54,6 +54,7 @@
 
   outputs: {
     save_example: true,
-    path: artifacts/models/minigrid_worker.p,
+    model: artifacts/models/minigrid_worker.p,
+    logs: artifacts/models/minigrid_worker
   }
 }

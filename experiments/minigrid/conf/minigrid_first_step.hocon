@@ -59,6 +59,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_worker.p,
+    model: artifacts/models/minigrid_worker.p,
+    logs: artifacts/logs/minigrid_worker
   }
 }

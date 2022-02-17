@@ -47,6 +47,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_rnd_ppo.p,
+    model: artifacts/models/minigrid_rnd_ppo.p,
+    logs: artifacts/logs/minigrid_rnd_ppo
   }
 }
