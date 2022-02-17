@@ -43,7 +43,7 @@ def init_obs_rms(env, conf):
 
 
 def im_train_ppo(env, agent, conf, after_epoch_callback=None):
-    writer = SummaryWriter('artifacts/logs')
+    writer = SummaryWriter(conf['outputs.logs'])
     reward_rms = RunningMeanStd(device=conf['agent.device'])
     obs_rms = init_obs_rms(env, conf)
 
@@ -141,7 +141,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
                     )
                 print()
 
-            torch.save(agent, conf['outputs.path'])
+            torch.save(agent, conf['outputs.model'])
 
             if after_epoch_callback is not None:
                 loss = after_epoch_callback(rollouts)

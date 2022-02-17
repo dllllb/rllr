@@ -19,7 +19,7 @@
   },
 
   agent: {
-    device: "cuda:1",
+    device: "cpu",
     ext_coef: 2.0,
     im_coef: 1.0,
     clip_param: 0.2,
@@ -46,6 +46,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_rnd_ppo_lava.p,
+    model: artifacts/models/minigrid_rnd_ppo_lava.p,
+    logs: artifacts/logs/minigrid_rnd_ppo_lava
   }
 }

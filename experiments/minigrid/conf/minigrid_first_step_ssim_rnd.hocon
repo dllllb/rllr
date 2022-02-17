@@ -94,6 +94,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_worker_ssim_rnd_buffer.p,
+    model: artifacts/models/minigrid_worker_ssim_rnd_buffer.p,
+    logs: artifacts/logs/minigrid_worker_ssim_rnd_buffer
   }
 }

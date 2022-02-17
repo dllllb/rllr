@@ -64,6 +64,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_ssim.p
+    model: artifacts/models/minigrid_ssim.p
+    logs: artifacts/logs/minigrid_state_distance_encoder
   }
 }

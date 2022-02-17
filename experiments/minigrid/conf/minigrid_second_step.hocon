@@ -49,6 +49,7 @@
   seed: 42,
 
   outputs: {
-      path: artifacts/models/minigrid_master.p,
+      model: artifacts/models/minigrid_master.p,
+      logs: artifacts/logs/minigrid_master
   }
 }

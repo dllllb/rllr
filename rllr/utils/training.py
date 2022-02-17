@@ -16,7 +16,7 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
 
 
 def train_ppo(env, agent, conf):
-    writer = SummaryWriter('artifacts/logs')
+    writer = SummaryWriter(conf['outputs.logs'])
 
     rollouts = RolloutStorage(
         conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space
@@ -70,4 +70,4 @@ def train_ppo(env, agent, conf):
             writer.add_scalar('action_loss', action_loss, total_num_steps)
             writer.add_scalar('reward', episode_rewards[-1])
 
-            torch.save(agent, conf['outputs.path'])
+            torch.save(agent, conf['outputs.model'])
