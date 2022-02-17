@@ -2,6 +2,7 @@ from tqdm import trange
 import time
 from collections import deque
 import torch
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 from rllr.buffer.rollout import RolloutStorage
@@ -15,9 +16,8 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
 
 
 def train_ppo(env, agent, conf):
-    """
-    Runs a series of episode and collect statistics
-    """
+    writer = SummaryWriter('artifacts/logs')
+
     rollouts = RolloutStorage(
         conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space
     )
@@ -64,5 +64,10 @@ def train_ppo(env, agent, conf):
                   f'dist_entropy {dist_entropy:.2f}, '
                   f'value_loss {value_loss:.2f}, '
                   f'action_loss {action_loss:.2f}')
+
+            writer.add_scalar('dist_entropy', dist_entropy, total_num_steps)
+            writer.add_scalar('value_loss', value_loss, total_num_steps)
+            writer.add_scalar('action_loss', action_loss, total_num_steps)
+            writer.add_scalar('reward', episode_rewards[-1])
 
             torch.save(agent, conf['outputs.path'])
