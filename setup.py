@@ -30,7 +30,8 @@ setup(
         'tqdm',
         'stable-baselines3',
         'opencv-python',
-        'tensorboardX'
+        'tensorboardX',
+        'tensorboard'
     ],
 )
 
