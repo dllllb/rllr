@@ -68,6 +68,6 @@ def train_ppo(env, agent, conf):
             writer.add_scalar('dist_entropy', dist_entropy, total_num_steps)
             writer.add_scalar('value_loss', value_loss, total_num_steps)
             writer.add_scalar('action_loss', action_loss, total_num_steps)
-            writer.add_scalar('reward', np.mean(episode_rewards))
+            writer.add_scalar('reward', np.mean(episode_rewards), total_num_steps)
 
             torch.save(agent, conf['outputs.model'])
