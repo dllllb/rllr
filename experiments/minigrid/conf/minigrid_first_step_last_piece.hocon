@@ -74,6 +74,6 @@
 
   outputs: {
     model: artifacts/models/minigrid_worker_ssim.p,
-    logs: artifacts/logs/minigrid_worker_ssim.p,
+    logs: artifacts/logs/minigrid_worker_ssim,
   }
 }
