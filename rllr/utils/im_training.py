@@ -134,7 +134,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
                 print(f'Task {task}:')
                 task_stats = episode_stats[task]
                 for key, value in task_stats.items():
-                    writer.add_scalar(f'{task}/{key}', value[-1], total_num_steps)
+                    writer.add_scalar(f'{task}/{key}', np.mean(value), total_num_steps)
                     print(
                         f'mean/median {key} {np.mean(value):.2f}/{np.median(value):.2f}, '
                         f'min/max {key} {np.min(value):.2f}/{np.max(value):.2f}'
