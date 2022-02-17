@@ -29,7 +29,8 @@ setup(
         'scipy',              # environments.py :: scipy.stats
         'tqdm',
         'stable-baselines3',
-        'opencv-python'
+        'opencv-python',
+        'tensorboardX'
     ],
 )
 
