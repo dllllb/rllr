@@ -50,9 +50,9 @@ class ContrastiveStateSimilarity:
                                 labels.append(int(abs(i - j) <= self.radius))
                     n, states = 0, []
             if len(labels)>0:
-                loss += self.optimize(torch.stack(states1, dim=0),
-                            torch.stack(states2, dim=0),
-                            convert_to_torch(labels).squeeze())
+                loss += self.optimize(torch.stack(states1, dim=0).to(self.device),
+                            torch.stack(states2, dim=0).to(self.device),
+                            convert_to_torch(labels, self.device).squeeze())
         return loss/rollouts.num_processes/self.epochs
 
     def optimize(self, states1, states2, labels):

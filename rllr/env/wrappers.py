@@ -52,11 +52,11 @@ class NavigationGoalWrapper(gym.Wrapper):
         self.is_goal_achieved = self._goal_achieved(next_state)
         reward = int(self.is_goal_achieved)
 
-        if self.is_goal_achieved and not done:
-            self.gen_goal(next_state)
-
         if env_reward > 0 and done:
             done = False
+
+        if self.is_goal_achieved and not done:
+            self.gen_goal(next_state)
 
         return next_state, reward, done, info
 
@@ -380,4 +380,7 @@ class HierarchicalWrapper(gym.Wrapper):
 class ZeroRewardWrapper(gym.Wrapper):
     def step(self, action):
         state, reward, done, info = self.env.step(action)
+        if reward > 0 and done:
+            done = False
+
         return state, 0, done, info
