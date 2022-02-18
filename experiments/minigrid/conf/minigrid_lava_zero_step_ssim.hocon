@@ -1,14 +1,9 @@
 {
   env: {
-    env_type: gym_minigrid,
-    env_task: MiniGrid-LavaGap,
-    s_size: 5,
-    fully_observed: false,
-    grid_size: 7,
+    env_task: MiniGrid-LavaCrossingS9N3-v0,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    video_path: artifacts/video/,
   },
 
   state_similarity: {
