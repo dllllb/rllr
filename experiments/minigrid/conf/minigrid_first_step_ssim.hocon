@@ -50,13 +50,12 @@
     head: {
         hidden_size: []
     },
-    emb_size: 32
+    emb_size: 8,
+    normalize: true,
   },
 
   agent: {
     device: "cpu",
-    ext_coef: 2.0,
-    im_coef: 1.0,
     clip_param: 0.2,
     ppo_epoch: 4,
     num_mini_batch: 4,
@@ -66,13 +65,12 @@
     eps: 1e-5,
     max_grad_norm: 0.5,
     gamma: 0.99,
-    im_gamma: 0.99,
     gae_lambda: 0.95
   },
 
   training: {
-    algorithm: imppo,
-    n_env_steps: 1000000,
+    algorithm: ppo,
+    n_env_steps: 4000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
