@@ -8,7 +8,7 @@ Train a state embedding networks, capable of abstracting from irrelevant of unco
 information.
 
 ```bash
-python train_ssim_with_new_rnd.py --conf conf/minigrid_zero_step_ssim.hocon
+python train_similarity.py --conf conf/minigrid_zero_step_ssim.hocon
 ```
 
 ## stage 1

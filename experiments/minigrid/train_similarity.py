@@ -108,6 +108,7 @@ def main(args=None):
     )
 
     agent = get_agent(env, config)
+    agent.to(config['agent.device'])
     ssim = get_ssim(config)
 
     logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
