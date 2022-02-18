@@ -87,16 +87,19 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
             self.unachieved_buffer_size = conf['unachieved_buffer_size']
             self.unachieved_buffer = deque(maxlen=self.unachieved_buffer_size)
 
-        self.verbose = verbose
         self.warmup_steps = conf['warmup_steps']
         super().__init__(env, goal_achieving_criterion)
 
         self.count = 0
         self.flag = 0
-        self.verbose = 200
         self.seed = seed
         np.random.seed(seed)
-        self.count = np.random.randint(0, self.verbose)
+
+        self.verbose = 200 if verbose else 0
+        if self.verbose:
+            self.count = np.random.randint(0, self.verbose)
+        else:
+            self.count = 0
         self.verbose_episode = False
 
     def gen_goal(self, state):
@@ -107,7 +110,8 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
 
     def reset(self):
         self.count += 1
-        self.verbose_episode = self.count % self.verbose == 0 and self.goal_state is not None
+        if self.verbose:
+            self.verbose_episode = self.count % self.verbose == 0 and self.goal_state is not None
 
         if not self.is_goal_achieved and self.goal_state is not None:
             self.unachieved_buffer.append(self.goal_state)
