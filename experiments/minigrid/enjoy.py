@@ -18,7 +18,7 @@ def test():
     algos = {
         'worker': (2.0, 1.0),
         'master': (0.90156251, 1.0),
-        'ssim_master': (0.90156251, 1.0),
+        'ssim_master': (0.936718762, 1.0),
         'ssim_master_lava': (0.95499998, 1.0),
         'ssim_worker': (0, 0),
         'direct_ppo': (0.87695312, 1.0),
