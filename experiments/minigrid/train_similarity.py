@@ -1,99 +1,36 @@
 import logging
 import torch
 
-from rllr.algo import IMPPO
-from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper, ZeroRewardWrapper
-from rllr.models import encoders, ActorCriticNetwork, StateSimilarityNetwork, RNDModel
-from rllr.utils import im_train_ppo, get_conf, switch_reproducibility_on
+from rllr.buffer.rollout import RolloutStorage
+from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper
+from rllr.models import encoders, StateSimilarityNetwork
+from rllr.utils import  get_conf, switch_reproducibility_on
 from rllr.utils.state_similarity import ContrastiveStateSimilarity
 from rllr.utils.logger import init_logger
+from tqdm import trange
 
 logger = logging.getLogger(__name__)
 
 
-def gen_env(conf, verbose=False):
-    if conf['env_type'] == 'gym_minigrid':
-        env = minigrid_envs.gen_wrapped_env(conf, verbose=verbose)
-    else:
-        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
-    return env
-
-
-def calculate_grid_size(config):
-    if config['env.env_type'] == 'gym_minigrid':
-        init_logger('rllr.env.gym_minigrid_navigation.environments')
-        if config['env'].get('fully_observed', True):
-            grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
-        else:
-            grid_size = 7 * config['env'].get('tile_size', 1)
-    else:
-        raise AttributeError(f"unknown env_type '{config['env_type']}'")
-    return grid_size
-
-
-def get_agent(env, config):
-    grid_size = calculate_grid_size(config)
-    encoder = encoders.get_encoder(grid_size, config['worker'])
-    hidden_size = config['worker.head.hidden_size']
-    policy = ActorCriticNetwork(
-        env.action_space, encoder,
-        encoder, hidden_size,
-        hidden_size, use_intrinsic_motivation=True
-    )
-
-    rnd = RNDModel(
-        encoders.get_encoder(grid_size, config['worker']),
-        encoders.get_encoder(grid_size, config['worker']),
-        config['agent.device'])
-
-    return IMPPO(
-        policy,
-        rnd,
-        config['agent.ext_coef'],
-        config['agent.im_coef'],
-        config['agent.clip_param'],
-        config['agent.ppo_epoch'],
-        config['agent.num_mini_batch'],
-        config['agent.value_loss_coef'],
-        config['agent.entropy_coef'],
-        config['agent.lr'],
-        config['agent.eps'],
-        config['agent.max_grad_norm']
-    )
-
-
-def get_ssim(conf):
-    grid_size = calculate_grid_size(conf)
+def get_ssim(env, conf):
+    grid_size = env.observation_space.shape[0]
     encoder = encoders.get_encoder(grid_size, conf['state_similarity'])
     ssim_network = StateSimilarityNetwork(encoder, conf['state_similarity.hidden_size'])
-    ssim = ContrastiveStateSimilarity(ssim_network,
-                                      lr=conf['state_similarity.lr'],
-                                      radius=conf['state_similarity.radius'],
-                                      n_updates=conf['state_similarity.n_updates'],
-                                      epochs=conf['state_similarity.epochs'],
-                                      verbose=conf['state_similarity.verbose'])
+    ssim = ContrastiveStateSimilarity(
+        ssim_network,
+        lr=conf['state_similarity.lr'],
+        radius=conf['state_similarity.radius'],
+        epochs=conf['state_similarity.epochs'],
+    )
     return ssim
 
 
 def gen_env_with_seed(conf, seed):
     conf['env.deterministic'] = True
     conf['env']['seed'] = seed
-    env = gen_env(conf['env'])
-
-    env = ZeroRewardWrapper(env)
+    env = minigrid_envs.gen_wrapped_env(conf['env'], verbose=False)
     env = EpisodeInfoWrapper(env)
-
     return env
-
-
-def train_ssim_with_rnd(env, agent, ssim, conf):
-    def ssim_update_callback(rollouts):
-        return ssim.update(rollouts)
-
-    im_train_ppo(env, agent, conf, ssim_update_callback)
-
-    torch.save(ssim, conf['outputs.path'])
-    return agent, ssim
 
 
 def main(args=None):
@@ -107,17 +44,43 @@ def main(args=None):
         config['agent.device']
     )
 
-    agent = get_agent(env, config)
-    agent.to(config['agent.device'])
-    ssim = get_ssim(config)
+    conf = config
+    ssim = get_ssim(env, config)
 
-    logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
-    train_ssim_with_rnd(
-        env=env,
-        agent=agent,
-        ssim=ssim,
-        conf=config
+    # training starts
+    rollouts = RolloutStorage(
+        conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space,
     )
+
+    obs = env.reset()
+    rollouts.set_first_obs(obs)
+    rollouts.to(conf['agent.device'])
+
+    num_updates = int(conf['training.n_env_steps'] // conf['training.n_steps'] // conf['training.n_processes'])
+
+    for epoch in trange(num_updates):
+        for step in range(conf['training.n_steps']):
+            # Sample actions
+            action = torch.randint(0, 3, (conf['training.n_processes'],)).view(-1, 1)
+            obs, reward, done, infos = env.step(action)
+
+            # If done then clean the history of observations.
+            masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
+            rollouts.insert(
+                obs,
+                action,
+                torch.zeros_like(action),
+                torch.zeros_like(action),
+                reward,
+                masks
+            )
+
+        shape = rollouts.obs.shape
+        obs = rollouts.obs.transpose(1, 0).reshape(shape[0] * shape[1], *shape[2:])
+        dones = 1 - rollouts.masks.transpose(1, 0).reshape(-1)
+        print('ssim_loss', ssim.update(obs, dones))
+        rollouts.after_update()
+        torch.save(ssim, conf['outputs.model'])
 
 
 if __name__ == '__main__':
