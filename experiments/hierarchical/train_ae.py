@@ -1,4 +1,3 @@
-from pyhocon import ConfigFactory
 from rllr.env.vec_wrappers import make_vec_envs
 import torch
 import numpy as np
@@ -8,14 +7,16 @@ from torch.optim import AdamW
 from matplotlib import pyplot as plt
 from tqdm import trange, tqdm
 
+from env import gen_env_with_seed
+
 
 def rollout(env):
     obs, done, info = env.reset(), False, []
 
     states = []
-    while not done:
+    for _ in range(128):
         states.append(obs)
-        action = torch.randint(0, 3, obs.size(0))
+        action = torch.randint(0, 3, (obs.size(0), 1))
         obs, reward, done, info = env.step(action)
     states.append(obs)
 
@@ -32,37 +33,30 @@ class VAE(nn.Module):
         c, w, h = state_shape
 
         self.enc = nn.Sequential(
-            nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4),
+            nn.Conv2d(in_channels=c, out_channels=16, kernel_size=4, stride=4),
             nn.LeakyReLU(inplace=True),
 
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
-            nn.LeakyReLU(inplace=True),
-
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(inplace=True),
 
             nn.Flatten(),
-            nn.Linear(in_features=3136, out_features=256)
+            nn.Linear(5184, 256),
         )
 
         self.mu = nn.Linear(in_features=256, out_features=256)
         self.std = nn.Linear(in_features=256, out_features=256)
 
         self.dec = nn.Sequential(
-            nn.Linear(256, 3136),
-            nn.Unflatten(dim=1, unflattened_size=(64, 7, 7)),
-            nn.LeakyReLU(inplace=True),
-
-            nn.UpsamplingBilinear2d(scale_factor=3),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
+            nn.Linear(256, 5184),
+            nn.Unflatten(dim=1, unflattened_size=(16, 18, 18)),
             nn.LeakyReLU(inplace=True),
 
             nn.UpsamplingBilinear2d(scale_factor=2),
-            nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=3, padding=1),
             nn.LeakyReLU(inplace=True),
 
             nn.UpsamplingBilinear2d(scale_factor=2),
-            nn.Conv2d(in_channels=32, out_channels=c, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=16, out_channels=c, kernel_size=3, padding=1),
             nn.Sigmoid()
         )
 
@@ -118,7 +112,7 @@ def train_vae(env):
             opt.step()
 
             rec_loss.append(loss.detach().cpu().numpy())
-        print(np.mean(rec_loss))
+        print('rec_loss', np.mean(rec_loss), len(rec_loss))
         torch.save(aenc.state_dict(), 'aenc.p')
 
 
@@ -131,23 +125,23 @@ def test_vae(env):
         with torch.no_grad():
             rec, _, _ = aenc(img)
         f, axarr = plt.subplots(1, 2)
-        axarr[0].imshow(img[0].permute(1, 2, 0), cmap='gray')
-        axarr[1].imshow(rec[0].permute(1, 2, 0), cmap='gray')
+        axarr[0].imshow(img[0].permute(1, 2, 0))
+        axarr[1].imshow(rec[0].permute(1, 2, 0))
         plt.show()
 
 
 if __name__ == '__main__':
     device = 'cpu'
-    config = ConfigFactory.parse_file('conf/montezuma_rnd_ppo.hocon')
 
     env = make_vec_envs(
-        lambda env_id: lambda: gen_env_with_seed(config, 0, render=False),
-        num_processes=1,
+        lambda env_id: lambda: gen_env_with_seed(env_id),
+        num_processes=16,
         device=device
     )
 
     aenc = VAE(env.observation_space.shape).to(device)
     train_vae(env)
+    exit(0)
 
     aenc.load_state_dict(torch.load(open('aenc.p', 'rb'), map_location=device))
     test_vae(env)
