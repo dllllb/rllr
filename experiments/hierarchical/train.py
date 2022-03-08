@@ -11,7 +11,9 @@ from rllr.utils import get_conf
 from rllr.buffer.rollout import RolloutStorage
 
 from worker import WorkerPolicyModel
+from master import MasterPolicyModel, MasterPPO
 from env import gen_env_with_seed
+from utils import train_vae, test_vae
 
 
 GOAL_SIZE = 256
@@ -48,11 +50,11 @@ if __name__ == '__main__':
         config['agent.max_grad_norm']
     )
 
-    #master_policy = PolicyModel(env.observation_space.shape, env.action_space.n)
-    #master_policy.to(config['agent.device'])
+    master_policy = MasterPolicyModel(env.observation_space.shape, env.action_space.n)
+    master_policy.to(config['agent.device'])
 
-    master = PPO(
-        worker_policy,
+    master = MasterPPO(
+        master_policy,
         config['agent.clip_param'],
         config['agent.ppo_epoch'],
         config['agent.num_mini_batch'],
@@ -62,6 +64,9 @@ if __name__ == '__main__':
         config['agent.eps'],
         config['agent.max_grad_norm']
     )
+
+    train_vae(env, master)
+    exit(0)
 
     goals = []
 
