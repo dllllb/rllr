@@ -33,16 +33,17 @@ class MasterPolicyModel(nn.Module):
         self.n_actions = n_actions
         self.is_recurrent = False
 
-        self.vae = VAE(state_shape)
+        self.goal_size = 256
+        self.vae = VAE(state_shape, emb_size=self.goal_size)
 
         self.policy = nn.Sequential(
-            nn.Linear(in_features=self.enc.output_size, out_features=256),
+            nn.Linear(in_features=self.goal_size, out_features=256),
             nn.ReLU(inplace=True),
             nn.Linear(in_features=256, out_features=self.n_actions)
         )
 
         self.value = nn.Sequential(
-            nn.Linear(in_features=self.enc.output_size, out_features=256),
+            nn.Linear(in_features=self.goal_size, out_features=256),
             nn.ReLU(inplace=True),
             nn.Linear(in_features=256, out_features=1)
         )
