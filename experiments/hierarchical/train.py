@@ -15,6 +15,8 @@ from master import MasterPolicyModel, MasterPPO
 from env import gen_env_with_seed
 from utils import train_vae, test_vae
 
+import os
+
 
 GOAL_SIZE = 256
 
@@ -65,7 +67,15 @@ if __name__ == '__main__':
         config['agent.max_grad_norm']
     )
 
-    train_vae(env, master)
+    if not os.path.isfile('master_agent.pt'):
+        train_vae(env, master)
+    else:
+        master.actor_critic.load_state_dict(
+            torch.load(open('aenc.p', 'rb'), map_location=config['agent.device'])
+        )
+
+    worker.actor_critic.enc
+    test_vae(env, master.actor_critic.vae)
     exit(0)
 
     goals = []

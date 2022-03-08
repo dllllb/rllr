@@ -49,7 +49,7 @@ class VAE(nn.Module):
                 layer.bias.data.zero_()
 
     def encode(self, x):
-        hid = self.enc(x)
+        hid = self.enc(x.float() / 255.)
         mu, logvar = self.mu(hid), self.std(hid)
         return self.sample(mu, logvar)
 
@@ -63,7 +63,7 @@ class VAE(nn.Module):
         return eps.mul(std).add_(mu)
 
     def forward(self, x):
-        hid = self.enc(x)
+        hid = self.enc(x.float() / 255.)
         mu, logvar = self.mu(hid), self.std(hid)
         z = self.sample(mu, logvar)
         rx = self.dec(z)
@@ -71,7 +71,7 @@ class VAE(nn.Module):
 
     def loss(self, recon_x, x, mu, logvar):
         # reconstruction losses are summed over all elements and batch
-        recon_loss = F.binary_cross_entropy(recon_x, x, reduction='sum')
+        recon_loss = F.binary_cross_entropy(recon_x, x.float() / 255., reduction='sum')
 
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014

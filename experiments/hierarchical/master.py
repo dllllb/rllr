@@ -116,7 +116,7 @@ class MasterPPO:
         rec_loss = []
         for _ in range(states.shape[0] // batch_size):
             ids = torch.randint(0, states.shape[0], (batch_size,))
-            imgs = (states[ids] / 255.)
+            imgs = states[ids]
             rec, mu, logvar = self.actor_critic.vae(imgs)
 
             self.optimizer.zero_grad()
