@@ -180,4 +180,4 @@ class MasterPPO:
         dist_entropy_epoch /= num_updates
         rec_loss_epoch /= num_updates
 
-        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch
+        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, rec_loss_epoch

@@ -71,12 +71,12 @@ if __name__ == '__main__':
         train_vae(env, master)
     else:
         master.actor_critic.load_state_dict(
-            torch.load(open('aenc.p', 'rb'), map_location=config['agent.device'])
+            torch.load(open('master_agent.pt', 'rb'), map_location=config['agent.device'])
         )
 
-    worker.actor_critic.enc
-    test_vae(env, master.actor_critic.vae)
-    exit(0)
+    # worker.actor_critic.enc.load_state_dict()
+    # test_vae(env, master.actor_critic.vae)
+    # exit(0)
 
     goals = []
 
@@ -118,7 +118,7 @@ if __name__ == '__main__':
         next_value = worker.get_value(worker_rollouts.get_last_obs())
         worker_rollouts.compute_returns(next_value, config['agent.gamma'], config['agent.gae_lambda'])
 
-        value_loss, action_loss, dist_entropy = worker.update(worker_rollouts)
+        value_loss, action_loss, dist_entropy, rec_loss = worker.update(worker_rollouts)
         worker_rollouts.after_update()
 
         if j % config['training.verbose'] == 0 and len(episode_rewards) > 1:
@@ -132,7 +132,9 @@ if __name__ == '__main__':
                   f'min/max reward {np.min(episode_rewards):.2f}/{np.max(episode_rewards):.2f}\n'
                   f'dist_entropy {dist_entropy:.2f}, '
                   f'value_loss {value_loss:.2f}, '
-                  f'action_loss {action_loss:.2f}')
+                  f'action_loss {action_loss:.2f} '
+                  f'rec_loss {rec_loss:.2f}'
+            )
 
             writer.add_scalar('dist_entropy', dist_entropy, total_num_steps)
             writer.add_scalar('value_loss', value_loss, total_num_steps)

@@ -28,7 +28,7 @@ def test_vae(env, vae):
     states = rollout(env)
     ids = torch.randint(0, states.shape[0] - 1, (states.shape[0],))
     for i in tqdm(ids):
-        img = states[i].unsqueeze(dim=0) / 255.
+        img = states[i].unsqueeze(dim=0)
 
         with torch.no_grad():
             rec, _, _ = vae(img)
