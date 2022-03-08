@@ -50,8 +50,7 @@ class VAE(nn.Module):
 
     def encode(self, x):
         hid = self.enc(x.float() / 255.)
-        mu, logvar = self.mu(hid), self.std(hid)
-        return self.sample(mu, logvar)
+        return self.mu(hid)
 
     def decode(self, z):
         with torch.no_grad():

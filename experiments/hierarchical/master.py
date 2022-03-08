@@ -134,6 +134,7 @@ class MasterPPO:
         value_loss_epoch = 0
         action_loss_epoch = 0
         dist_entropy_epoch = 0
+        rec_loss_epoch = 0
 
         for e in range(self.ppo_epoch):
             data_generator = rollouts.feed_forward_generator(advantages, self.num_mini_batch)
@@ -158,9 +159,12 @@ class MasterPPO:
                 value_losses_clipped = (value_pred_clipped - return_batch).pow(2)
                 value_loss = 0.5 * torch.max(value_losses, value_losses_clipped).mean()
 
+                rec, mu, logvar = self.actor_critic.vae(obs_batch)
+
                 self.optimizer.zero_grad()
                 ppo_loss = value_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef
-                ppo_loss.backward()
+                vae_loss = self.actor_critic.vae.loss(rec, obs_batch, mu, logvar) / 1.e6
+                (ppo_loss + vae_loss).backward()
 
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
@@ -168,6 +172,7 @@ class MasterPPO:
                 value_loss_epoch += value_loss.item()
                 action_loss_epoch += action_loss.item()
                 dist_entropy_epoch += dist_entropy.item()
+                rec_loss_epoch += vae_loss.item()
 
         num_updates = self.ppo_epoch * self.num_mini_batch
 
@@ -175,4 +180,4 @@ class MasterPPO:
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
 
-        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch
+        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, rec_loss_epoch
