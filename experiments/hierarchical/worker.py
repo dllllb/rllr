@@ -51,7 +51,7 @@ class Encoder(nn.Module):
 
 class WorkerPolicyModel(nn.Module):
 
-    def __init__(self, state_shape, n_actions):
+    def __init__(self, state_shape, n_actions, goal_size):
         super(WorkerPolicyModel, self).__init__()
         self.state_shape = state_shape
         self.n_actions = n_actions
@@ -60,13 +60,13 @@ class WorkerPolicyModel(nn.Module):
         self.enc = Encoder(self.state_shape)
 
         self.policy = nn.Sequential(
-            nn.Linear(in_features=self.enc.output_size, out_features=256),
+            nn.Linear(in_features=self.enc.output_size + goal_size, out_features=256),
             nn.ReLU(inplace=True),
             nn.Linear(in_features=256, out_features=self.n_actions)
         )
 
         self.value = nn.Sequential(
-            nn.Linear(in_features=self.enc.output_size, out_features=256),
+            nn.Linear(in_features=self.enc.output_size + goal_size, out_features=256),
             nn.ReLU(inplace=True),
             nn.Linear(in_features=256, out_features=1)
         )
@@ -74,7 +74,8 @@ class WorkerPolicyModel(nn.Module):
         self.apply(init_params)
 
     def forward(self, inputs, rnn_hxs, masks):
-        enc = self.enc(inputs)
+        enc = self.enc(inputs['image'])
+        enc = torch.cat([enc, inputs['goal']], dim=1)
         value = self.value(enc)
         logits = self.policy(enc)
         dist = FixedCategorical(logits=F.log_softmax(logits, dim=1))

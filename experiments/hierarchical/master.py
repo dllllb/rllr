@@ -4,7 +4,7 @@ from torch.nn import functional as F
 import torch.optim as optim
 import numpy as np
 
-from rllr.models.ppo import FixedCategorical
+from rllr.models.ppo import FixedNormal
 from vae import VAE
 
 
@@ -27,25 +27,25 @@ def init_params(m):
 
 class MasterPolicyModel(nn.Module):
 
-    def __init__(self, state_shape, n_actions):
+    def __init__(self, state_shape, action_size):
         super(MasterPolicyModel, self).__init__()
         self.state_shape = state_shape
-        self.n_actions = n_actions
         self.is_recurrent = False
+        self.logstd = nn.Parameter(torch.zeros((action_size,)))
 
-        self.goal_size = 256
-        self.vae = VAE(state_shape, emb_size=self.goal_size)
+        self.action_size = action_size
+        self.vae = VAE(state_shape, emb_size=self.action_size)
 
         self.policy = nn.Sequential(
-            nn.Linear(in_features=self.goal_size, out_features=256),
-            nn.ReLU(inplace=True),
-            nn.Linear(in_features=256, out_features=self.n_actions)
+            nn.Linear(in_features=self.action_size, out_features=self.action_size),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(in_features=self.action_size, out_features=self.action_size)
         )
 
         self.value = nn.Sequential(
-            nn.Linear(in_features=self.goal_size, out_features=256),
-            nn.ReLU(inplace=True),
-            nn.Linear(in_features=256, out_features=1)
+            nn.Linear(in_features=self.action_size, out_features=self.action_size),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(in_features=self.action_size, out_features=1)
         )
 
         self.apply(init_params)
@@ -53,9 +53,10 @@ class MasterPolicyModel(nn.Module):
     def forward(self, inputs, rnn_hxs, masks):
         enc = self.vae.encode(inputs)
         value = self.value(enc)
-        logits = self.policy(enc)
-        dist = FixedCategorical(logits=F.log_softmax(logits, dim=1))
 
+        mu = self.policy(enc)
+        std = self.logstd.exp()
+        dist = FixedNormal(mu, std)
         return dist, value, rnn_hxs
 
     def act(self, states, rnn_hxs, masks, deterministic=False):
@@ -73,6 +74,13 @@ class MasterPolicyModel(nn.Module):
     def evaluate_actions(self, states, actions, rnn_hxs, masks):
         dist, value, rnn_hxs = self.forward(states, rnn_hxs, masks)
         return value, dist.log_probs(actions), dist.entropy().mean(), rnn_hxs
+
+    def kl_loss(self, states):
+        enc = self.vae.encode(states)
+        mu = self.policy(enc)
+        logvar = self.logstd
+        kl_diverge = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        return kl_diverge
 
 
 class MasterPPO:
@@ -135,6 +143,7 @@ class MasterPPO:
         action_loss_epoch = 0
         dist_entropy_epoch = 0
         rec_loss_epoch = 0
+        kl_loss_epoch = 0
 
         for e in range(self.ppo_epoch):
             data_generator = rollouts.feed_forward_generator(advantages, self.num_mini_batch)
@@ -164,7 +173,9 @@ class MasterPPO:
                 self.optimizer.zero_grad()
                 ppo_loss = value_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef
                 vae_loss = self.actor_critic.vae.loss(rec, obs_batch, mu, logvar) / 1.e3
-                (ppo_loss + vae_loss).backward()
+                kl_loss = self.actor_critic.kl_loss(obs_batch)
+
+                (ppo_loss + vae_loss + kl_loss).backward()
 
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
@@ -173,6 +184,7 @@ class MasterPPO:
                 action_loss_epoch += action_loss.item()
                 dist_entropy_epoch += dist_entropy.item()
                 rec_loss_epoch += vae_loss.item()
+                kl_loss_epoch += kl_loss.item()
 
         num_updates = self.ppo_epoch * self.num_mini_batch
 
@@ -180,5 +192,6 @@ class MasterPPO:
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
         rec_loss_epoch /= num_updates
+        kl_loss_epoch /= num_updates
 
-        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, rec_loss_epoch
+        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, rec_loss_epoch, kl_loss_epoch
