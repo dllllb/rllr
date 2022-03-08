@@ -78,6 +78,9 @@ if __name__ == '__main__':
     # test_vae(env, master.actor_critic.vae)
     # exit(0)
 
+    # tmp for check
+    worker = master
+
     goals = []
 
     writer = SummaryWriter(config['outputs.logs'])
@@ -118,7 +121,13 @@ if __name__ == '__main__':
         next_value = worker.get_value(worker_rollouts.get_last_obs())
         worker_rollouts.compute_returns(next_value, config['agent.gamma'], config['agent.gae_lambda'])
 
-        value_loss, action_loss, dist_entropy, rec_loss = worker.update(worker_rollouts)
+        value_loss, action_loss, dist_entropy = worker.update(worker_rollouts)
+
+        rec_loss = master.update_vae(
+            worker_rollouts.obs.reshape(-1, env.observation_space.shape),
+            batch_size=32
+        )
+
         worker_rollouts.after_update()
 
         if j % config['training.verbose'] == 0 and len(episode_rewards) > 1:
