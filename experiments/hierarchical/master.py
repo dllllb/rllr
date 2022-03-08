@@ -33,7 +33,7 @@ class MasterPolicyModel(nn.Module):
         self.n_actions = n_actions
         self.is_recurrent = False
 
-        self.goal_size = 256
+        self.goal_size = 1024
         self.vae = VAE(state_shape, emb_size=self.goal_size)
 
         self.policy = nn.Sequential(
