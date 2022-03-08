@@ -31,7 +31,7 @@ def test_vae(env, vae):
         img = states[i].unsqueeze(dim=0)
 
         with torch.no_grad():
-            rec, _, _ = vae(img)
+            rec = vae.decode(vae.encode(img))
         f, axarr = plt.subplots(1, 2)
         axarr[0].imshow(img[0].permute(1, 2, 0))
         axarr[1].imshow(rec[0].permute(1, 2, 0))

@@ -75,6 +75,7 @@ if __name__ == '__main__':
         )
 
     # worker.actor_critic.enc.load_state_dict()
+    # master = torch.load('artifacts/models/master.p', map_location='cpu')
     # test_vae(env, master.actor_critic.vae)
     # exit(0)
 

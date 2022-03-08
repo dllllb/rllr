@@ -163,7 +163,7 @@ class MasterPPO:
 
                 self.optimizer.zero_grad()
                 ppo_loss = value_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef
-                vae_loss = self.actor_critic.vae.loss(rec, obs_batch, mu, logvar) / 1.e6
+                vae_loss = self.actor_critic.vae.loss(rec, obs_batch, mu, logvar) / 1.e3
                 (ppo_loss + vae_loss).backward()
 
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
@@ -179,5 +179,6 @@ class MasterPPO:
         value_loss_epoch /= num_updates
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
+        rec_loss_epoch /= num_updates
 
         return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, rec_loss_epoch
