@@ -20,15 +20,15 @@ class VAE(nn.Module):
             nn.LeakyReLU(inplace=True),
 
             nn.Flatten(),
-            nn.Linear(5184, emb_size),
+            nn.Linear(4096, emb_size), #5184
         )
 
         self.mu = nn.Linear(in_features=emb_size, out_features=emb_size)
         self.std = nn.Linear(in_features=emb_size, out_features=emb_size)
 
         self.dec = nn.Sequential(
-            nn.Linear(emb_size, 5184),
-            nn.Unflatten(dim=1, unflattened_size=(16, 18, 18)),
+            nn.Linear(emb_size, 4096),
+            nn.Unflatten(dim=1, unflattened_size=(16, 16, 18)), #16, 18, 18
             nn.LeakyReLU(inplace=True),
 
             nn.UpsamplingBilinear2d(scale_factor=2),
