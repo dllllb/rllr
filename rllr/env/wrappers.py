@@ -347,6 +347,7 @@ class EpisodeInfoWrapper(gym.Wrapper):
         self.episode_steps += 1
         self.visits_stats[tuple(self.agent_pos)] += 1
         info['visit_stats'] = self.visits_stats
+        info['steps'] = self.episode_steps
         if done:
             info['episode'] = {
                 'task': self.env.unwrapped.spec.id,
