@@ -64,7 +64,7 @@ class MasterPolicyModel(nn.Module):
         if deterministic:
             action = dist.mode()
         else:
-            action = dist.sample()
+            action = dist.rsample()
         return value, action, dist.log_probs(action), rnn_hxs
 
     def get_value(self, states, rnn_hxs, masks):

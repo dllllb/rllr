@@ -134,6 +134,9 @@ if __name__ == '__main__':
     master_rollouts.set_first_obs(master_obs)
     master_rollouts.to(config['agent.device'])
 
+    # worker = torch.load('worker.p', map_location='cpu')
+    # master = torch.load('master.p', map_location='cpu')
+
     def make_goal(img_obs):
         with torch.no_grad():
             return master.actor_critic.vae.encode(img_obs)
@@ -221,25 +224,26 @@ if __name__ == '__main__':
                 hindsight_returns[i + 1] * config['agent.gamma'] * mask + \
                 make_reward(next_obs, hindsight_goals[i])
 
-        #from matplotlib import pyplot as plt
-        #for i, (obs, h_goal, goal, mask, ret) in enumerate(zip(
-        #        worker_rollouts.obs['image'],
-        #        hindsight_goals,
-        #        worker_rollouts.obs['goal'],
-        #        worker_rollouts.masks,
-        #        hindsight_returns
-        #)):
-        #    def dec(img):
-        #        with torch.no_grad():
-        #            return master.actor_critic.vae.decode(img)
         #
-        #    env_id = 8
-        #    fig, ax = plt.subplots(1, 3)
-        #    plt.title(f'step {i}, done {1 - mask[env_id].item()}, return {ret[env_id].item()}')
-        #    ax[0].imshow(obs[env_id].permute(1, 2, 0).int())
-        #    ax[1].imshow(dec(h_goal)[env_id].permute(1, 2, 0))
-        #    ax[2].imshow(dec(goal)[env_id].permute(1, 2, 0))
-        #    plt.show()
+        # from matplotlib import pyplot as plt
+        # for i, (obs, h_goal, goal, mask, ret) in enumerate(zip(
+        #         worker_rollouts.obs['image'],
+        #         hindsight_goals,
+        #         worker_rollouts.obs['goal'],
+        #         worker_rollouts.masks,
+        #         hindsight_returns
+        # )):
+        #     def dec(img):
+        #         with torch.no_grad():
+        #             return master.actor_critic.vae.decode(img)
+        #
+        #     env_id = 8
+        #     fig, ax = plt.subplots(1, 3)
+        #     plt.title(f'step {i}, done {1 - mask[env_id].item()}, return {ret[env_id].item()}')
+        #     ax[0].imshow(obs[env_id].permute(1, 2, 0).int())
+        #     ax[1].imshow(dec(h_goal)[env_id].permute(1, 2, 0))
+        #     ax[2].imshow(dec(goal)[env_id].permute(1, 2, 0))
+        #     plt.show()
 
         master_next_value = master.get_value(master_rollouts.get_last_obs())
         master_rollouts.compute_returns(master_next_value, config['agent.gamma'], config['agent.gae_lambda'])
@@ -266,9 +270,9 @@ if __name__ == '__main__':
 
         for e in range(master.ppo_epoch):
             for obs_batch, actions in bc_batch(worker_rollouts, hindsight_goals, hindsight_returns, master.num_mini_batch):
-                _, action_log_probs, _, _ = master.actor_critic.evaluate_actions(obs_batch['image'], obs_batch['goal'], None, None)
+                _, action, _, _ = master.actor_critic.act(obs_batch['image'], obs_batch['goal'], None, None)
                 master.optimizer.zero_grad()
-                sil_loss = -torch.mean(action_log_probs)
+                sil_loss = F.mse_loss(action, obs_batch['goal'])
                 sil_loss.backward()
                 master.optimizer.step()
                 sil_master_loss += sil_loss.item()
