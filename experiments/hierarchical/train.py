@@ -22,6 +22,7 @@ import os
 
 GOAL_SIZE = 256
 UNK_GOAL = torch.zeros(GOAL_SIZE)
+WORKER_STEPS = 4
 
 
 def bc_batch(rollouts, hindsight_goals, hindsight_returns, num_batches):
@@ -156,7 +157,7 @@ if __name__ == '__main__':
         update_linear_schedule(worker.optimizer, j, num_updates, config['agent.lr'])
         update_linear_schedule(master.optimizer, j, num_updates, config['agent.lr'])
 
-        WORKER_STEPS = 5
+        master_masks = torch.zeros_like(worker_rollouts.masks)
 
         for step in range(config['training.n_steps']):
             # Sample actions
@@ -224,7 +225,6 @@ if __name__ == '__main__':
                 hindsight_returns[i + 1] * config['agent.gamma'] * mask + \
                 make_reward(next_obs, hindsight_goals[i])
 
-        #
         # from matplotlib import pyplot as plt
         # for i, (obs, h_goal, goal, mask, ret) in enumerate(zip(
         #         worker_rollouts.obs['image'],
@@ -287,6 +287,8 @@ if __name__ == '__main__':
                   f'Last {len(master_episode_rewards)} training episodes: '
                   f'mean/median reward {np.mean(master_episode_rewards):.4f}/{np.median(master_episode_rewards):.4f}, '
                   f'min/max reward {np.min(master_episode_rewards):.4f}/{np.max(master_episode_rewards):.4f}\n'
+                  f'mean/median wreward {np.mean(worker_episode_rewards):.4f}/{np.median(worker_episode_rewards):.4f}, '
+                  f'min/max wreward {np.min(worker_episode_rewards):.4f}/{np.max(worker_episode_rewards):.4f}\n'
                   f'worker_dist_entropy {worker_dist_entropy:.4f}, '
                   f'worker_value_loss {worker_value_loss:.4f}, '
                   f'worker_action_loss {worker_action_loss:.4f}\n'
