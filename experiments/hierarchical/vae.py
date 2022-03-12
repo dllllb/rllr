@@ -28,7 +28,7 @@ class VAE(nn.Module):
 
         self.dec = nn.Sequential(
             nn.Linear(emb_size, 4096),
-            nn.Unflatten(dim=1, unflattened_size=(16, 16, 18)), #16, 18, 18
+            nn.Unflatten(dim=1, unflattened_size=(16, 16, 16)), #16, 18, 18
             nn.LeakyReLU(inplace=True),
 
             nn.UpsamplingBilinear2d(scale_factor=2),
