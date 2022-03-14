@@ -40,6 +40,23 @@ class VAE(nn.Module):
             nn.Sigmoid()
         )
 
+        self.dec_copy = nn.Sequential(
+            nn.Linear(emb_size, 4096),
+            nn.Unflatten(dim=1, unflattened_size=(16, 16, 16)), #16, 18, 18
+            nn.LeakyReLU(inplace=True),
+
+            nn.UpsamplingBilinear2d(scale_factor=2),
+            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=3, padding=1),
+            nn.LeakyReLU(inplace=True),
+
+            nn.UpsamplingBilinear2d(scale_factor=2),
+            nn.Conv2d(in_channels=16, out_channels=c, kernel_size=3, padding=1),
+            nn.Sigmoid()
+        )
+
+        for param in self.dec_copy.parameters():
+            param.requires_grad = False
+
         for layer in self.modules():
             if isinstance(layer, nn.Conv2d):
                 nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
@@ -53,8 +70,7 @@ class VAE(nn.Module):
         return self.mu(hid)
 
     def decode(self, z):
-        with torch.no_grad():
-            return self.dec(z)
+        return self.dec_copy(z)
 
     def sample(self, mu, logvar):
         std = torch.exp(0.5 * logvar)  # e^(1/2 * log(std^2))

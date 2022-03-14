@@ -194,4 +194,6 @@ class MasterPPO:
         rec_loss_epoch /= num_updates
         kl_loss_epoch /= num_updates
 
+        self.actor_critic.vae.dec_copy.load_state_dict(self.actor_critic.vae.dec.state_dict())
+
         return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, rec_loss_epoch, kl_loss_epoch

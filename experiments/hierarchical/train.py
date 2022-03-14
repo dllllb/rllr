@@ -58,11 +58,11 @@ if __name__ == '__main__':
         config['agent.device']
     )
 
-    worker_policy = WorkerPolicyModel(env.observation_space.shape, env.action_space.n, GOAL_SIZE)
-    worker_policy.to(config['agent.device'])
+    master_policy = MasterPolicyModel(env.observation_space.shape, GOAL_SIZE)
+    master_policy.to(config['agent.device'])
 
-    worker = PPO(
-        worker_policy,
+    master = MasterPPO(
+        master_policy,
         config['agent.clip_param'],
         config['agent.ppo_epoch'],
         config['agent.num_mini_batch'],
@@ -73,11 +73,11 @@ if __name__ == '__main__':
         config['agent.max_grad_norm']
     )
 
-    master_policy = MasterPolicyModel(env.observation_space.shape, GOAL_SIZE)
-    master_policy.to(config['agent.device'])
+    worker_policy = WorkerPolicyModel(env.observation_space.shape, env.action_space.n, master)
+    worker_policy.to(config['agent.device'])
 
-    master = MasterPPO(
-        master_policy,
+    worker = PPO(
+        worker_policy,
         config['agent.clip_param'],
         config['agent.ppo_epoch'],
         config['agent.num_mini_batch'],
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     def make_reward(img_obs, goal, thr=0.8):
         with torch.no_grad():
             obs_enc = master.actor_critic.vae.encode(img_obs)
-            return (F.cosine_similarity(goal, obs_enc).unsqueeze(dim=1) > thr).float()
+            return F.cosine_similarity(goal, obs_enc).unsqueeze(dim=1)
 
     start = time.time()
     num_updates = int(config['training.n_env_steps'] // config['training.n_steps'] // config['training.n_processes'])
@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
             worker_done = \
                 worker_timeout + \
-                (worker_reward > 0) + \
+                (worker_reward > 0.8) + \
                 torch.tensor(master_done, device=worker_reward.device).unsqueeze(dim=1)
 
             master_value, master_action, master_action_log_prob, _ = master.act(master_obs)
