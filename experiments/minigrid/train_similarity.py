@@ -38,7 +38,8 @@ def get_agent(env, config):
     policy = ActorCriticNetwork(
         env.action_space, encoder,
         encoder, hidden_size,
-        hidden_size, use_intrinsic_motivation=True
+        hidden_size, use_intrinsic_motivation=True,
+        is_recurrent=True if config['worker.state_encoder_type'] == 'cnn_rnn' else False
     )
 
     rnd = RNDModel(
@@ -108,6 +109,7 @@ def main(args=None):
     )
 
     agent = get_agent(env, config)
+    agent.to(config['agent.device'])
     ssim = get_ssim(config)
 
     logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")

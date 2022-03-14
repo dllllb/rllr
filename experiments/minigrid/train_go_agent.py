@@ -56,13 +56,6 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
     if not goal_achieving_criterion:
         goal_achieving_criterion = get_goal_achieving_criterion(conf)
 
-    if conf.get('state_distance_network_params', {}).get('path', False):
-        encoder = torch.load(conf['state_distance_network_params.path'], map_location='cpu')
-        device = torch.device(conf['state_distance_network_params.device'])
-        embedder = models.StateEmbedder(encoder, device)
-    else:
-        embedder = None
-
     if conf.get('goal_type', None) == 'random':
         if conf['env_type'] == 'gym_minigrid':
             random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
@@ -84,9 +77,6 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
         random_goal_generator=random_goal_generator,
         verbose=verbose)
 
-    if conf.get('intrinsic_episodic_reward', False):
-        env = environments.IntrinsicEpisodicReward(env, embedder)
-
     return env
 
 
@@ -105,32 +95,6 @@ def get_encoders(conf):
         raise AttributeError(f"unknown env_type '{conf['env_type']}'")
 
 
-def get_hindsight_state_encoder(state_encoder, goal_state_encoder, config):
-    hidden_size_master = config['master']['head.hidden_size']
-    emb_size = config['master']['emb_size']
-    # FIXME: DDPG's actor looks strange here
-    goal_state_encoder = models.ActorNetwork(emb_size, goal_state_encoder, hidden_size_master)
-    return models.GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=goal_state_encoder)
-
-
-def get_ppo_worker_agent(env, config):
-    hindsight_encoder = get_hindsight_state_encoder(*get_encoders(config), config)
-    hidden_size = config['worker.head.hidden_size']
-    policy = models.ActorCriticNetwork(env.action_space, hindsight_encoder, hindsight_encoder, hidden_size, hidden_size)
-
-    return PPO(
-        policy,
-        config['agent.clip_param'],
-        config['agent.ppo_epoch'],
-        config['agent.num_mini_batch'],
-        config['agent.value_loss_coef'],
-        config['agent.entropy_coef'],
-        config['agent.lr'],
-        config['agent.eps'],
-        config['agent.max_grad_norm']
-    )
-
-
 def get_rnd_model(config):
     if config['env'].get('fully_observed', True):
         grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
@@ -145,11 +109,21 @@ def get_rnd_model(config):
 
 
 def get_imppo_worker_agent(env, config):
-    hindsight_encoder = get_hindsight_state_encoder(*get_encoders(config), config)
+    if config['env.env_type'] == 'gym_minigrid':
+        init_logger('rllr.env.gym_minigrid_navigation.environments')
+        if config['env'].get('fully_observed', True):
+            grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
+        else:
+            grid_size = 7 * config['env'].get('tile_size', 1)
+
+        state_encoder = encoders.get_encoder(grid_size, config['worker'])
+    else:
+        raise AttributeError(f"unknown env_type '{config['env_type']}'")
+
     hidden_size = config['worker.head.hidden_size']
     policy = models.ActorCriticNetwork(
-        env.action_space, hindsight_encoder,
-        hindsight_encoder, hidden_size,
+        env.action_space, state_encoder,
+        state_encoder, hidden_size,
         hidden_size, use_intrinsic_motivation=True
     )
 
@@ -187,18 +161,7 @@ def main(args=None):
         config['agent.device']
     )
 
-    if config['training.algorithm'] == 'ppo':
-        agent = get_ppo_worker_agent(env, config)
-        agent.to(config['agent.device'])
-
-        logger.info(f"Running PPO agent training: {config['training.n_steps'] * config['training.n_processes']} steps")
-        train_ppo(
-            env=env,
-            agent=agent,
-            conf=config,
-        )
-
-    elif config['training.algorithm'] == 'imppo':
+    if config['training.algorithm'] == 'imppo':
         agent = get_imppo_worker_agent(env, config)
         agent.to(config['agent.device'])
 

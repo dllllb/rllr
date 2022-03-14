@@ -1,8 +1,4 @@
 {
-  env: {
-    env_id: MontezumaRevengeNoFrameskip-v4
-  },
-
   encoder: {
     state_encoder_type: simple_cnn,
     n_channels: [16, 16],
@@ -43,6 +39,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/montezuma_rnd_ppo.p,
+    model: artifacts/models/montezuma_rnd_ppo.p,
+    logs: artifacts/logs/montezuma_rnd_ppo
   }
 }

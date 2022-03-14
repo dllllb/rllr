@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import torch
 
-from collections import deque
+from collections import deque, defaultdict
 from gym.wrappers import Monitor
 import torch.nn.functional as F
 from rllr.models import encoders
@@ -42,7 +42,7 @@ class NavigationGoalWrapper(gym.Wrapper):
         raise NotImplementedError
 
     def reset(self):
-        state = super().reset()
+        state = self.env.reset()
         self.gen_goal(state)
         self.is_goal_achieved = False
         return state
@@ -52,11 +52,105 @@ class NavigationGoalWrapper(gym.Wrapper):
         self.is_goal_achieved = self._goal_achieved(next_state)
         reward = int(self.is_goal_achieved)
 
-        if self.is_goal_achieved and not done:
-            self.gen_goal(next_state)
+        #print("curr goal:", self.goal_state['position'][:2])
 
         if env_reward > 0 and done:
             done = False
+
+        if self.is_goal_achieved and not done:
+            self.gen_goal(next_state)
+
+        return next_state, reward, done, info
+
+
+class WalkGoalWrapper(NavigationGoalWrapper):
+    def __init__(self, env, walk_grid_goal_generator, goal_achieving_criterion, verbose=False):
+        self.verbose = verbose
+        self.walk_grid_goal_generator = walk_grid_goal_generator
+        super().__init__(env, goal_achieving_criterion)
+
+    def gen_goal(self, state):
+        self.gen_goal_(state)
+
+    def gen_goal_(self, state):
+        goal = next(self.walk_grid_goal_generator)
+        self.goal_state = goal
+
+    def step(self, action):
+        next_state, env_reward, done, info = self.env.step(action)
+        info['goal_pos'] = self.goal_state['position']
+        info['pos'] = np.array([*self.env.unwrapped.agent_pos, self.env.unwrapped.agent_dir])
+        self.is_goal_achieved = self._goal_achieved(next_state)
+        reward = int(self.is_goal_achieved)
+
+        if env_reward > 0 and done:
+            done = False
+
+        if self.is_goal_achieved and not done:
+            self.gen_goal(next_state)
+            self.env.unwrapped.reset()
+            next_state = self.env.gen_obs()
+            done = True
+
+        return next_state, reward, done, info
+
+
+class GoAndResetGoalGenerator(NavigationGoalWrapper):
+    def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
+        self.verbose = verbose
+        super().__init__(env, goal_achieving_criterion)
+
+        self.verbose = 200 if verbose else 0
+        if self.verbose:
+            self.count = np.random.randint(0, self.verbose)
+        else:
+            self.count = 0
+        self.verbose_episode = False
+
+        self.go_agent = torch.load(conf['go_agent'])
+        self.go_steps = conf['go_steps']
+        self.go_deterministic = conf.get('go_deterministic', False)
+
+    def go(self, next_obs):
+        for _ in range(self.go_steps):
+            obs = next_obs
+            _, action, _, _ = self.go_agent.act(torch.tensor(next_obs['image']).unsqueeze(0), deterministic=self.go_deterministic)
+            next_obs, reward, done, info = self.env.step(action)
+            if reward < 0:
+                next_obs = obs
+                done = False
+                break
+            if done and reward > 0:
+                next_obs = None
+                break
+        return next_obs, done
+
+    def gen_goal(self, state):
+        while True:
+            # loop enforces goal_state != current state
+            done = self.gen_goal_(state)
+            if not self._goal_achieved(state):
+                break
+        return done
+
+    def gen_goal_(self, state):
+        curr_pos = self.unwrapped.agent_pos
+        curr_dir = self.unwrapped.agent_dir
+        self.goal_state, done = self.go(state)
+        self.unwrapped.agent_pos = curr_pos
+        self.unwrapped.agent_dir = curr_dir
+        return done
+
+    def step(self, action):
+        next_state, env_reward, done, info = self.env.step(action)
+        self.is_goal_achieved = self._goal_achieved(next_state)
+        reward = int(self.is_goal_achieved)
+
+        if env_reward > 0 and done:
+            done = False
+
+        if self.is_goal_achieved and not done:
+            done = self.gen_goal(next_state)
 
         return next_state, reward, done, info
 
@@ -87,16 +181,19 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
             self.unachieved_buffer_size = conf['unachieved_buffer_size']
             self.unachieved_buffer = deque(maxlen=self.unachieved_buffer_size)
 
-        self.verbose = verbose
         self.warmup_steps = conf['warmup_steps']
         super().__init__(env, goal_achieving_criterion)
 
         self.count = 0
         self.flag = 0
-        self.verbose = 200
         self.seed = seed
         np.random.seed(seed)
-        self.count = np.random.randint(0, self.verbose)
+
+        self.verbose = 200 if verbose else 0
+        if self.verbose:
+            self.count = np.random.randint(0, self.verbose)
+        else:
+            self.count = 0
         self.verbose_episode = False
 
     def gen_goal(self, state):
@@ -107,7 +204,8 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
 
     def reset(self):
         self.count += 1
-        self.verbose_episode = self.count % self.verbose == 0 and self.goal_state is not None
+        if self.verbose:
+            self.verbose_episode = self.count % self.verbose == 0 and self.goal_state is not None
 
         if not self.is_goal_achieved and self.goal_state is not None:
             self.unachieved_buffer.append(self.goal_state)
@@ -264,6 +362,7 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
             conf['from_buffer_choice_params'],
             verbose=verbose,
             seed=conf['seed'])
+
     elif goal_type == 'rnd_buffer':
         device = conf['device']
         if conf['env_type'] == 'gym_minigrid':
@@ -276,6 +375,21 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
                                grid_size,
                                device,
                                verbose=verbose)
+
+    elif goal_type == "walk":
+        env = WalkGoalWrapper(
+            env=env,
+            goal_achieving_criterion=goal_achieving_criterion,
+            walk_grid_goal_generator=random_goal_generator,
+            verbose=verbose)
+
+    elif goal_type == "go_and_reset":
+        env = GoAndResetGoalGenerator(
+            env=env,
+            goal_achieving_criterion=goal_achieving_criterion,
+            conf=conf['go_and_reset_params'],
+            verbose=verbose)
+
     else:
         raise AttributeError(f"unknown goal_type '{goal_type}'")
 
@@ -329,26 +443,26 @@ class EpisodeInfoWrapper(gym.Wrapper):
         super(EpisodeInfoWrapper, self).__init__(env)
         self.episode_reward = 0
         self.episode_steps = 0
-        self.visits_stats = dict()
+        self.visits_stats = defaultdict(int)
 
     def reset(self):
         self.episode_reward = 0
         self.episode_steps = 0
-        self.visits_stats = dict()
+        self.visits_stats.clear()
         return self.env.reset()
 
     def step(self, action):
         state, reward, done, info = self.env.step(action)
         self.episode_reward += reward
         self.episode_steps += 1
-        pos = tuple(self.agent_pos)
-        if pos in self.visits_stats:
-            self.visits_stats[pos] += 1
-        else:
-            self.visits_stats[pos] = 1
+        self.visits_stats[tuple(self.agent_pos)] += 1
         info['visit_stats'] = self.visits_stats
         if done:
-            info['episode'] = {'r': self.episode_reward, 'steps': self.episode_steps}
+            info['episode'] = {
+                'task': self.env.unwrapped.spec.id,
+                'r': self.episode_reward,
+                'steps': self.episode_steps
+            }
         return state, reward, done, info
 
 
@@ -380,4 +494,7 @@ class HierarchicalWrapper(gym.Wrapper):
 class ZeroRewardWrapper(gym.Wrapper):
     def step(self, action):
         state, reward, done, info = self.env.step(action)
+        if reward > 0 and done:
+            done = False
+
         return state, 0, done, info

@@ -30,7 +30,7 @@ class RNDModel(nn.Module):
         return self.predictor.parameters()
 
     def forward(self, next_obs):
-        next_obs = next_obs.float() * 255.
+        next_obs = next_obs.float()
 
         target_feature = self.target(next_obs)
         predict_feature = self.predictor(next_obs)

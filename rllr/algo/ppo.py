@@ -50,15 +50,19 @@ class PPO:
         dist_entropy_epoch = 0
 
         for e in range(self.ppo_epoch):
-            data_generator = rollouts.feed_forward_generator(advantages, self.num_mini_batch)
+            if self.actor_critic.is_recurrent:
+                data_generator = rollouts.recurrent_generator(advantages, self.num_mini_batch)
+            else:
+                data_generator = rollouts.feed_forward_generator(advantages, self.num_mini_batch)
 
             for sample in data_generator:
-                obs_batch, actions_batch, value_preds_batch, return_batch, masks_batch, \
-                    old_action_log_probs_batch, adv_targ = sample
+                obs_batch, actions_batch, recurrent_hidden_states_batch, \
+                value_preds_batch, return_batch, masks_batch, \
+                old_action_log_probs_batch, adv_targ = sample
 
                 # Reshape to do in a single forward pass for all steps
                 values, action_log_probs, dist_entropy, _ = self.actor_critic.evaluate_actions(
-                    obs_batch, actions_batch, None, None)
+                    obs_batch, actions_batch, recurrent_hidden_states_batch, masks_batch)
 
                 ratio = torch.exp(action_log_probs - old_action_log_probs_batch)
                 surr1 = ratio * adv_targ

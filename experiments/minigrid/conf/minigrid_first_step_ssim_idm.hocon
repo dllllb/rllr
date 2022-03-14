@@ -6,44 +6,29 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    device: "cpu",
-    goal_type: rnd_buffer,
-    rnd_buffer_params: {
+    goal_type: random,
+    random_goal_seed: 42,
+    from_buffer_choice_params: {
         warmup_steps: 1000,
-        replay_buffer_size: 100000,
-        goal_buffer_size: 10000,
-        learning_rate: 0.001,
-        batch_size: 64,
-        update_step: 4,
-        target: {
-            state_encoder_type: simple_cnn,
-            n_channels: [16, 16],
-            kernel_sizes: [4, 3],
-            strides: [4, 1],
-            paddings: [0, 1],
-            head: {
-                hidden_size: 64
-            }
-        },
-        predictor: {
-            state_encoder_type: simple_cnn,
-            n_channels: [16, 16],
-            kernel_sizes: [4, 3],
-            strides: [4, 1],
-            paddings: [0, 1],
-            head: {
-                hidden_size: 64
-            }
-      }
+        buffer_size: 100000,
+        unachieved_buffer_size: 100,
+        unachieved_prob: 0.65,
     },
-    random_goal_seed: 123456789,
     goal_achieving_criterion: state_similarity,
     ssim_network_params: {
-        path: artifacts/models/minigrid_ssim.p,
+        path: artifacts/models/minigrid_ssim_idm.p,
         device: "cpu",
-        threshold: 0.35
+        threshold: 0.6
     },
     video_path: artifacts/video/
+  },
+
+  rnd: {
+    state_encoder_type: simple_cnn,
+    n_channels: [16, 16],
+    kernel_sizes: [4, 3],
+    strides: [4, 1],
+    paddings: [0, 1]
   },
 
   worker: {
@@ -66,11 +51,14 @@
     head: {
         hidden_size: []
     },
-    emb_size: 32
+    emb_size: 8,
+    normalize: true,
   },
 
   agent: {
     device: "cpu",
+    ext_coef: 2.0,
+    im_coef: 1.0,
     clip_param: 0.2,
     ppo_epoch: 4,
     num_mini_batch: 4,
@@ -80,12 +68,13 @@
     eps: 1e-5,
     max_grad_norm: 0.5,
     gamma: 0.99,
+    im_gamma: 0.99,
     gae_lambda: 0.95
   },
 
   training: {
-    reward: fair_goal_achievement,
-    n_env_steps: 2000000,
+    algorithm: imppo,
+    n_env_steps: 16000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
@@ -94,7 +83,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_worker_ssim_rnd_buffer.p,
-    logs: artifacts/logs/minigrid_worker_ssim_rnd_buffer
+    model: artifacts/models/minigrid_worker_ssim_idm_big.p,
+    logs: artifacts/logs/minigrid_worker_ssim_idm_big
   }
 }

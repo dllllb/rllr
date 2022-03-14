@@ -83,7 +83,7 @@ class SimpleCNN(nn.Module):
         self.output_size = output_size
 
     def forward(self, x):
-        res = self.conv_net(x.float() / 255.).reshape(x.shape[0], -1)
+        res = self.conv_net(x.float()).reshape(x.shape[0], -1)
         if self.fc is not None:
             res = self.fc(res)
         return res
@@ -248,14 +248,13 @@ class LastActionEncoder(nn.Module):
 
 
 class RNNEncoder(nn.Module):
-    def __init__(self, model, output_size):
+    def __init__(self, input_size, output_size):
         super().__init__()
-        self.model = model
+        self.input_size = input_size
         self.output_size = output_size
-        self.rnn = nn.LSTM(model.output_size, output_size)
+        self.rnn = nn.LSTM(input_size, output_size)
 
     def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
-        out = self.model(out)
         out, rnn_rhs = self._forward_rnn(out, rnn_rhs, masks)
         return out, rnn_rhs
 
@@ -323,9 +322,20 @@ class RNNEncoder(nn.Module):
         return x, hxs
 
 
+class IDMEncoder(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+        self.output_size = model.encoder.output_size
+
+    def forward(self, state):
+        out = self.model.encode(state).detach()
+        return out
+
+
 def get_encoder(grid_size, config):
     if config['state_encoder_type'] == 'simple_mlp':
-        state_size = 3 * (grid_size - 2) ** 2
+        state_size = config.get('input_size', 3 * (grid_size - 2) ** 2)
         state_encoder = Flattener(MLP(state_size, config['hidden_layers_sizes']))
     elif config['state_encoder_type'] == 'simple_cnn':
         state_encoder = SimpleCNN(grid_size, config)
@@ -337,6 +347,12 @@ def get_encoder(grid_size, config):
         state_encoder = DummyRawStateEncoder(grid_size)
     elif config['state_encoder_type'] == 'dummy_image':
         state_encoder = DummyImageStateEncoder(grid_size, config)
+    elif config['state_encoder_type'] == 'cnn_rnn':
+        cnn_encoder = SimpleCNN(grid_size, config)
+        state_encoder = RNNEncoder(cnn_encoder, config.get('rnn_output', cnn_encoder.output_size))
+    elif config['state_encoder_type'] == 'idm':
+        encoder = torch.load(config['encoder_path'], map_location='cpu')
+        state_encoder = IDMEncoder(encoder.idm_network)
     else:
         raise AttributeError(f"unknown nn_type '{config['master.state_encoder_type']}'")
 

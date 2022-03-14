@@ -1,12 +1,14 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Dynamic-Obstacles,
-    grid_size: 8,
+    env_task: MiniGrid-LavaCrossing,
+    grid_size: 11,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
     video_path: artifacts/video/,
+    n_size: 5,
+    fully_observed: false,
   },
 
   state_similarity: {
@@ -64,8 +66,8 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_ssim_del.p
-    model: artifacts/models/minigrid_agent_ssim_del.p
-    logs: artifacts/logs/minigrid_ssim_del
+    path: artifacts/models/minigrid_lava_ssim.p
+    model: artifacts/models/minigrid_agent_lava_ssim.p
+    logs: artifacts/logs/minigrid_lava_ssim
   }
 }

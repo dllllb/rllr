@@ -29,6 +29,10 @@ class InverseDynamicsModel(nn.Module):
 
         return self.fc(torch.cat((x, y), 1))
 
+    def encode(self, state):
+        with torch.no_grad():
+            return self.encoder(state)
+
 
 class StateEmbedder:
     def __init__(self, encoder, device):

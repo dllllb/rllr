@@ -41,7 +41,7 @@ class IMPPO:
         self.actor_critic = self.actor_critic.to(device)
         return self
 
-    def act(self, state, rnn_hxs, masks, deterministic=False):
+    def act(self, state, rnn_hxs=None, masks=None, deterministic=False):
         with torch.no_grad():
             return self.actor_critic.act(state, rnn_hxs, masks, deterministic)
 
@@ -76,7 +76,8 @@ class IMPPO:
                     return_batch, im_return_batch, masks_batch, \
                     old_action_log_probs_batch, adv_targ = sample
 
-                next_obs_batch = ((get_state(next_obs_batch) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5)
+                #next_obs_batch = ((get_state(next_obs_batch) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5)
+                next_obs_batch = get_state(next_obs_batch)
                 im_loss = self.im_model.compute_loss(next_obs_batch)
 
                 # Reshape to do in a single forward pass for all steps

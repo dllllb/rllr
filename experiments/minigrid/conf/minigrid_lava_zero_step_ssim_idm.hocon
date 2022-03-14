@@ -1,8 +1,10 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Dynamic-Obstacles,
-    grid_size: 8,
+    env_task: MiniGrid-LavaGap,
+    s_size: 5,
+    fully_observed: false,
+    grid_size: 7,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
@@ -64,8 +66,8 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_ssim_del.p
-    model: artifacts/models/minigrid_agent_ssim_del.p
-    logs: artifacts/logs/minigrid_ssim_del
+    path: rtifacts/models/minigrid_lava_ssim_idm.p
+    model: artifacts/models/minigrid_lava_agent_ssim_idm.p
+    logs: artifacts/logs/minigrid_lava_ssim_idm
   }
 }

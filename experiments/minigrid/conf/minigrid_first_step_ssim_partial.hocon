@@ -2,12 +2,11 @@
   env: {
     env_type: gym_minigrid,
     env_task: MiniGrid-Dynamic-Obstacles,
-    grid_size: 8,
+    grid_size: 16,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    goal_type: random,
-    random_goal_seed: 42,
+    goal_type: from_buffer,
     from_buffer_choice_params: {
         warmup_steps: 1000,
         buffer_size: 100000,
@@ -16,11 +15,12 @@
     },
     goal_achieving_criterion: state_similarity,
     ssim_network_params: {
-        path: artifacts/models/minigrid_ssim.p,
+        path: artifacts/models/minigrid_ssim_partial_big.p,
         device: "cpu",
         threshold: 0.65
     },
-    video_path: artifacts/video/
+    video_path: artifacts/video/,
+    fully_observed: false
   },
 
   rnd: {
@@ -57,8 +57,6 @@
 
   agent: {
     device: "cpu",
-    ext_coef: 2.0,
-    im_coef: 1.0,
     clip_param: 0.2,
     ppo_epoch: 4,
     num_mini_batch: 4,
@@ -82,7 +80,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_worker_ssim.p,
-    logs: artifacts/logs/minigrid_worker_ssim
+    model: artifacts/models/minigrid_worker_ssim_partial_big.p,
+    logs: artifacts/logs/minigrid_worker_ssim_partial_big
   }
 }

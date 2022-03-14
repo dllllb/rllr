@@ -7,16 +7,20 @@ from argparse import ArgumentParser
 from collections import defaultdict
 from tqdm import trange, tqdm
 
-from rllr.env.gym_minigrid_navigation.environments import RGBImgObsWrapper, PosObsWrapper, RandomStartPointWrapper
+from rllr.env.gym_minigrid_navigation.environments import RGBImgObsWrapper, PosObsWrapper, RandomStartPointWrapper, ImgNorm, PosEncoding, RGBImgPartialObsWrapper
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
 
 
 def make_env():
-    env = gym.make('MiniGrid-Dynamic-Obstacles-8x8-v0')
+    #env = gym.make('MiniGrid-Dynamic-Obstacles-8x8-v0')
+    env = gym.make('MiniGrid-LavaCrossingS9N3-v0')
     env = RandomStartPointWrapper(env, {})
     env = RGBImgObsWrapper(env, tile_size=4)
+    #env = RGBImgPartialObsWrapper(env, tile_size=4)
+    env = ImgNorm(env)
+    #env = PosEncoding(env)
     env = PosObsWrapper(env)
     return env
 
@@ -24,7 +28,13 @@ def make_env():
 def rnd_obs(env, seed):
     env.seed(seed)
     while True:
-        yield env.reset()
+        #yield env.reset()
+        agent_pos = np.random.randint(1, 8, 2)
+        agent_dir = np.random.randint(0, 3)
+        env.unwrapped.agent_pos = agent_pos
+        env.unwrapped.agent_dir = agent_dir
+        obs, _, _, _ = env.step(0)
+        yield obs
 
 
 def make_dataset(generator, total_size=100000):
@@ -42,7 +52,7 @@ def dist(ssim, state, goal_state):
 
 
 def main(args):
-    encoder = torch.load('artifacts/models/minigrid_ssim.p')
+    encoder = torch.load('artifacts/models/minigrid_lava_ssim.p')
 
     dataset = make_dataset(rnd_obs(make_env(), args.seed), args.episodes)
     thd = args.thd

@@ -34,12 +34,12 @@ def play(mode, viz, n_episodes):
         assert False
 
     env = make_vec_envs(
-        lambda env_id: lambda: gen_env_with_seed(config, np.random.randint(0, 100), render=viz),
+        lambda env_id: lambda: gen_env_with_seed(seed=np.random.randint(0, 100), render=viz),
         num_processes=1,
         device='cpu'
     )
 
-    agent = torch.load(config['outputs.path'], map_location='cpu')
+    agent = torch.load(config['outputs.model'], map_location='cpu')
 
     rewards, steps, rooms = [], [], []
     for _ in trange(n_episodes):

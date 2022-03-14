@@ -10,11 +10,8 @@
   },
 
   state_similarity: {
-    state_encoder_type: simple_cnn,
-    n_channels: [16, 16],
-    kernel_sizes: [4, 3],
-    strides: [4, 1],
-    paddings: [0, 1],
+    encoder_path: artifacts/models/minigrid_idm.p
+    state_encoder_type: idm,
     head: {
         hidden_size: 64
     },
@@ -64,8 +61,8 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_ssim_del.p
-    model: artifacts/models/minigrid_agent_ssim_del.p
-    logs: artifacts/logs/minigrid_ssim_del
+    path: artifacts/models/minigrid_ssim_idm_big.p
+    model: artifacts/models/minigrid_agent_ssim_idm_big.p
+    logs: artifacts/logs/minigrid_ssim_idm_big
   }
 }

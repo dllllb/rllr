@@ -2,43 +2,49 @@
   env: {
     env_type: gym_minigrid,
     env_task: MiniGrid-Dynamic-Obstacles,
-    grid_size: 8,
+    grid_size: 16,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
+    video_path: artifacts/video/,
+    num_processes: 16,
+    fully_observed: false
   },
 
-  encoder: {
+  worker_agent: {
+    path: "artifacts/models/minigrid_worker_ssim_partial.p",
+    device: "cpu"
+  }
+
+  master: {
     state_encoder_type: simple_cnn,
     n_channels: [16, 16],
     kernel_sizes: [4, 3],
     strides: [4, 1],
     paddings: [0, 1],
     head: {
-        hidden_size: 64
-    }
-  },
+        hidden_size: []
+    },
+    normalize: true,
+  }
 
   agent: {
     device: "cpu",
-    ext_coef: 2.0,
-    im_coef: 1.0,
     clip_param: 0.2,
     ppo_epoch: 4,
     num_mini_batch: 4,
     value_loss_coef: 0.5,
-    entropy_coef: 0.1,
-    lr: 0.0001,
+    entropy_coef: 0.01,
+    lr: 0.001,
     eps: 1e-5,
     max_grad_norm: 0.5,
-    gamma: 0.999,
-    im_gamma: 0.99,
+    gamma: 0.99,
     gae_lambda: 0.95
-  },
+  }
 
   training: {
-    reward: fair_goal_achievement,
-    n_env_steps: 25000000,
+    n_env_steps: 400000,
+    worker_n_steps: 5,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
@@ -47,7 +53,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_rnd_ppo.p,
-    logs: artifacts/logs/minigrid_rnd_ppo
+      model: artifacts/models/minigrid_master_ssim_partial.p,
+      logs: artifacts/logs/minigrid_master_ssim_partial
   }
 }

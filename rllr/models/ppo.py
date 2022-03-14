@@ -175,7 +175,7 @@ class ActorCriticNetwork(nn.Module):
                 m.weight.data *= 1 / torch.sqrt(m.weight.data.pow(2).sum(1, keepdim=True))
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-            if classname.find("GRU") != -1:
+            if classname.find("LSTM") != -1:
                 for name, param in m.named_parameters():
                     if 'bias' in name:
                         nn.init.constant_(param, 0)

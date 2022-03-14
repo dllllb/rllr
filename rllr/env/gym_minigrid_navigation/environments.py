@@ -1,6 +1,7 @@
 import gym
 import logging
 import numpy as np
+import math
 
 from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper, RGBImgPartialObsWrapper
 
@@ -20,7 +21,8 @@ class PosObsWrapper(gym.core.ObservationWrapper):
 class ImageObsWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.observation_space = self.observation_space.spaces['image']
+        if type(self.observation_space) == gym.spaces.Dict:
+            self.observation_space = self.observation_space.spaces['image']
 
     def observation(self, obs):
         return obs['image']
@@ -72,9 +74,68 @@ class GoalPatch(gym.Wrapper):
         return next_state, reward, done, info
 
 
+class PosEncoding(gym.ObservationWrapper):
+    def __init__(self, env):
+        assert env.tile_size == 4
+        super().__init__(env)
+        self.tile_size = env.tile_size
+        self.d_model = (env.tile_size ** 2) // 2
+        self.div_term = np.tile(np.exp(np.arange(0, self.d_model, 2) * (-math.log(10000.0) / self.d_model)), 7)
+        self.pe = np.zeros((7*env.tile_size, 7*env.tile_size))
+
+    def observation(self, obs):
+        img_obs = obs['image']
+
+        pos = self.env.agent_pos
+        direction = self.env.agent_dir
+
+        if direction == 0:
+            xx = np.arange(7) + pos[0]
+            yy = np.arange(-3, 4) + pos[1]
+        elif direction == 1:
+            xx = np.arange(-3, 4) + pos[0]
+            yy = np.arange(7) + pos[1]
+        elif direction == 2:
+            xx = np.arange(-6, 1) + pos[0]
+            yy = np.arange(-3, 4) + pos[1]
+        else:
+            xx = np.arange(-3, 4) + pos[0]
+            yy = np.arange(-6, 1) + pos[1]
+
+        xx, yy = xx.repeat(self.tile_size), yy.repeat(self.tile_size)
+        xx, yy = np.meshgrid(xx, yy)
+
+        for i in range(0, 7*self.tile_size, self.tile_size):
+            self.pe[i, :] = np.sin(xx[i] * self.div_term)
+            self.pe[i+1, :] = np.cos(xx[i] * self.div_term)
+            self.pe[i+2, :] = np.sin(yy[i] * self.div_term)
+            self.pe[i+3, :] = np.cos(yy[i] * self.div_term)
+
+        img_obs += np.expand_dims(self.pe, -1)
+        obs['image'] = img_obs
+        return obs
+
+
+class ImgNorm(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.mean = np.array([0.485, 0.456, 0.406])
+        self.std = np.array([0.229, 0.224, 0.225])
+
+        self.observation_space.spaces['image'] = gym.spaces.Box(-5, 5,
+                                                                env.observation_space.spaces['image'].shape,
+                                                                dtype=np.float32)
+
+    def observation(self, obs):
+        img_obs = obs['image']
+        img_obs = img_obs / 255.
+        img_obs = ((img_obs - self.mean) / self.std).clip(-5, 5)
+        obs['image'] = img_obs
+        return obs
+
 def get_env_name(conf):
     if conf['env_task'] in ['MiniGrid-Empty', 'MiniGrid-Dynamic-Obstacles']:
-        env_name = f"{conf['env_task']}-{conf['grid_size']}x{conf['grid_size']}-v0"
+        return f"{conf['env_task']}-{conf['grid_size']}x{conf['grid_size']}-v0"
 
     elif conf['env_task'] == 'MiniGrid-MultiRoom':
         env_names_dict = {
@@ -82,7 +143,7 @@ def get_env_name(conf):
             4: 'MiniGrid-MultiRoom-N4-S5-v0',
             6: 'MiniGrid-MultiRoom-N6-v0'
         }
-        env_name = env_names_dict[conf['num_rooms']]
+        return env_names_dict[conf['num_rooms']]
 
     elif conf['env_task'] == 'MiniGrid-LavaGap':
         env_names_dict = {
@@ -90,7 +151,7 @@ def get_env_name(conf):
             6: 'MiniGrid-LavaGapS6-v0',
             7: 'MiniGrid-LavaGapS7-v0',
         }
-        env_name = env_names_dict[conf['s_size']]
+        return env_names_dict[conf['s_size']]
 
     elif conf['env_task'] == 'MiniGrid-LavaCrossing':
         env_names_dict = {
@@ -99,7 +160,7 @@ def get_env_name(conf):
             3: 'MiniGrid-LavaCrossingS9N3-v0',
             5: 'MiniGrid-LavaCrossingS11N5-v0',
         }
-        env_name = env_names_dict[conf['n_size']]
+        return env_names_dict[conf['n_size']]
 
     elif conf['env_task'] == 'MiniGrid-SimpleCrossing':
         env_names_dict = {
@@ -108,15 +169,9 @@ def get_env_name(conf):
             3: 'MiniGrid-SimpleCrossingS9N3-v0',
             5: 'MiniGrid-SimpleCrossingS11N5-v0',
         }
-        env_name = env_names_dict[conf['n_size']]
+        return env_names_dict[conf['n_size']]
 
-    elif conf['env_task'] == 'MiniGrid-FourRooms':
-        env_name = 'MiniGrid-FourRooms-v0'
-
-    else:
-        raise AttributeError(f"unknown env_task '{conf['env_task']}'")
-
-    return env_name
+    return conf['env_task']
 
 
 def gen_wrapped_env(conf, verbose=False):
@@ -147,12 +202,15 @@ def gen_wrapped_env(conf, verbose=False):
     if conf.get('fully_observed', True):
         if conf.get('rgb_image', False):
             env = RGBImgObsWrapper(env, tile_size=conf['tile_size'])  # Fully observed RGB image
+            env = ImgNorm(env)
         else:
             env = FullyObsWrapper(env)  # Fully observable gridworld using a compact grid encoding
 
     else:
         if conf.get('rgb_image', False):
             env = RGBImgPartialObsWrapper(env, tile_size=conf['tile_size'])  # Fully observed RGB image
+            env = ImgNorm(env)
+            #env = PosEncoding(env)
 
     if conf.get('goal_achieving_criterion', None) in {'position_and_direction', 'position'} or verbose:
         env = PosObsWrapper(env)

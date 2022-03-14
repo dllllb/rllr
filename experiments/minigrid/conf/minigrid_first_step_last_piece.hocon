@@ -73,6 +73,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_worker_ssim.p,
+    model: artifacts/models/minigrid_worker_ssim.p,
+    logs: artifacts/logs/minigrid_worker_ssim,
   }
 }

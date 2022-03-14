@@ -1,10 +1,9 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-LavaGap,
-    s_size: 5,
-    fully_observed: false,
-    grid_size: 7,
+    env_task: MiniGrid-LavaCrossing,
+    n_size: 3,
+    grid_size: 9,
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
@@ -43,7 +42,7 @@
   }
 
   training: {
-    n_env_steps: 400000,
+    n_env_steps: 1500000,
     worker_n_steps: 5,
     n_steps: 128,
     n_processes: 16,
@@ -53,6 +52,7 @@
   seed: 42,
 
   outputs: {
-      path: artifacts/models/minigrid_lava_master_ssim.p,
+      model: artifacts/models/minigrid_lava_master_ssim.p,
+      logs: artifacts/logs/minigrid_lava_master_ssim
   }
 }

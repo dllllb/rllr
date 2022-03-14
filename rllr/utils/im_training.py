@@ -2,6 +2,7 @@ from tqdm import trange
 import time
 from collections import deque, defaultdict
 import torch
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 from rllr.buffer.im_rollout import IMRolloutStorage
@@ -42,16 +43,15 @@ def init_obs_rms(env, conf):
 
 
 def im_train_ppo(env, agent, conf, after_epoch_callback=None):
-    """
-    Runs a series of episode and collect statistics
-    """
+    writer = SummaryWriter(conf['outputs.logs'])
     reward_rms = RunningMeanStd(device=conf['agent.device'])
-    obs_rms = init_obs_rms(env, conf)
+    #obs_rms = init_obs_rms(env, conf)
+    obs_rms = None
 
     # training starts
     rollouts = IMRolloutStorage(
         conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space,
-        conf.get('encoder.recurrent_hidden_size', 1)
+        conf.get('encoder.recurrent_hidden_size', 784) * 2
     )
 
     obs = env.reset()
@@ -63,8 +63,8 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
 
     episode_stats = defaultdict(lambda: defaultdict(lambda: deque(maxlen=10)))
 
-    for j in trange(num_updates):
-        update_linear_schedule(agent.optimizer, j, num_updates, conf['agent.lr'])
+    for epoch in trange(num_updates):
+        update_linear_schedule(agent.optimizer, epoch, num_updates, conf['agent.lr'])
 
         for step in range(conf['training.n_steps']):
             # Sample actions
@@ -77,7 +77,8 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
             obs, reward, done, infos = env.step(action)
 
             im_reward = agent.compute_intrinsic_reward(
-                ((get_state(obs) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5))
+                #((get_state(obs) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5))
+                get_state(obs))
 
             for info in infos:
                 if 'episode' in info.keys():
@@ -98,7 +99,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
         mean, var, count = torch.mean(im_ret), torch.var(im_ret), len(im_ret)
         reward_rms.update_from_moments(mean, var, count)
 
-        obs_rms.update(get_state(rollouts.obs))
+        #obs_rms.update(get_state(rollouts.obs))
 
         rollouts.im_rewards /= torch.sqrt(reward_rms.var)
 
@@ -114,28 +115,35 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
         value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
         rollouts.after_update()
 
-        if j % conf['training.verbose'] == 0:
-            total_num_steps = (j + 1) * conf['training.n_processes'] * conf['training.n_steps']
+        if epoch % conf['training.verbose'] == 0:
+            total_num_steps = (epoch + 1) * conf['training.n_processes'] * conf['training.n_steps']
             end = time.time()
-            print(f'Updates {j}, '
+            print(f'Updates {epoch}, '
                   f'num timesteps {total_num_steps}, '
                   f'FPS {int(total_num_steps / (end - start))} \n'
                   f'dist_entropy {dist_entropy:.2f}, '
                   f'value_loss {value_loss:.2f}, '
                   f'im_value_loss {im_value_loss:.2f}, '
                   f'action_loss {action_loss:.2f}'
-                )
+            )
+
+            writer.add_scalar('dist_entropy', dist_entropy, total_num_steps)
+            writer.add_scalar('value_loss', value_loss, total_num_steps)
+            writer.add_scalar('im_value_loss', im_value_loss, total_num_steps)
+            writer.add_scalar('action_loss', action_loss, total_num_steps)
+
             for task in episode_stats:
                 print(f'Task {task}:')
                 task_stats = episode_stats[task]
                 for key, value in task_stats.items():
+                    writer.add_scalar(f'{task}/{key}', np.mean(value), total_num_steps)
                     print(
                         f'mean/median {key} {np.mean(value):.2f}/{np.median(value):.2f}, '
                         f'min/max {key} {np.min(value):.2f}/{np.max(value):.2f}'
                     )
                 print()
 
-            torch.save(agent, conf['outputs.path'])
+            torch.save(agent, conf['outputs.model'])
 
             if after_epoch_callback is not None:
                 loss = after_epoch_callback(rollouts)
