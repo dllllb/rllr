@@ -20,7 +20,7 @@ setup(
         'numpy',
         'torch',
         'torchvision',
-        'gym[accept-rom-license]',
+        'gym[atari, accept-rom-license]==0.19.0',
         'ale-py',
         'matplotlib',
         'pyhocon',            # utils.config :: get_conf

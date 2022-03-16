@@ -2,7 +2,6 @@ import logging
 
 import numpy as np
 import torch
-
 from argparse import ArgumentParser
 from pyhocon.config_parser import ConfigFactory
 from tqdm import trange
@@ -25,6 +24,8 @@ def test():
         'direct_ppo_lava': (0.94722223, 1.0),
         'rnd_ppo': (0.30742186, 1.0),
         'rnd_ppo_lava': (0.86111110, 1.0),
+        'rnd_ppo_doorkey': (0.960625, 1.0),
+        'rnd_ppo_fourrooms': (0.73, 1.0),
         'multi': (0.77222222, 1.0)
     }
 
@@ -73,6 +74,14 @@ def play(mode, viz, n_episodes):
         from train_rnd_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_lava.hocon')
 
+    elif mode == 'rnd_ppo_doorkey':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_doorkey.hocon')
+
+    elif mode == 'rnd_ppo_fourrooms':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_fourrooms.hocon')
+
     elif mode == 'multi':
         from train_multitask import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_multitask.hocon')
@@ -112,7 +121,8 @@ def play(mode, viz, n_episodes):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_master_lava',
-                                           'ssim_worker', 'direct_ppo', 'rnd_ppo', 'multi'])
+                                           'ssim_worker', 'direct_ppo', 'rnd_ppo', 'rnd_ppo_doorkey',
+                                           'rnd_ppo_fourrooms', 'multi'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()
