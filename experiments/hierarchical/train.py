@@ -270,12 +270,9 @@ if __name__ == '__main__':
 
         for e in range(master.ppo_epoch):
             for obs_batch, actions in bc_batch(worker_rollouts, hindsight_goals, hindsight_returns, master.num_mini_batch):
-                _, action, _, _ = master.actor_critic.act(obs_batch['image'], None, None, deterministic=False)
+                _, action_log_probs, _, _ = master.actor_critic.evaluate_actions(obs_batch['image'], obs_batch['goal'], None, None)
                 master.optimizer.zero_grad()
-                with torch.no_grad():
-                    trg = master.actor_critic.vae.decode(obs_batch['goal'])
-                rec = master.actor_critic.vae.decode(action)
-                sil_loss = F.binary_cross_entropy(rec, trg, reduction='sum')
+                sil_loss = -torch.mean(action_log_probs)
                 sil_loss.backward()
                 master.optimizer.step()
                 sil_master_loss += sil_loss.item()
