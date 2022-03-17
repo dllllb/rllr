@@ -119,10 +119,10 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
             print(f'Updates {epoch}, '
                   f'num timesteps {total_num_steps}, '
                   f'FPS {int(total_num_steps / (end - start))} \n'
-                  f'dist_entropy {dist_entropy:.2f}, '
-                  f'value_loss {value_loss:.2f}, '
-                  f'im_value_loss {im_value_loss:.2f}, '
-                  f'action_loss {action_loss:.2f}'
+                  f'dist_entropy {dist_entropy:.3f}, '
+                  f'value_loss {value_loss:.3f}, '
+                  f'im_value_loss {im_value_loss:.3f}, '
+                  f'action_loss {action_loss:.3f}'
             )
 
             writer.add_scalar('dist_entropy', dist_entropy, total_num_steps)
@@ -136,8 +136,8 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
                 for key, value in task_stats.items():
                     writer.add_scalar(f'{task}/{key}', np.mean(value), total_num_steps)
                     print(
-                        f'mean/median {key} {np.mean(value):.2f}/{np.median(value):.2f}, '
-                        f'min/max {key} {np.min(value):.2f}/{np.max(value):.2f}'
+                        f'mean/median {key} {np.mean(value):.3f}/{np.median(value):.3f}, '
+                        f'min/max {key} {np.min(value):.3f}/{np.max(value):.3f}'
                     )
                 print()
 
@@ -145,4 +145,4 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
 
             if after_epoch_callback is not None:
                 loss = after_epoch_callback(rollouts)
-                print(f'loss: {loss:.2f}')
+                print(f'loss: {loss:.3f}')
