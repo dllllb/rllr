@@ -33,6 +33,20 @@ class ContrastiveStateSimilarity:
         self.bce_loss = nn.BCELoss()
         self.optimizer = optim.Adam(self.ssim_network.parameters(), lr=lr)
 
+    def balance(self, labels, states1, states2):
+        labels = np.asarray(labels)
+        pos_indices = np.where(labels==True)[0]
+        n_pos = pos_indices.shape[0]
+        neg_indices = np.where(labels==False)[0]
+        n_neg = neg_indices.shape[0]
+
+        if n_neg > n_pos:
+            neg_indices = np.random.choice(neg_indices, n_pos, replace=False)
+        elif n_pos > n_neg:
+            pos_indices = np.random.choice(pos_indices, n_neg, replace=False)
+        indices = np.concatenate([pos_indices, neg_indices], dtype=np.int64)
+        return labels[indices], states1[indices], states2[indices]
+
     def update(self, rollouts: RolloutStorage):
         loss = 0
         for p in trange(rollouts.num_processes):
@@ -49,10 +63,15 @@ class ContrastiveStateSimilarity:
                                 states2.append(states[j])
                                 labels.append(int(abs(i - j) <= self.radius))
                     n, states = 0, []
-            if len(labels)>0:
-                loss += self.optimize(torch.stack(states1, dim=0).to(self.device),
-                            torch.stack(states2, dim=0).to(self.device),
-                            convert_to_torch(labels, self.device).squeeze())
+            if len(labels) > 0:
+
+                labels = np.asarray(labels)
+                states1, states2 = torch.stack(states1, dim=0), torch.stack(states2, dim=0)
+                labels, states1, states2 = self.balance(labels, states1, states2)
+
+                loss += self.optimize(states1.to(self.device),
+                                      states2.to(self.device),
+                                      torch.Tensor(labels, device=self.device))
         return loss/rollouts.num_processes/self.epochs
 
     def optimize(self, states1, states2, labels):

@@ -20,7 +20,7 @@ def train_ppo(env, agent, conf):
 
     rollouts = RolloutStorage(
         conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space,
-        conf.get('encoder.recurrent_hidden_size', 32) * 2
+        conf.get('worker.rnn_output', 32) * 2
     )
     obs = env.reset()
     rollouts.set_first_obs(obs)

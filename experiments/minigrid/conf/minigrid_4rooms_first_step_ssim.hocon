@@ -6,38 +6,21 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    video_path: artifacts/video/,
-    hash_penalty: 0.05,
-  },
-
-  state_similarity: {
-    state_encoder_type: simple_cnn,
-    n_channels: [16, 16],
-    kernel_sizes: [4, 3],
-    strides: [4, 3],
-    paddings: [0, 1],
-    head: {
-        hidden_size: 64
-    },
-    hidden_size: [128, 128],
-    lr: 1e-3,
-    radius: 3,
-    n_updates: 5,
-    epochs: 5,
-    verbose: 100,
-  }
-
-  worker: {
-    state_encoder_type: cnn_rnn,
-    n_channels: [16, 16],
-    kernel_sizes: [4, 3],
-    strides: [4, 1],
-    paddings: [0, 1],
-    hidden_layers_sizes: [128],
-    rnn_output: 128
-    head: {
-        hidden_size: 64
+    minigrid_max_steps: 300,
+    goal_type: go_and_reset,
+    go_and_reset_params: {
+        go_agent: artifacts/models/minigrid_4rooms_agent_ssim.p,
+        go_steps: 30,
+        rhs_size: 128,
+        device: 'cpu',
     }
+    goal_achieving_criterion: state_similarity,
+    ssim_network_params: {
+        path: artifacts/models/minigrid_4rooms_ssim.p,
+        device: "cpu",
+        threshold: 0.5
+    },
+    video_path: artifacts/video/,
   },
 
   rnd: {
@@ -45,10 +28,31 @@
     n_channels: [16, 16],
     kernel_sizes: [4, 3],
     strides: [4, 1],
+    paddings: [0, 1]
+  },
+
+  worker: {
+    state_encoder_type: simple_cnn,
+    n_channels: [16, 16],
+    kernel_sizes: [4, 3],
+    strides: [4, 1],
     paddings: [0, 1],
     head: {
         hidden_size: 64
     }
+  },
+
+  master: {
+    state_encoder_type: simple_cnn,
+    n_channels: [16, 16],
+    kernel_sizes: [4, 3],
+    strides: [4, 1],
+    paddings: [0, 1],
+    head: {
+        hidden_size: []
+    },
+    emb_size: 8,
+    normalize: true,
   },
 
   agent: {
@@ -59,17 +63,18 @@
     ppo_epoch: 4,
     num_mini_batch: 4,
     value_loss_coef: 0.5,
-    entropy_coef: 0.1,
-    lr: 0.0001,
+    entropy_coef: 0.01,
+    lr: 0.001,
     eps: 1e-5,
     max_grad_norm: 0.5,
-    gamma: 0.999,
+    gamma: 0.99,
     im_gamma: 0.99,
     gae_lambda: 0.95
   },
 
   training: {
-    n_env_steps: 1000000,
+    algorithm: ppo,
+    n_env_steps: 10000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
@@ -78,8 +83,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_4rooms_ssim.p
-    model: artifacts/models/minigrid_4rooms_agent_ssim.p
-    logs: artifacts/logs/minigrid_4rooms_ssim
+    model: artifacts/models/minigrid_4rooms_worker_ssim.p,
+    logs: artifacts/logs/minigrid_4rooms_worker_ssim
   }
 }

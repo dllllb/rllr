@@ -248,13 +248,14 @@ class LastActionEncoder(nn.Module):
 
 
 class RNNEncoder(nn.Module):
-    def __init__(self, input_size, output_size):
+    def __init__(self, model, output_size):
         super().__init__()
-        self.input_size = input_size
+        self.model = model
         self.output_size = output_size
-        self.rnn = nn.LSTM(input_size, output_size)
+        self.rnn = nn.LSTM(model.output_size, output_size)
 
     def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
+        out = self.model(out)
         out, rnn_rhs = self._forward_rnn(out, rnn_rhs, masks)
         return out, rnn_rhs
 

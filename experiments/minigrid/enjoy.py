@@ -12,6 +12,7 @@ from tqdm import trange
 from rllr.env import make_vec_envs
 from rllr.utils.logger import init_logger
 from rllr.utils import switch_reproducibility_on
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,11 @@ def play(mode, viz, n_episodes, walk):
         from train_multitask import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_multitask.hocon')
 
+    elif mode == 'ssim_ssim_agent':
+        from train_similarity import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_4rooms_zero_step_ssim.hocon')
+        #config = ConfigFactory.parse_file('conf/minigrid_zero_step_ssim.hocon')
+
     else:
         assert False
 
@@ -152,6 +158,7 @@ def play(mode, viz, n_episodes, walk):
         while not done:
             if viz:
                 env.render('human')
+                time.sleep(0.2)
             value, action, _, rnn_hxs = agent.act(obs, rnn_hxs, masks, deterministic=False)
             obs, reward, done, infos = env.step(action)
             episode_reward += float(reward)
@@ -167,7 +174,7 @@ def play(mode, viz, n_episodes, walk):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_master_partial', 'ssim_master_lava',
-                                           'ssim_worker', 'direct_ppo', 'rnd_ppo', 'multi'])
+                                           'ssim_worker', 'direct_ppo', 'rnd_ppo', 'multi', 'ssim_ssim_agent'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     parser.add_argument('--walk', action='store_true')

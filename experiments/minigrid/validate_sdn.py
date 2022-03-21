@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 def make_env():
     #env = gym.make('MiniGrid-Dynamic-Obstacles-8x8-v0')
-    env = gym.make('MiniGrid-LavaCrossingS9N3-v0')
+    #env = gym.make('MiniGrid-LavaCrossingS9N3-v0')
+    env = gym.make('MiniGrid-FourRooms-v0')
     env = RandomStartPointWrapper(env, {})
     env = RGBImgObsWrapper(env, tile_size=4)
     #env = RGBImgPartialObsWrapper(env, tile_size=4)
@@ -52,7 +53,7 @@ def dist(ssim, state, goal_state):
 
 
 def main(args):
-    encoder = torch.load('artifacts/models/minigrid_lava_ssim.p')
+    encoder = torch.load('artifacts/models/minigrid_4rooms_ssim.p')
 
     dataset = make_dataset(rnd_obs(make_env(), args.seed), args.episodes)
     thd = args.thd

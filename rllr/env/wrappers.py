@@ -63,38 +63,6 @@ class NavigationGoalWrapper(gym.Wrapper):
         return next_state, reward, done, info
 
 
-class WalkGoalWrapper(NavigationGoalWrapper):
-    def __init__(self, env, walk_grid_goal_generator, goal_achieving_criterion, verbose=False):
-        self.verbose = verbose
-        self.walk_grid_goal_generator = walk_grid_goal_generator
-        super().__init__(env, goal_achieving_criterion)
-
-    def gen_goal(self, state):
-        self.gen_goal_(state)
-
-    def gen_goal_(self, state):
-        goal = next(self.walk_grid_goal_generator)
-        self.goal_state = goal
-
-    def step(self, action):
-        next_state, env_reward, done, info = self.env.step(action)
-        info['goal_pos'] = self.goal_state['position']
-        info['pos'] = np.array([*self.env.unwrapped.agent_pos, self.env.unwrapped.agent_dir])
-        self.is_goal_achieved = self._goal_achieved(next_state)
-        reward = int(self.is_goal_achieved)
-
-        if env_reward > 0 and done:
-            done = False
-
-        if self.is_goal_achieved and not done:
-            self.gen_goal(next_state)
-            self.env.unwrapped.reset()
-            next_state = self.env.gen_obs()
-            done = True
-
-        return next_state, reward, done, info
-
-
 class GoAndResetGoalGenerator(NavigationGoalWrapper):
     def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
         self.verbose = verbose
@@ -107,20 +75,28 @@ class GoAndResetGoalGenerator(NavigationGoalWrapper):
             self.count = 0
         self.verbose_episode = False
 
-        self.go_agent = torch.load(conf['go_agent'])
+        self.device = conf.get('device', 'cpu')
+        self.go_agent = torch.load(conf['go_agent'], map_location=self.device)
+        self.rhs_size = conf.get('rhs_size', 0)
+        self.init_rhs = torch.zeros((1, self.rhs_size * 2), device=self.device)
+        self.masks = torch.ones((1, 1), device=self.device)
         self.go_steps = conf['go_steps']
         self.go_deterministic = conf.get('go_deterministic', False)
 
     def go(self, next_obs):
+        rnn_rhs = self.init_rhs
         for _ in range(self.go_steps):
             obs = next_obs
-            _, action, _, _ = self.go_agent.act(torch.tensor(next_obs['image']).unsqueeze(0), deterministic=self.go_deterministic)
+            _, action, _, rnn_hxs = self.go_agent.act(torch.tensor(next_obs['image']).unsqueeze(0),
+                                                      rnn_rhs,
+                                                      self.masks,
+                                                      deterministic=self.go_deterministic)
             next_obs, reward, done, info = self.env.step(action)
             if reward < 0:
                 next_obs = obs
                 done = False
                 break
-            if done and reward > 0:
+            if done and reward == 0:
                 next_obs = None
                 break
         return next_obs, done
@@ -376,13 +352,6 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
                                device,
                                verbose=verbose)
 
-    elif goal_type == "walk":
-        env = WalkGoalWrapper(
-            env=env,
-            goal_achieving_criterion=goal_achieving_criterion,
-            walk_grid_goal_generator=random_goal_generator,
-            verbose=verbose)
-
     elif goal_type == "go_and_reset":
         env = GoAndResetGoalGenerator(
             env=env,
@@ -498,3 +467,25 @@ class ZeroRewardWrapper(gym.Wrapper):
             done = False
 
         return state, 0, done, info
+
+
+class HashCounterWrapper(gym.Wrapper):
+    def __init__(self, env, penalty):
+        super(HashCounterWrapper, self).__init__(env)
+        self.hashed_states = set()
+        self.penalty = penalty
+
+    def reset(self):
+        obs = self.env.reset()
+        self.hashed_states = set()
+        return obs
+
+    def step(self, action):
+        state, reward, done, info = self.env.step(action)
+        state_h = self.env.unwrapped.hash()
+        if state_h in self.hashed_states:
+            reward -= self.penalty
+        else:
+            self.hashed_states.add(state_h)
+            reward += self.penalty/2
+        return state, reward, done, info

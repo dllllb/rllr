@@ -133,6 +133,7 @@ class ImgNorm(gym.ObservationWrapper):
         obs['image'] = img_obs
         return obs
 
+
 def get_env_name(conf):
     if conf['env_task'] in ['MiniGrid-Empty', 'MiniGrid-Dynamic-Obstacles']:
         return f"{conf['env_task']}-{conf['grid_size']}x{conf['grid_size']}-v0"
@@ -181,6 +182,9 @@ def gen_wrapped_env(conf, verbose=False):
         env = gym.make(env_name, agent_start_pos=conf['agent_start_pos'])
     else:
         env = gym.make(env_name)
+
+    if 'minigrid_max_steps' in conf:
+        env.max_steps = conf['minigrid_max_steps']
 
     if conf.get('fix_reset_seed', False):
         env = FixResetSeedWrapper(env, conf.get('reset_seed', 0))

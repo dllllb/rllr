@@ -68,12 +68,6 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
             random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
         else:
             raise AttributeError(f"unknown env_type '{conf['env_type']}'")
-    elif conf.get('goal_type', None) == 'walk':
-        if conf['env_type'] == 'gym_minigrid':
-            #random_goal_generator = minigrid_envs.walk_grid_goal_generator(conf, verbose=verbose)
-            random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
-        else:
-            raise AttributeError(f"unknown env_type '{conf['env_type']}'")
     else:
         random_goal_generator = None
 

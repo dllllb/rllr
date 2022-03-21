@@ -31,10 +31,10 @@ class FixedCategorical(torch.distributions.Categorical):
     def log_probs(self, actions):
         return (
             super()
-            .log_prob(actions.squeeze(-1))
-            .view(actions.size(0), -1)
-            .sum(-1)
-            .unsqueeze(-1)
+                .log_prob(actions.squeeze(-1))
+                .view(actions.size(0), -1)
+                .sum(-1)
+                .unsqueeze(-1)
         )
 
     def mode(self):
@@ -66,11 +66,14 @@ class DiscreteActorNetwork(nn.Module):
         self.output_size = action_size
         self.is_recurrent = is_recurrent
 
-    def forward(self, states, rnn_hxs, masks):
-        if self.is_recurrent:
-            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+    def forward(self, states, rnn_hxs, masks, encodings_feeded=False):
+        if encodings_feeded:
+            states_encoding = states
         else:
-            states_encoding = self.state_encoder(states)
+            if self.is_recurrent:
+                states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+            else:
+                states_encoding = self.state_encoder(states)
 
         logits = self.logits(states_encoding)
         return FixedCategorical(logits=F.log_softmax(logits, dim=1)), rnn_hxs
@@ -91,11 +94,14 @@ class ContiniousActorNetwork(nn.Module):
         self.output_size = action_size
         self.is_recurrent = is_recurrent
 
-    def forward(self, states, rnn_hxs, masks):
-        if self.is_recurrent:
-            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+    def forward(self, states, rnn_hxs, masks, encodings_feeded=False):
+        if encodings_feeded:
+            states_encoding = states
         else:
-            states_encoding = self.state_encoder(states)
+            if self.is_recurrent:
+                states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+            else:
+                states_encoding = self.state_encoder(states)
 
         mu = self.fc(states_encoding)
         std = self.logstd.exp()
@@ -114,11 +120,14 @@ class CriticNetwork(nn.Module):
         self.fc = make_mlp(input_size, hidden_size, 1)
         self.is_recurrent = is_recurrent
 
-    def forward(self, states, rnn_hxs, masks):
-        if self.is_recurrent:
-            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+    def forward(self, states, rnn_hxs, masks, encodings_feeded=False):
+        if encodings_feeded:
+            states_encoding = states
         else:
-            states_encoding = self.state_encoder(states)
+            if self.is_recurrent:
+                states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+            else:
+                states_encoding = self.state_encoder(states)
 
         return self.fc(states_encoding)
 
@@ -137,11 +146,14 @@ class IMCriticNetwork(nn.Module):
 
         self.is_recurrent = is_recurrent
 
-    def forward(self, states, rnn_hxs, masks):
-        if self.is_recurrent:
-            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+    def forward(self, states, rnn_hxs, masks, encodings_feeded=False):
+        if encodings_feeded:
+            states_encoding = states
         else:
-            states_encoding = self.state_encoder(states)
+            if self.is_recurrent:
+                states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+            else:
+                states_encoding = self.state_encoder(states)
 
         return self.ext_head(states_encoding), self.int_head(states_encoding)
 
@@ -152,10 +164,11 @@ class ActorCriticNetwork(nn.Module):
     """
 
     def __init__(self, action_space, actor_state_encoder, critic_state_encoder, actor_hidden_size, critic_hidden_size,
-                 use_intrinsic_motivation=False, is_recurrent=False):
+                 use_intrinsic_motivation=False, is_recurrent=False, same_encoders=False):
         super(ActorCriticNetwork, self).__init__()
         if type(action_space) == gym.spaces.Box:
-            self.actor = ContiniousActorNetwork(action_space.shape[0], actor_state_encoder, actor_hidden_size, is_recurrent)
+            self.actor = ContiniousActorNetwork(action_space.shape[0], actor_state_encoder, actor_hidden_size,
+                                                is_recurrent)
         elif type(action_space) == gym.spaces.Discrete:
             self.actor = DiscreteActorNetwork(action_space.n, actor_state_encoder, actor_hidden_size, is_recurrent)
         else:
@@ -167,6 +180,8 @@ class ActorCriticNetwork(nn.Module):
             self.critic = CriticNetwork(critic_state_encoder, critic_hidden_size, is_recurrent)
 
         self.is_recurrent = is_recurrent
+        self.same_encoders = same_encoders
+        self.state_encoder = actor_state_encoder
 
         def init_params(m):
             classname = m.__class__.__name__
@@ -188,17 +203,31 @@ class ActorCriticNetwork(nn.Module):
         self.apply(init_params)
 
     def act(self, states, rnn_hxs, masks, deterministic=False):
-        dist, actor_rnn_hxs = self.actor.forward(states, rnn_hxs, masks)
+        if self.same_encoders:
+            if self.is_recurrent:
+                states, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+            else:
+                states = self.state_encoder(states)
+
+        dist, actor_rnn_hxs = self.actor.forward(states, rnn_hxs, masks, encodings_feeded=self.same_encoders)
         if deterministic:
             action = dist.mode()
         else:
             action = dist.sample()
-        return self.critic.forward(states, rnn_hxs, masks), action, dist.log_probs(action), actor_rnn_hxs
+
+        return self.critic.forward(states, rnn_hxs, masks, encodings_feeded=self.same_encoders), \
+               action, dist.log_probs(action), actor_rnn_hxs
 
     def get_value(self, states, rnn_hxs, masks):
         return self.critic.forward(states, rnn_hxs, masks)
 
     def evaluate_actions(self, states, actions, rnn_hxs, masks):
-        dist, rnn_hxs = self.actor.forward(states, rnn_hxs, masks)
-        values = self.critic.forward(states, rnn_hxs, masks)
+        if self.same_encoders:
+            if self.is_recurrent:
+                states, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+            else:
+                states = self.state_encoder(states)
+
+        dist, rnn_hxs = self.actor.forward(states, rnn_hxs, masks, encodings_feeded=self.same_encoders)
+        values = self.critic.forward(states, rnn_hxs, masks, encodings_feeded=self.same_encoders)
         return values, dist.log_probs(actions), dist.entropy().mean(), rnn_hxs
