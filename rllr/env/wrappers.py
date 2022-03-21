@@ -76,7 +76,7 @@ class GoAndResetGoalGenerator(NavigationGoalWrapper):
         self.verbose_episode = False
 
         self.device = conf.get('device', 'cpu')
-        self.go_agent = torch.load(conf['go_agent'], map_location=self.device)
+        self.go_agent = torch.load(conf['go_agent'], map_location='cpu').to(self.device)
         self.rhs_size = conf.get('rhs_size', 0)
         self.init_rhs = torch.zeros((1, self.rhs_size * 2), device=self.device)
         self.masks = torch.ones((1, 1), device=self.device)
