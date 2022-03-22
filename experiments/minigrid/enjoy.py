@@ -22,17 +22,19 @@ def test():
         'ssim_worker': (0, 0),
         'direct_ppo': (0.87695312, 1.0),
         'direct_ppo_lava': (0.94722223, 1.0),
-        'rnd_ppo': (0.30742186, 1.0),
-        'rnd_ppo_lava': (0.86111110, 1.0),
-        'rnd_ppo_doorkey': (0.960625, 1.0),
+        'rnd_ppo': (0.760937, 1.0),
+        'rnd_ppo_lava': (0.908333, 1.0),
+        'rnd_ppo_doorkey': (0.953593, 1.0),
         'rnd_ppo_fourrooms': (0.73, 1.0),
-        'rnd_ppo_keycorridor': ( 0.7233333, 1.0),
+        'rnd_ppo_keycorridor': (0.7233333, 1.0),
+        'rnd_ppo_putnear': (0.79, 1.0),
         'multi': (0.77222222, 1.0)
     }
 
     for algo, (expected_reward, expected_success) in algos.items():
         switch_reproducibility_on()
         rewards, steps, success = play(mode=algo, viz=False, n_episodes=1)
+        print(algo, rewards, steps,success)
         assert np.allclose(rewards, expected_reward)
         assert np.allclose(success, expected_success)
 
@@ -87,6 +89,10 @@ def play(mode, viz, n_episodes):
         from train_rnd_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_keycorridor.hocon')
 
+    elif mode == 'rnd_ppo_putnear':
+        from train_lang_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_putnear.hocon')
+
     elif mode == 'multi':
         from train_multitask import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_multitask.hocon')
@@ -126,8 +132,9 @@ def play(mode, viz, n_episodes):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_master_lava',
-                                           'ssim_worker', 'direct_ppo', 'rnd_ppo', 'rnd_ppo_doorkey',
-                                           'rnd_ppo_fourrooms', 'rnd_ppo_keycorridor', 'multi'])
+                                           'ssim_worker', 'direct_ppo', 'rnd_ppo', 'rnd_ppo_lava',
+                                           'rnd_ppo_doorkey', 'rnd_ppo_fourrooms', 'rnd_ppo_keycorridor',
+                                           'rnd_ppo_putnear', 'multi'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()

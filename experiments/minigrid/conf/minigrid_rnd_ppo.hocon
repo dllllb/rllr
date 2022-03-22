@@ -20,7 +20,7 @@
   },
 
   agent: {
-    device: "cpu",
+    device: "cuda:1",
     ext_coef: 2.0,
     im_coef: 1.0,
     clip_param: 0.2,

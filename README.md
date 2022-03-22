@@ -73,4 +73,47 @@ python train_worker.py --conf conf/minigrid_first_step.hocon
 python train_master.py --conf conf/minigrid_second_step.hocon
 
 python enjoy.py --mode master
+
+
 ```
+## Benchmarks 
+| task / method                            | PPO         | PPO + RND | PATH RL |
+| ---------------------------------------- | ----------- | ----------| --------|
+| MiniGrid-Dynamic-Obstacles-8x8-v0        |             |  0.61     | 0.90    |
+| MiniGrid-LavaCrossingS9N3-v0             |             |  0.90     |         |
+| MiniGrid-DoorKey-8x8-v0                  |             |  0.91     |         |
+| MiniGrid-FourRooms-v0                    |             |  0.72     |         |
+| MiniGrid-KeyCorridorS3R3-v0              |             |  0.71     |         |
+| MiniGrid-PutNear-6x6-N2-v0               |             |  0.78     |         |
+
+<p align="center">
+    Table 1. MiniGrid, fully observed: Mean return over 1000 episodes
+</p> 
+
+
+| task / method  | PPO         | PPO + RND | PATH RL |
+| ---------------------------------------- | ----------- | ---------| ---------|
+| MiniGrid-Dynamic-Obstacles-8x8-v0        |             | 110.77   | 25.32    |
+| MiniGrid-LavaCrossingS9N3-v0             |             | 35.45    |          |
+| MiniGrid-DoorKey-8x8-v0                  |             | 66.11    |          |
+| MiniGrid-FourRooms-v0                    |             | 30.85    |          |
+| MiniGrid-KeyCorridorS3R3-v0              |             | 88.18    |          |
+| MiniGrid-PutNear-6x6-N2-v0               |             | 7.25     |          |
+
+<p align="center">
+    Table 2. MiniGrid, fully observed: Mean number of steps over 1000 episodes
+</p> 
+
+
+| task / method  | PPO         | PPO + RND | PATH RL |
+| ---------------------------------------- | ----------- | ----------| --------|
+| MiniGrid-Dynamic-Obstacles-8x8-v0        |             | 0.97      | 0.99    |
+| MiniGrid-LavaCrossingS9N3-v0             |             | 1.00      |         |
+| MiniGrid-DoorKey-8x8-v0                  |             | 1.00      |         |
+| MiniGrid-FourRooms-v0                    |             | 0.98      |         |
+| MiniGrid-KeyCorridorS3R3-v0              |             | 0.99      |         |
+| MiniGrid-PutNear-6x6-N2-v0               |             | 0.99      |         |
+
+<p align="center">
+    Table 3. MiniGrid, fully observed: Mean success rate over 1000 episodes
+</p> 
