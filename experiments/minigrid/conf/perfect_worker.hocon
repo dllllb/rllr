@@ -39,8 +39,8 @@
   seed: 0,
 
   outputs: {
-    model: artifacts/models/minigrid_simple.p,
-    logs: artifacts/logs/minigrid_simple
+    model: ../artifacts/minigrid/models/minigrid_simple.p,
+    logs: ../artifacts/minigrid/logs/minigrid_simple
   }
 
 }

@@ -43,7 +43,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_ppo_doorkey.p,
-    logs: artifacts/logs/minigrid_ppo_doorkey
+    model: ../artifacts/minigrid/models/minigrid_ppo_doorkey.p,
+    logs: ../artifacts/minigrid/logs/minigrid_ppo_doorkey
   }
 }

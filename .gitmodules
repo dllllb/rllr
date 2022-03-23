@@ -1,0 +1,3 @@
+[submodule "experiments/artifacts"]
+	path = experiments/artifacts
+	url = git@github.com:dmitrySorokin/rllr_artifacts.git

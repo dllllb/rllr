@@ -11,7 +11,7 @@
   },
 
   worker_agent: {
-    path: "artifacts/models/minigrid_worker.p",
+    path: "../artifacts/minigrid/models/minigrid_worker.p",
     device: "cpu"
   }
 
@@ -49,7 +49,7 @@
   seed: 42,
 
   outputs: {
-      model: artifacts/models/minigrid_master.p,
-      logs: artifacts/logs/minigrid_master
+      model: ../artifacts/minigrid/models/minigrid_master.p,
+      logs: ../artifacts/minigrid/logs/minigrid_master
   }
 }

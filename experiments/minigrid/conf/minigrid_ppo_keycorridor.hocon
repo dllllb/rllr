@@ -43,7 +43,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_ppo_keycorridor.p,
-    logs: artifacts/logs/minigrid_ppo_keycorridor
+    model: ../artifacts/minigrid/models/minigrid_ppo_keycorridor.p,
+    logs: ../artifacts/minigrid/logs/minigrid_ppo_keycorridor
   }
 }

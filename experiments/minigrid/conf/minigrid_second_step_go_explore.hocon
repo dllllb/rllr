@@ -10,7 +10,7 @@
   },
 
   worker_agent: {
-    path: artifacts/models/minigrid_simple.p,
+    path: ../artifacts/minigrid/models/minigrid_simple.p,
     device: cpu
   }
 
