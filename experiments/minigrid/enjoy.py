@@ -21,7 +21,12 @@ def test():
         'ssim_master_lava': (0.95499998, 1.0),
         'ssim_worker': (0, 0),
         'direct_ppo': (0.87695312, 1.0),
-        'direct_ppo_lava': (0.94722223, 1.0),
+        'ppo_dynobs': (0.0, 0.0),
+        'ppo_lava': (0.952777, 1.0),
+        'ppo_doorkey': (0.983124, 1.0),
+        'ppo_fourrooms': (0.802, 1.0),
+        'ppo_keycorridor': (0.92, 1.0),
+        'ppo_putnear': (0.79, 1.0),
         'rnd_ppo': (0.760937, 1.0),
         'rnd_ppo_lava': (0.908333, 1.0),
         'rnd_ppo_doorkey': (0.953593, 1.0),
@@ -65,9 +70,29 @@ def play(mode, viz, n_episodes):
         config = ConfigFactory.parse_file('conf/minigrid_direct_ppo.hocon')
         config['env']['agent_start_pos'] = (1, 1)
 
-    elif mode == 'direct_ppo_lava':
+    elif mode == 'ppo_dynobs':
         from train_direct_ppo import gen_env_with_seed
-        config = ConfigFactory.parse_file('conf/minigrid_direct_ppo_lava.hocon')
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_dynobst.hocon')
+
+    elif mode == 'ppo_lava':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_lava.hocon')
+
+    elif mode == 'ppo_doorkey':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_doorkey.hocon')
+
+    elif mode == 'ppo_fourrooms':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_fourrooms.hocon')
+
+    elif mode == 'ppo_keycorridor':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_keycorridor.hocon')
+
+    elif mode == 'ppo_putnear':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_putnear.hocon')
 
     elif mode == 'rnd_ppo':
         from train_rnd_ppo import gen_env_with_seed
@@ -131,10 +156,12 @@ def play(mode, viz, n_episodes):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_master_lava',
-                                           'ssim_worker', 'direct_ppo', 'rnd_ppo', 'rnd_ppo_lava',
-                                           'rnd_ppo_doorkey', 'rnd_ppo_fourrooms', 'rnd_ppo_keycorridor',
-                                           'rnd_ppo_putnear', 'multi'])
+    parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_master_lava', 'ssim_worker',
+                                           'direct_ppo', 'ppo_dynobs', 'ppo_lava', 'ppo_doorkey', 'ppo_fourrooms',
+                                           'ppo_keycorridor', 'ppo_putnear',
+                                           'rnd_ppo', 'rnd_ppo_lava','rnd_ppo_doorkey', 'rnd_ppo_fourrooms',
+                                           'rnd_ppo_keycorridor', 'rnd_ppo_putnear',
+                                           'multi'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()
