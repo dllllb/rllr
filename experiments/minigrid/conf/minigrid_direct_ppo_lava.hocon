@@ -46,7 +46,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_direct_ppo_lava.p,
-    logs: artifacts/logs/minigrid_direct_ppo_lava,
+    model: ../artifacts/minigrid/models/minigrid_direct_ppo_lava.p,
+    logs: ../artifacts/minigrid/logs/minigrid_direct_ppo_lava,
   }
 }

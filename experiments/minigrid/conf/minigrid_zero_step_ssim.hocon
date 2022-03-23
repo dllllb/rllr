@@ -64,7 +64,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_ssim.p
-    logs: artifacts/logs/minigrid_ssim
+    model: ../artifacts/minigrid/models/minigrid_ssim.p
+    logs: ../artifacts/minigrid/logs/minigrid_ssim
   }
 }

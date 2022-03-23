@@ -13,7 +13,7 @@
   },
 
   worker_agent: {
-    path: "artifacts/models/minigrid_lava_worker_ssim.p",
+    path: "../artifacts/minigrid/models/minigrid_lava_worker_ssim.p",
     device: "cpu"
   }
 
@@ -53,7 +53,7 @@
   seed: 42,
 
   outputs: {
-      model: artifacts/models/minigrid_lava_master_ssim.p,
-      logs: artifacts/logs/minigrid_lava_master_ssim
+      model: ../artifacts/minigrid/models/minigrid_lava_master_ssim.p,
+      logs: ../artifacts/minigrid/logs/minigrid_lava_master_ssim
   }
 }

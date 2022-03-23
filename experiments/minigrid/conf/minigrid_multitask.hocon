@@ -61,7 +61,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_multitask.p,
-    logs: artifacts/logs/minigrid_multitask
+    model: ../artifacts/minigrid/models/minigrid_multitask.p,
+    logs: ../artifacts/minigrid/logs/minigrid_multitask
   }
 }

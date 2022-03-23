@@ -39,7 +39,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/montezuma_rnd_ppo.p,
-    logs: artifacts/logs/montezuma_rnd_ppo
+    model: ../artifacts/montezuma/models/montezuma_rnd_ppo.p,
+    logs: ../artifacts/montezuma/logs/montezuma_rnd_ppo
   }
 }

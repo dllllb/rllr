@@ -44,7 +44,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_ppo_dynobst.p,
-    logs: artifacts/logs/minigrid_ppo_dynobst
+    model: ../artifacts/minigrid/models/minigrid_ppo_dynobst.p,
+    logs: ../artifacts/minigrid/logs/minigrid_ppo_dynobst
   }
 }
