@@ -2,11 +2,6 @@
 
 ## Getting Started
 
-### Install Git LFS
-
-```brew install git-lfs```  
-```git lfs install```
-
 ### Variant 1: pipenv installation
 
 Pipenv is a tool that creates and manages a virtualenv for your projects, and track packages
@@ -51,7 +46,7 @@ conda activate pysandbox
 # python -m ipykernel install --user --name pysandbox --display-name "Py3.8 (rllr)"
 
 # clone and install the repo
-git clone https://github.com/dllllb/rllr.git
+git clone --recursive https://github.com/dllllb/rllr.git
 cd rllr
 pip install -e .  # editable installation accessible form anywhere
 
