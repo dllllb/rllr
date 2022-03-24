@@ -323,6 +323,22 @@ class RNNEncoder(nn.Module):
         return x, hxs
 
 
+# Todo: finish sigmoid sampling
+def gumbel_sigmoid(logits, tau):
+    r"""Straight-through gumbel-sigmoid estimator
+    """
+    gumbels = -torch.empty_like(logits,
+                                memory_format=torch.legacy_contiguous_format).exponential_().log()  # ~Gumbel(0,1)
+    gumbels = (logits + gumbels) / tau  # ~Gumbel(logits,tau)
+    y_soft = gumbels.sigmoid()
+
+    # Straight through.
+    y_hard = (y_soft > 0.5).long()
+    ret = y_hard - y_soft.detach() + y_soft
+
+    return ret
+
+
 class ImageTextEncoder(nn.Module):
     def __init__(self, image_shape, sent_shape):
         super(ImageTextEncoder, self).__init__()
@@ -331,13 +347,16 @@ class ImageTextEncoder(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.LeakyReLU(inplace=True),
-            nn.Flatten()
+            #nn.Flatten()
         )
 
         self.word_enc = nn.Linear(in_features=sent_shape[1], out_features=sent_shape[1], bias=False)
         self.rnn = nn.LSTM(sent_shape[1], 128, batch_first=True)
+        self.film = nn.Linear(128, 16)
 
-        self.output_size = 576 + 128
+        self.output_size = 576 + 576
+
+        self.train()
 
     def forward(self, t):
         img, msg = t['state'].float() / 255., t['mission']
@@ -346,8 +365,22 @@ class ImageTextEncoder(nn.Module):
         word_enc = self.word_enc(msg.view(-1, msg.shape[2])).view(msg.shape[0], msg.shape[1], msg.shape[2])
         out, (h, c) = self.rnn(word_enc)
         msg_enc = h.squeeze(dim=0)
+        chan_mask = self.sample_channels_mask(logits=self.film(msg_enc)).unsqueeze(dim=2).unsqueeze(dim=3)
+        return torch.cat([img_enc, img_enc * chan_mask], dim=1)\.view(img.shape[0], -1)
 
-        return torch.cat([img_enc, msg_enc], dim=1)
+    def sample_channels_mask(self, logits):
+        """
+            Samples binary mask to select
+            relevant output channel of the convolution
+            Attributes:
+            logits - logprobabilities of the bernoully variables
+                for each output channel of the convolution to be selected
+        """
+        if self.training:
+            channels_mask = gumbel_sigmoid(logits, tau=2 / 3)
+        else:
+            channels_mask = (logits > 0).long()
+        return channels_mask
 
 
 def get_encoder(grid_size, config):
