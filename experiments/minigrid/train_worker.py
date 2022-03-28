@@ -110,7 +110,8 @@ def get_hindsight_state_encoder(state_encoder, goal_state_encoder, config):
 def get_ppo_worker_agent(env, config):
     hindsight_encoder = get_hindsight_state_encoder(*get_encoders(config), config)
     hidden_size = config['worker.head.hidden_size']
-    policy = models.ActorCriticNetwork(env.action_space, hindsight_encoder, hindsight_encoder, hidden_size, hidden_size)
+    policy = models.ActorCriticNetwork(env.action_space, hindsight_encoder, hindsight_encoder, hidden_size, hidden_size,
+                                       same_encoders=True)
 
     return PPO(
         policy,

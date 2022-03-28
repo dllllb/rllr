@@ -64,7 +64,7 @@ class NavigationGoalWrapper(gym.Wrapper):
 
 
 class GoAndResetGoalGenerator(NavigationGoalWrapper):
-    def __init__(self, env, goal_achieving_criterion, conf, verbose=False):
+    def __init__(self, env, goal_achieving_criterion, go_agent, conf, verbose=False):
         self.verbose = verbose
         super().__init__(env, goal_achieving_criterion)
 
@@ -76,7 +76,7 @@ class GoAndResetGoalGenerator(NavigationGoalWrapper):
         self.verbose_episode = False
 
         self.device = conf.get('device', 'cpu')
-        self.go_agent = torch.load(conf['go_agent'], map_location='cpu').to(self.device)
+        self.go_agent = go_agent
         self.rhs_size = conf.get('rhs_size', 0)
         self.init_rhs = torch.zeros((1, self.rhs_size * 2), device=self.device)
         self.masks = torch.ones((1, 1), device=self.device)
@@ -91,6 +91,7 @@ class GoAndResetGoalGenerator(NavigationGoalWrapper):
                                                       rnn_rhs,
                                                       self.masks,
                                                       deterministic=self.go_deterministic)
+            self.env.unwrapped.step_count -= 1
             next_obs, reward, done, info = self.env.step(action)
             if reward < 0:
                 next_obs = obs
@@ -151,6 +152,7 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
     def __init__(self, env, goal_achieving_criterion, conf, verbose=False, seed=0):
         self.buffer_size = conf['buffer_size']
         self.buffer = deque(maxlen=self.buffer_size)
+        self.shrink_traj = conf.get("shrink_traj", 1)
 
         if 'unachieved_prob' in conf:
             self.unachieved_prob = conf['unachieved_prob']
@@ -212,7 +214,8 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
 
     def step(self, action):
         next_state, reward, done, info = super().step(action)
-        self.buffer.append(next_state)
+        if np.random.rand() < self.shrink_traj:
+            self.buffer.append(next_state)
 
         return next_state, reward, done, info
 
@@ -353,9 +356,12 @@ def navigation_wrapper(env, conf, goal_achieving_criterion, random_goal_generato
                                verbose=verbose)
 
     elif goal_type == "go_and_reset":
+        go_agent = torch.load(conf['go_and_reset_params.go_agent'],
+                              map_location=conf.get('go_and_reset_params.device', 'cpu'))
         env = GoAndResetGoalGenerator(
             env=env,
             goal_achieving_criterion=goal_achieving_criterion,
+            go_agent=go_agent,
             conf=conf['go_and_reset_params'],
             verbose=verbose)
 
@@ -470,22 +476,52 @@ class ZeroRewardWrapper(gym.Wrapper):
 
 
 class HashCounterWrapper(gym.Wrapper):
-    def __init__(self, env, penalty):
+    def __init__(self, env, penalty, conf):
         super(HashCounterWrapper, self).__init__(env)
         self.hashed_states = set()
         self.penalty = penalty
+        self.hash_type = conf.get('hash_type', 'simple')
+        self.pool_size = conf.get('hash_pool_size', 12)
 
     def reset(self):
         obs = self.env.reset()
         self.hashed_states = set()
+        self.hashed_states.add(self.get_hash(obs))
         return obs
 
+    def get_hash(self, obs):
+        if self.hash_type == 'simple':
+            state_h = self.env.unwrapped.hash()
+        elif self.hash_type == 'go_explore':
+            img = torch.tensor(obs).unsqueeze(0)
+            img = torch.permute(img, (0, 3, 1, 2))
+            img = torch.max_pool2d(img, self.pool_size).numpy()
+            #print(img.shape)
+            img.flags.writeable = False
+            state_h = hash(img.tobytes())
+        elif self.hash_type == "coord":
+            x, y = self.env.unwrapped.agent_pos
+            if x < 9 and y < 9:
+                state_h = 0
+            elif x > 9 and y < 9:
+                state_h = 1
+            elif x < 9 and y > 9:
+                state_h = 2
+            elif x > 9 and y > 9:
+                state_h = 3
+            else:
+                state_h = 4
+        return state_h
+
     def step(self, action):
-        state, reward, done, info = self.env.step(action)
-        state_h = self.env.unwrapped.hash()
+        obs, reward, done, info = self.env.step(action)
+        state_h = self.get_hash(obs)
         if state_h in self.hashed_states:
-            reward -= self.penalty
+            if not (self.hash_type == "coord" and state_h == 4):
+                #reward -= self.penalty/100
+                pass
         else:
             self.hashed_states.add(state_h)
-            reward += self.penalty/2
-        return state, reward, done, info
+            if not (self.hash_type == "coord" and state_h == 4):
+                reward += self.penalty
+        return obs, reward, done, info

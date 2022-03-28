@@ -29,13 +29,15 @@ def make_env():
 def rnd_obs(env, seed):
     env.seed(seed)
     while True:
-        #yield env.reset()
+        yield env.reset()
+        '''
         agent_pos = np.random.randint(1, 8, 2)
         agent_dir = np.random.randint(0, 3)
         env.unwrapped.agent_pos = agent_pos
         env.unwrapped.agent_dir = agent_dir
         obs, _, _, _ = env.step(0)
         yield obs
+        '''
 
 
 def make_dataset(generator, total_size=100000):

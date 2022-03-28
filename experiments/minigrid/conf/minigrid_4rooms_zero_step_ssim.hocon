@@ -7,7 +7,10 @@
     rgb_image: true,
     tile_size: 4,
     video_path: artifacts/video/,
-    hash_penalty: 0.05,
+    hash_penalty: 1,
+    hash_type: coord,
+    hash_pool_size: 19,
+    minigrid_max_steps: 50
   },
 
   state_similarity: {
@@ -28,13 +31,14 @@
   }
 
   worker: {
-    state_encoder_type: cnn_rnn,
+    state_encoder_type: simple_cnn,
     n_channels: [16, 16],
     kernel_sizes: [4, 3],
     strides: [4, 1],
     paddings: [0, 1],
     hidden_layers_sizes: [128],
-    rnn_output: 128
+    rnn_output: 128,
+    rnn_num_layers: 1,
     head: {
         hidden_size: 64
     }
@@ -59,8 +63,8 @@
     ppo_epoch: 4,
     num_mini_batch: 4,
     value_loss_coef: 0.5,
-    entropy_coef: 0.1,
-    lr: 0.0001,
+    entropy_coef: 0.01,
+    lr: 0.001,
     eps: 1e-5,
     max_grad_norm: 0.5,
     gamma: 0.999,
@@ -69,7 +73,7 @@
   },
 
   training: {
-    n_env_steps: 1000000,
+    n_env_steps: 10000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
@@ -78,8 +82,8 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_4rooms_ssim.p
-    model: artifacts/models/minigrid_4rooms_agent_ssim.p
-    logs: artifacts/logs/minigrid_4rooms_ssim
+    path: artifacts/models/minigrid_4rooms_ssim_go_explore_hash.p
+    model: artifacts/models/minigrid_4rooms_agent_ssim_go_explore_hash.p
+    logs: artifacts/logs/minigrid_4rooms_ssim_go_explore_hash
   }
 }

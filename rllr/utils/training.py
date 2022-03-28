@@ -15,12 +15,12 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
         param_group['lr'] = lr
 
 
-def train_ppo(env, agent, conf):
+def train_ppo(env, agent, conf, after_epoch_callback=None):
     writer = SummaryWriter(conf['outputs.logs'])
 
     rollouts = RolloutStorage(
         conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space,
-        conf.get('worker.rnn_output', 32) * 2
+        conf.get('worker.rnn_output', 32) * 2 * conf.get('worker.rnn_num_layers', 1)
     )
     obs = env.reset()
     rollouts.set_first_obs(obs)
@@ -86,3 +86,7 @@ def train_ppo(env, agent, conf):
                 print()
 
             torch.save(agent, conf['outputs.model'])
+
+            if after_epoch_callback is not None:
+                loss = after_epoch_callback(rollouts)
+                print(f'loss: {loss:.2f}')

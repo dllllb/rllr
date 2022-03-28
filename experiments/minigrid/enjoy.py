@@ -91,7 +91,7 @@ def play(mode, viz, n_episodes, walk):
 
     elif mode == 'ssim_worker':
         from train_worker import gen_env_with_seed
-        config = ConfigFactory.parse_file('conf/minigrid_first_step_ssim_idm.hocon')
+        config = ConfigFactory.parse_file('conf/minigrid_4rooms_first_step_ssim.hocon')
 
     elif mode == 'ssim_master':
         from train_master import gen_env_with_seed
@@ -152,7 +152,7 @@ def play(mode, viz, n_episodes, walk):
     rewards, steps, successes = [], [], []
     for _ in trange(n_episodes):
         obs, done, episode_reward = env.reset(), False, 0
-        rnn_hxs = torch.zeros((1, config.get('encoder.recurrent_hidden_size', 1)))
+        rnn_hxs = torch.zeros((1, config.get('worker.rnn_output', 1) * 2 * config.get('worker.rnn_num_layers', 1)))
         masks = torch.ones((1, 1))
 
         while not done:

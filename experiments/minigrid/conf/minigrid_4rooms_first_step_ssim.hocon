@@ -6,18 +6,25 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    minigrid_max_steps: 300,
-    goal_type: go_and_reset,
+    minigrid_max_steps: 100,
+    goal_type: from_buffer,
     go_and_reset_params: {
         go_agent: artifacts/models/minigrid_4rooms_agent_ssim.p,
-        go_steps: 30,
+        go_steps: 20,
         rhs_size: 128,
-        device: 'cpu',
-    }
+        device: cpu,
+    },
+    from_buffer_choice_params: {
+        warmup_steps: 1000,
+        buffer_size: 10000,
+        unachieved_buffer_size: 100,
+        unachieved_prob: 0.0,
+        shrink_traj: 0.2,
+    },
     goal_achieving_criterion: state_similarity,
     ssim_network_params: {
         path: artifacts/models/minigrid_4rooms_ssim.p,
-        device: "cpu",
+        device: cpu,
         threshold: 0.5
     },
     video_path: artifacts/video/,
@@ -51,7 +58,7 @@
     head: {
         hidden_size: []
     },
-    emb_size: 8,
+    emb_size: 32,
     normalize: true,
   },
 
@@ -68,13 +75,13 @@
     eps: 1e-5,
     max_grad_norm: 0.5,
     gamma: 0.99,
-    im_gamma: 0.99,
+    im_gamma: 0.99
     gae_lambda: 0.95
   },
 
   training: {
     algorithm: ppo,
-    n_env_steps: 10000000,
+    n_env_steps: 16000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
@@ -83,7 +90,7 @@
   seed: 42,
 
   outputs: {
-    model: artifacts/models/minigrid_4rooms_worker_ssim.p,
-    logs: artifacts/logs/minigrid_4rooms_worker_ssim
+    model: artifacts/models/minigrid_4rooms_worker_ssim_from_buffer.p,
+    logs: artifacts/logs/minigrid_4rooms_worker_ssim_from_buffer
   }
 }

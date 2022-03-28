@@ -248,25 +248,46 @@ class LastActionEncoder(nn.Module):
 
 
 class RNNEncoder(nn.Module):
-    def __init__(self, model, output_size):
+    def __init__(self, model, output_size, num_layers=1):
         super().__init__()
+        self.num_layers = num_layers
         self.model = model
         self.output_size = output_size
-        self.rnn = nn.LSTM(model.output_size, output_size)
+        self.rnn = nn.LSTM(model.output_size, output_size, num_layers=num_layers)
 
     def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
         out = self.model(out)
         out, rnn_rhs = self._forward_rnn(out, rnn_rhs, masks)
         return out, rnn_rhs
 
+    def flatten_hc(self, h, c):
+        h = torch.permute(h, (1, 0, 2))
+        h = h.reshape(h.size(0), -1)
+        c = torch.permute(c, (1, 0, 2))
+        c = c.reshape(h.size(0), -1)
+        hxs = torch.cat([h, c], dim=1)
+        return hxs
+
+    def unflatten_hxs(self, n, hxs):
+        hxs = hxs.view(n, 2, hxs.size(1) // 2)
+        h = hxs[:, 0, :].unsqueeze(0)
+        h = h.reshape(-1, self.num_layers, h.size(-1) // self.num_layers)
+        #h = h.reshape(-1, 1, h.size(-1) // 1)
+        h = torch.permute(h, (1, 0, 2))
+        c = hxs[:, 1, :].unsqueeze(0)
+        c = h.reshape(-1, self.num_layers, c.size(-1) // self.num_layers)
+        #c = h.reshape(-1, 1, c.size(-1) // 1)
+        c = torch.permute(c, (1, 0, 2))
+        return h, c
+
     def _forward_rnn(self, x, hxs, masks):
         if x.size(0) == hxs.size(0):
-            hxs = hxs.view(x.size(0), 2, hxs.size(1) // 2)
-            h = hxs[:, 0, :]
-            c = hxs[:, 1, :]
-            x, (h, c) = self.rnn(x.unsqueeze(0), ((h * masks).unsqueeze(0), (c * masks).unsqueeze(0)))
+            n = x.size(0)
+            h, c = self.unflatten_hxs(n, hxs)
+            x, (h, c) = self.rnn(x.unsqueeze(0), (h * masks, c * masks))
             x = x.squeeze(0)
-            hxs = torch.cat([h.squeeze(0), c.squeeze(0)], dim=1)
+            #hxs = torch.cat([h.squeeze(0), c.squeeze(0)], dim=1)
+            hxs = self.flatten_hc(h, c)
         else:
             # x is a (T, N, -1) tensor that has been flatten to (T * N, -1)
             N = hxs.size(0)
@@ -295,10 +316,12 @@ class RNNEncoder(nn.Module):
 
             # add t=0 and t=T to the list
             has_zeros = [0] + has_zeros + [T]
-
+            '''
             hxs = hxs.view(N, 2, -1)
             h = hxs[:, 0, :].unsqueeze(0)
             c = hxs[:, 1, :].unsqueeze(0)
+            '''
+            h, c = self.unflatten_hxs(N, hxs)
             outputs = []
             for i in range(len(has_zeros) - 1):
                 # We can now process steps that don't have any zeros in masks together!
@@ -318,7 +341,8 @@ class RNNEncoder(nn.Module):
             x = torch.cat(outputs, dim=0)
             # flatten
             x = x.view(T * N, -1)
-            hxs = torch.cat([h.squeeze(0), c.squeeze(0)], dim=1)
+            #hxs = torch.cat([h.squeeze(0), c.squeeze(0)], dim=1)
+            hxs = self.flatten_hc(h, c)
 
         return x, hxs
 
@@ -350,7 +374,9 @@ def get_encoder(grid_size, config):
         state_encoder = DummyImageStateEncoder(grid_size, config)
     elif config['state_encoder_type'] == 'cnn_rnn':
         cnn_encoder = SimpleCNN(grid_size, config)
-        state_encoder = RNNEncoder(cnn_encoder, config.get('rnn_output', cnn_encoder.output_size))
+        state_encoder = RNNEncoder(cnn_encoder,
+                                   config.get('rnn_output', cnn_encoder.output_size),
+                                   config.get('rnn_num_layers', 1))
     elif config['state_encoder_type'] == 'idm':
         encoder = torch.load(config['encoder_path'], map_location='cpu')
         state_encoder = IDMEncoder(encoder.idm_network)

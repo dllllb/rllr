@@ -229,5 +229,6 @@ class ActorCriticNetwork(nn.Module):
                 states = self.state_encoder(states)
 
         dist, rnn_hxs = self.actor.forward(states, rnn_hxs, masks, encodings_feeded=self.same_encoders)
+        #print(dist.entropy(), dist.probs)
         values = self.critic.forward(states, rnn_hxs, masks, encodings_feeded=self.same_encoders)
         return values, dist.log_probs(actions), dist.entropy().mean(), rnn_hxs
