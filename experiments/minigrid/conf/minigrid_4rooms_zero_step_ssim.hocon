@@ -8,9 +8,19 @@
     tile_size: 4,
     video_path: artifacts/video/,
     hash_penalty: 1,
-    hash_type: coord,
     hash_pool_size: 19,
-    minigrid_max_steps: 50
+    minigrid_max_steps: 50,
+    hash_type: rnd,
+    rnd: {
+        grid_size: 76,
+        device: cpu
+        state_encoder_type: simple_cnn,
+        n_channels: [16, 16],
+        kernel_sizes: [4, 3],
+        strides: [4, 1],
+        paddings: [0, 1],
+        hidden_layers_sizes: [32, 1],
+    }
   },
 
   state_similarity: {
@@ -82,8 +92,8 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_4rooms_ssim_go_explore_hash.p
-    model: artifacts/models/minigrid_4rooms_agent_ssim_go_explore_hash.p
-    logs: artifacts/logs/minigrid_4rooms_ssim_go_explore_hash
+    path: artifacts/models/minigrid_4rooms_ssim_rnd_hash.p
+    model: artifacts/models/minigrid_4rooms_agent_ssim_rnd_hash.p
+    logs: artifacts/logs/minigrid_4rooms_ssim_rnd_hash
   }
 }

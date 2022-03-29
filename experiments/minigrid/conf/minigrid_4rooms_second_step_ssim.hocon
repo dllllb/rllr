@@ -8,12 +8,12 @@
     tile_size: 4,
     video_path: artifacts/video/,
     num_processes: 16,
-    minigrid_max_steps: 250
+    minigrid_max_steps: 100
   },
 
   worker_agent: {
-    path: "artifacts/models/minigrid_4rooms_worker_ssim.p",
-    device: "cpu"
+    path: "artifacts/models/minigrid_4rooms_worker_ssim_from_buffer.p",
+    device: cpu,
   }
 
   master: {
@@ -43,7 +43,7 @@
 
   training: {
     n_env_steps: 5000000,
-    worker_n_steps: 25,
+    worker_n_steps: 10,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,

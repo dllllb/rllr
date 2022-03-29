@@ -483,9 +483,15 @@ class HashCounterWrapper(gym.Wrapper):
         self.hash_type = conf.get('hash_type', 'simple')
         self.pool_size = conf.get('hash_pool_size', 12)
 
+        if self.hash_type == "rnd":
+            self.rnd = encoders.get_encoder(conf['rnd.grid_size'], conf['rnd'])
+            self.rnd.to(conf.get('rnd.device', 'cpu'))
+
     def reset(self):
         obs = self.env.reset()
         self.hashed_states = set()
+        if self.hash_type == "coord":
+            self.hashed_states.add(4)
         self.hashed_states.add(self.get_hash(obs))
         return obs
 
@@ -511,6 +517,11 @@ class HashCounterWrapper(gym.Wrapper):
                 state_h = 3
             else:
                 state_h = 4
+        elif self.hash_type == "rnd":
+            img = torch.tensor(obs).unsqueeze(0)
+            img = torch.permute(img, (0, 3, 1, 2))
+            with torch.no_grad():
+                state_h = self.rnd(img).cpu().item()
         return state_h
 
     def step(self, action):
