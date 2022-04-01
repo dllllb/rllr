@@ -8,12 +8,10 @@ class ContrastiveStateSimilarity:
 
     def __init__(self,
                  ssim_network,
-                 device="cpu",
                  lr=1e-3,
                  radius=5,
                  batch_size=256,
                  epochs=10):
-        self.device = device
         self.ssim_network = ssim_network
         self.bce_loss = nn.BCELoss()
         self.radius = radius
@@ -28,7 +26,7 @@ class ContrastiveStateSimilarity:
         n_observations = observations.size(0)
         n_batches = n_observations // self.batch_size
         total_loss = 0
-        (reset_ids,) = np.where(dones)
+        (reset_ids,) = np.where(dones.cpu())
         reset_ids = np.asarray([0] + list(reset_ids) + [n_observations])
         for epoch in range(self.epochs):
             for batch in range(n_batches):

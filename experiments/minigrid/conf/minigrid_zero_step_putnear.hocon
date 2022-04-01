@@ -36,15 +36,15 @@
   },
 
   agent: {
-    device: "cpu",
+    device: "cuda:1",
     ext_coef: 2.0,
     im_coef: 1.0,
     clip_param: 0.2,
     ppo_epoch: 4,
     num_mini_batch: 4,
     value_loss_coef: 0.5,
-    entropy_coef: 0.1,
-    lr: 0.0001,
+    entropy_coef: 0.01,
+    lr: 0.001,
     eps: 1e-5,
     max_grad_norm: 0.5,
     gamma: 0.999,
@@ -53,7 +53,7 @@
   },
 
   training: {
-    n_env_steps: 1000000,
+    n_env_steps: 10000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,

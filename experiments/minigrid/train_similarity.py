@@ -50,8 +50,8 @@ def get_ssim(env, conf):
         ssim_network,
         lr=conf['state_similarity.lr'],
         radius=conf['state_similarity.radius'],
-        epochs=conf['state_similarity.epochs']
-    )
+        epochs=conf['state_similarity.epochs'],
+    ).to(conf['agent.device'])
     return ssim
 
 
