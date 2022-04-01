@@ -1,9 +1,8 @@
 import logging
 import torch
 
-from train_worker import gen_env
 from rllr.algo import PPO
-from rllr.env import make_vec_envs, HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward
+from rllr.env import make_vec_envs, HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward, minigrid_envs
 from rllr.models import encoders, ActorCriticNetwork, StateEmbedder
 from rllr.utils import train_ppo, get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
@@ -12,19 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 def get_master_agent(env, conf):
-    if conf['env.env_type'] == 'gym_minigrid':
-        if conf['env'].get('fully_observed', True):
-            grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-        else:
-            grid_size = 7 * conf['env'].get('tile_size', 1)
-        state_encoder = encoders.get_encoder(grid_size, conf['master'])
-        goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
-    else:
-        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+    grid_size = env.observation_space.shape[0]
+    state_encoder = encoders.get_encoder(grid_size, conf['master'])
+    goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
 
     hidden_size = conf['master.head.hidden_size']
-    master_network = ActorCriticNetwork(env.action_space, state_encoder, goal_state_encoder,
-                                 actor_hidden_size=hidden_size, critic_hidden_size=hidden_size)
+    master_network = ActorCriticNetwork(
+        env.action_space, state_encoder, goal_state_encoder,
+        actor_hidden_size=hidden_size, critic_hidden_size=hidden_size
+    )
 
     master_agent = PPO(
         master_network,
@@ -44,14 +39,14 @@ def gen_env_with_seed(conf, seed):
     conf['env.deterministic'] = True
     conf['env']['seed'] = seed
 
-    worker_agent = torch.load(conf['worker_agent.path'], map_location='cpu').to(conf['worker_agent.device'])
+    worker_agent = torch.load(conf['worker_agent.path'], map_location='cpu').to(conf['agent.device'])
     emb_size = worker_agent.actor_critic.actor.state_encoder.goal_state_encoder.output_size
 
-    env = gen_env(conf['env'])
+    env = minigrid_envs.gen_wrapped_env(conf['env'], verbose=False)
 
     if conf['env'].get('intrinsic_episodic_reward', False):
         encoder = worker_agent.actor_critic.actor.state_encoder.state_encoder
-        device = torch.device(conf['worker_agent.device'])
+        device = torch.device(conf['agent.device'])
         embedder = StateEmbedder(encoder, device)
         env = IntrinsicEpisodicReward(env, embedder, conf['env.intrinsic_episodic_reward.gamma'])
 
@@ -67,7 +62,7 @@ def main(args=None):
 
     env = make_vec_envs(
         lambda env_id: lambda: gen_env_with_seed(config, env_id),
-        config['env.num_processes'],
+        config['training.n_processes'],
         config['agent.device']
     )
 
@@ -80,7 +75,6 @@ def main(args=None):
 
 if __name__ == '__main__':
     init_logger(__name__)
-    init_logger('dqn')
     init_logger('ppo')
     init_logger('rllr.env.wrappers')
     init_logger('rllr.env.gym_minigrid_navigation.environments')

@@ -41,17 +41,8 @@ def get_goal_achieving_criterion(config):
         raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
 
 
-def gen_env(conf, verbose=False):
-    if conf['env_type'] == 'gym_minigrid':
-        env = minigrid_envs.gen_wrapped_env(conf, verbose=verbose)
-    else:
-        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
-    return env
-
-
-def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=None):
-    if not env:
-        env = gen_env(conf=conf, verbose=verbose)
+def gen_navigation_env(conf, verbose=True, goal_achieving_criterion=None):
+    env = minigrid_envs.gen_wrapped_env(conf, verbose=verbose)
 
     if not goal_achieving_criterion:
         goal_achieving_criterion = get_goal_achieving_criterion(conf)
@@ -64,10 +55,7 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
         embedder = None
 
     if conf.get('goal_type', None) == 'random':
-        if conf['env_type'] == 'gym_minigrid':
-            random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
-        else:
-            raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+        random_goal_generator = minigrid_envs.random_grid_goal_generator(conf, verbose=verbose)
     else:
         random_goal_generator = None
 
@@ -84,19 +72,11 @@ def gen_navigation_env(conf, env=None, verbose=True, goal_achieving_criterion=No
     return env
 
 
-def get_encoders(conf):
-    if conf['env.env_type'] == 'gym_minigrid':
-        init_logger('rllr.env.gym_minigrid_navigation.environments')
-        if conf['env'].get('fully_observed', True):
-            grid_size = conf['env.grid_size'] * conf['env'].get('tile_size', 1)
-        else:
-            grid_size = 7 * conf['env'].get('tile_size', 1)
-
-        state_encoder = encoders.get_encoder(grid_size, conf['worker'])
-        goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
-        return state_encoder, goal_state_encoder
-    else:
-        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
+def get_encoders(env, conf):
+    grid_size = env.observation_space['state'].shape[0]
+    state_encoder = encoders.get_encoder(grid_size, conf['worker'])
+    goal_state_encoder = encoders.get_encoder(grid_size, conf['master'])
+    return state_encoder, goal_state_encoder
 
 
 def get_hindsight_state_encoder(state_encoder, goal_state_encoder, config):
@@ -108,7 +88,7 @@ def get_hindsight_state_encoder(state_encoder, goal_state_encoder, config):
 
 
 def get_ppo_worker_agent(env, config):
-    hindsight_encoder = get_hindsight_state_encoder(*get_encoders(config), config)
+    hindsight_encoder = get_hindsight_state_encoder(*get_encoders(env, config), config)
     hidden_size = config['worker.head.hidden_size']
     policy = models.ActorCriticNetwork(env.action_space, hindsight_encoder, hindsight_encoder, hidden_size, hidden_size)
 

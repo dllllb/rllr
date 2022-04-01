@@ -7,17 +7,19 @@ from argparse import ArgumentParser
 from collections import defaultdict
 from tqdm import trange, tqdm
 
-from rllr.env.gym_minigrid_navigation.environments import RGBImgObsWrapper, PosObsWrapper, RandomStartPointWrapper
+from rllr.env.gym_minigrid_navigation.environments import RGBImgObsWrapper, PosObsWrapper, RandomStartPointWrapper, FixResetSeedWrapper
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
 
 
-def make_env(env_name):
+def make_env(env_name, reset_seed=None):
     env = gym.make(env_name)
     env = RandomStartPointWrapper(env, {})
     env = RGBImgObsWrapper(env, tile_size=4)
     env = PosObsWrapper(env)
+    if reset_seed is not None:
+        env = FixResetSeedWrapper(env, seed=reset_seed)
     return env
 
 
@@ -44,7 +46,7 @@ def dist(ssim, state, goal_state):
 def main(args):
     encoder = torch.load(args.model)
 
-    dataset = make_dataset(rnd_obs(make_env(args.env), args.seed), args.episodes)
+    dataset = make_dataset(rnd_obs(make_env(args.env, args.reset_seed), args.seed), args.episodes)
     thd = args.thd
 
     # same state distances
@@ -94,6 +96,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--env', default='MiniGrid-Dynamic-Obstacles-8x8-v0', type=str)
     parser.add_argument('--model', default='../artifacts/minigrid/models/minigrid_ssim.p', type=str)
+    parser.add_argument('--reset_seed', default=None, type=int)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--thd', default=0.5, type=float)
     parser.add_argument('--episodes', default=1000, type=int)
