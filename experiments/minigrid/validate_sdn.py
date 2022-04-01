@@ -13,8 +13,8 @@ from rllr.utils.logger import init_logger
 logger = logging.getLogger(__name__)
 
 
-def make_env():
-    env = gym.make('MiniGrid-Dynamic-Obstacles-8x8-v0')
+def make_env(env_name):
+    env = gym.make(env_name)
     env = RandomStartPointWrapper(env, {})
     env = RGBImgObsWrapper(env, tile_size=4)
     env = PosObsWrapper(env)
@@ -42,9 +42,9 @@ def dist(ssim, state, goal_state):
 
 
 def main(args):
-    encoder = torch.load('../artifacts/minigrid/models/minigrid_ssim.p')
+    encoder = torch.load(args.model)
 
-    dataset = make_dataset(rnd_obs(make_env(), args.seed), args.episodes)
+    dataset = make_dataset(rnd_obs(make_env(args.env), args.seed), args.episodes)
     thd = args.thd
 
     # same state distances
@@ -92,6 +92,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+    parser.add_argument('--env', default='MiniGrid-Dynamic-Obstacles-8x8-v0', type=str)
+    parser.add_argument('--model', default='../artifacts/minigrid/models/minigrid_ssim.p', type=str)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--thd', default=0.5, type=float)
     parser.add_argument('--episodes', default=1000, type=int)
