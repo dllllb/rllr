@@ -121,8 +121,8 @@ def gen_wrapped_env(conf, verbose=False):
     else:
         env = gym.make(env_name)
 
-    if conf.get('fix_reset_seed', False):
-        env = FixResetSeedWrapper(env, conf.get('reset_seed', 0))
+    if 'reset_seed' in conf:
+        env = FixResetSeedWrapper(env, conf['reset_seed'])
 
     if conf.get('goal_patch', False):
         env = GoalPatch(env)

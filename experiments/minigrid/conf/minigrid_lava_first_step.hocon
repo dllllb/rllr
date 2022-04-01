@@ -6,7 +6,6 @@
     action_size: 3,
     fully_observed: false,
     grid_size: 7,
-    fix_reset_seed: true,
     reset_seed: 42,
     rgb_image: true,
     tile_size: 4,
