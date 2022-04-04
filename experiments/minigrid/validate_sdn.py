@@ -44,7 +44,7 @@ def dist(ssim, state, goal_state):
 
 
 def main(args):
-    encoder = torch.load(args.model)
+    encoder = torch.load(args.model, map_location='cpu')
 
     dataset = make_dataset(rnd_obs(make_env(args.env, args.reset_seed), args.seed), args.episodes)
     thd = args.thd
