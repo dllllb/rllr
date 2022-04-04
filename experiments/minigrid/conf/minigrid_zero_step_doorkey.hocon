@@ -1,6 +1,6 @@
 {
   env: {
-    env_task: MiniGrid-PutNear-6x6-N2-v0,
+    env_task: MiniGrid-DoorKey-8x8-v0,
     rgb_image: true,
     tile_size: 4,
     action_size: 6,
@@ -62,8 +62,8 @@
   seed: 42,
 
   outputs: {
-    model: ../artifacts/minigrid/models/minigrid_putnear.p
-    ssim_model: ../artifacts/minigrid/models/minigrid_ssim_putnear.p
-    logs: ../artifacts/minigrid/logs/minigrid_ssim_putnear
+    model: ../artifacts/minigrid/models/minigrid_doorkey.p
+    ssim_model: ../artifacts/minigrid/models/minigrid_ssim_doorkey.p
+    logs: ../artifacts/minigrid/logs/minigrid_ssim_doorkey
   }
 }

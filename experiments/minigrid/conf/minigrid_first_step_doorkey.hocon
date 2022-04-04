@@ -1,6 +1,6 @@
 {
   env: {
-    env_task: MiniGrid-PutNear-6x6-N2-v0,
+    env_task: MiniGrid-DoorKey-8x8-v0,
     rgb_image: true,
     tile_size: 4,
     action_size: 6,
@@ -12,20 +12,12 @@
         unachieved_buffer_size: 100,
         unachieved_prob: 0.5,
     },
-    goal_achieving_criterion: state_similarity,
+    goal_achieving_criterion: position,
     ssim_network_params: {
-        path: ../artifacts/minigrid/models/minigrid_ssim_putnear.p,
+        path: ../artifacts/minigrid/models/minigrid_ssim_doorkey.p,
         device: "cpu",
         threshold: 0.3
     },
-  },
-
-  rnd: {
-    state_encoder_type: simple_cnn,
-    n_channels: [16, 16],
-    kernel_sizes: [4, 3],
-    strides: [4, 1],
-    paddings: [0, 1]
   },
 
   worker: {
@@ -77,7 +69,7 @@
   seed: 42,
 
   outputs: {
-    model: ../artifacts/minigrid/models/minigrid_worker_putnear.p,
-    logs: ../artifacts/minigrid/logs/minigrid_worker_putnear
+    model: ../artifacts/minigrid/models/minigrid_worker_doorkey.p,
+    logs: ../artifacts/minigrid/logs/minigrid_worker_doorkey
   }
 }

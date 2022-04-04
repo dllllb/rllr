@@ -20,7 +20,6 @@ class PosObsWrapper(gym.core.ObservationWrapper):
 class ImageObsWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.observation_space = self.observation_space.spaces['image']
 
     def observation(self, obs):
         return obs['image']
