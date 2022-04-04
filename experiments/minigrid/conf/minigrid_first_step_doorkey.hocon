@@ -16,7 +16,7 @@
     ssim_network_params: {
         path: ../artifacts/minigrid/models/minigrid_ssim_doorkey.p,
         threshold: 0.3,
-        device: cuda:1,
+        device: cpu,
     },
   },
 
@@ -45,7 +45,7 @@
   },
 
   agent: {
-    device: "cuda:1",
+    device: cpu,
     clip_param: 0.2,
     ppo_epoch: 4,
     num_mini_batch: 4,

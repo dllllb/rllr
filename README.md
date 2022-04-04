@@ -77,7 +77,7 @@ python enjoy.py --mode master
 | MiniGrid-Dynamic-Obstacles-8x8-v0        | 0.00        |  0.61     | 0.90    |
 | MiniGrid-PutNear-6x6-N2-v0               | 0.40        |  0.78     |         |
 | MiniGrid-LavaCrossingS9N3-v0             | 0.88        |  0.90     |         |
-| MiniGrid-DoorKey-8x8-v0                  | 0.98        |  0.91     |         |
+| MiniGrid-DoorKey-8x8-v0                  | 0.98        |  0.91     | 0.97    |
 | MiniGrid-FourRooms-v0                    | 0.79        |  0.72     |         |
 | MiniGrid-KeyCorridorS3R3-v0              | 0.92        |  0.71     |         |
 
@@ -91,7 +91,7 @@ python enjoy.py --mode master
 | MiniGrid-Dynamic-Obstacles-8x8-v0        | 256         | 110.77   | 25.32    |
 | MiniGrid-PutNear-6x6-N2-v0               | 6.30        | 7.25     |          |
 | MiniGrid-LavaCrossingS9N3-v0             | 37.36       | 35.45    |          |
-| MiniGrid-DoorKey-8x8-v0                  | 16.89       | 66.11    |          |
+| MiniGrid-DoorKey-8x8-v0                  | 16.89       | 66.11    | 18.41    |
 | MiniGrid-FourRooms-v0                    | 23.21       | 30.85    |          |
 | MiniGrid-KeyCorridorS3R3-v0              | 22.67       | 88.18    |          |
 
@@ -105,7 +105,7 @@ python enjoy.py --mode master
 | MiniGrid-Dynamic-Obstacles-8x8-v0        | 0.00        | 0.97      | 0.99    |
 | MiniGrid-PutNear-6x6-N2-v0               | 0.50        | 0.99      |         |
 | MiniGrid-LavaCrossingS9N3-v0             | 0.93        | 1.00      |         |
-| MiniGrid-DoorKey-8x8-v0                  | 1.00        | 1.00      |         |
+| MiniGrid-DoorKey-8x8-v0                  | 1.00        | 1.00      | 1.00    |
 | MiniGrid-FourRooms-v0                    | 0.98        | 0.98      |         |
 | MiniGrid-KeyCorridorS3R3-v0              | 1.00        | 0.99      |         |
 

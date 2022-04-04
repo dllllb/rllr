@@ -33,7 +33,7 @@ def get_goal_achieving_criterion(config):
         return models.SameStatesCriterion(encoder, device, threshold)
 
     elif config['goal_achieving_criterion'] == 'state_similarity':
-        ssim = torch.load(config['ssim_network_params.path'])
+        ssim = torch.load(config['ssim_network_params.path'], map_location='cpu')
         device = torch.device(config['ssim_network_params.device'])
         threshold = config['ssim_network_params.threshold']
         return models.SSIMCriterion(ssim.ssim_network, device, threshold)
