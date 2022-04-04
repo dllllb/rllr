@@ -1,6 +1,6 @@
 {
   env: {
-    env_task: MiniGrid-PutNear-8x8-v0,
+    env_task: MiniGrid-DoorKey-8x8-v0,
     rgb_image: true,
     tile_size: 4,
     action_size: 6,
@@ -24,7 +24,7 @@
   }
 
   agent: {
-    device: "cuda:1",
+    device: "cpu",
     clip_param: 0.2,
     ppo_epoch: 4,
     num_mini_batch: 4,

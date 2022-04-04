@@ -53,7 +53,7 @@
   },
 
   training: {
-    n_env_steps: 10000000,
+    n_env_steps: 1000000,
     n_steps: 128,
     n_processes: 16,
     verbose: 1,
