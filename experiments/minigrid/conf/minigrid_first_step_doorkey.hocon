@@ -15,7 +15,8 @@
     goal_achieving_criterion: state_similarity,
     ssim_network_params: {
         path: ../artifacts/minigrid/models/minigrid_ssim_doorkey.p,
-        threshold: 0.3
+        threshold: 0.3,
+        device: cuda:1,
     },
   },
 
