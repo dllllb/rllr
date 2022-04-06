@@ -37,6 +37,12 @@ def get_goal_achieving_criterion(config):
         device = torch.device(config['ssim_network_params.device'])
         threshold = config['ssim_network_params.threshold']
         return models.SSIMCriterion(ssim.ssim_network, device, threshold)
+
+    elif config['goal_achieving_criterion'] == 'image':
+        def image_achievement(state, goal_state):
+            import numpy as np
+            return np.mean(state['image'] - goal_state) < 0.1
+        return image_achievement
     else:
         raise AttributeError(f"unknown goal_achieving_criterion '{config['env.goal_achieving_criterion']}'")
 
