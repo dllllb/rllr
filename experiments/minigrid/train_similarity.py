@@ -11,28 +11,8 @@ from rllr.utils.logger import init_logger
 logger = logging.getLogger(__name__)
 
 
-def gen_env(conf, verbose=False):
-    if conf['env_type'] == 'gym_minigrid':
-        env = minigrid_envs.gen_wrapped_env(conf, verbose=verbose)
-    else:
-        raise AttributeError(f"unknown env_type '{conf['env_type']}'")
-    return env
-
-
-def calculate_grid_size(config):
-    if config['env.env_type'] == 'gym_minigrid':
-        init_logger('rllr.env.gym_minigrid_navigation.environments')
-        if config['env'].get('fully_observed', True):
-            grid_size = config['env.grid_size'] * config['env'].get('tile_size', 1)
-        else:
-            grid_size = 7 * config['env'].get('tile_size', 1)
-    else:
-        raise AttributeError(f"unknown env_type '{config['env_type']}'")
-    return grid_size
-
-
 def get_agent(env, config):
-    grid_size = calculate_grid_size(config)
+    grid_size = env.observation_space.shape[0]
     encoder = encoders.get_encoder(grid_size, config['worker'])
     hidden_size = config['worker.head.hidden_size']
     policy = ActorCriticNetwork(
@@ -62,23 +42,23 @@ def get_agent(env, config):
     )
 
 
-def get_ssim(conf):
-    grid_size = calculate_grid_size(conf)
+def get_ssim(env, conf):
+    grid_size = env.observation_space.shape[0]
     encoder = encoders.get_encoder(grid_size, conf['state_similarity'])
     ssim_network = StateSimilarityNetwork(encoder, conf['state_similarity.hidden_size'])
-    ssim = ContrastiveStateSimilarity(ssim_network,
-                                      lr=conf['state_similarity.lr'],
-                                      radius=conf['state_similarity.radius'],
-                                      n_updates=conf['state_similarity.n_updates'],
-                                      epochs=conf['state_similarity.epochs'],
-                                      verbose=conf['state_similarity.verbose'])
+    ssim = ContrastiveStateSimilarity(
+        ssim_network,
+        lr=conf['state_similarity.lr'],
+        radius=conf['state_similarity.radius'],
+        epochs=conf['state_similarity.epochs'],
+    ).to(conf['agent.device'])
     return ssim
 
 
 def gen_env_with_seed(conf, seed):
     conf['env.deterministic'] = True
     conf['env']['seed'] = seed
-    env = gen_env(conf['env'])
+    env = minigrid_envs.gen_wrapped_env(conf['env'], verbose=False)
 
     env = ZeroRewardWrapper(env)
     env = EpisodeInfoWrapper(env)
@@ -88,11 +68,10 @@ def gen_env_with_seed(conf, seed):
 
 def train_ssim_with_rnd(env, agent, ssim, conf):
     def ssim_update_callback(rollouts):
+        torch.save(ssim, conf['outputs.ssim_model'])
         return ssim.update(rollouts)
 
     im_train_ppo(env, agent, conf, ssim_update_callback)
-
-    torch.save(ssim, conf['outputs.path'])
     return agent, ssim
 
 
@@ -109,7 +88,7 @@ def main(args=None):
 
     agent = get_agent(env, config)
     agent.to(config['agent.device'])
-    ssim = get_ssim(config)
+    ssim = get_ssim(env, config)
 
     logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
     train_ssim_with_rnd(

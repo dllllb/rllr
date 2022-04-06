@@ -111,6 +111,11 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
         rollouts.compute_im_returns(next_im_value, conf['agent.im_gamma'], conf['agent.gae_lambda'])
 
         value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
+
+        if after_epoch_callback is not None:
+            loss = after_epoch_callback(rollouts)
+            print(f'loss: {loss:.3f}')
+
         rollouts.after_update()
 
         if epoch % conf['training.verbose'] == 0:
@@ -142,7 +147,3 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
                 print()
 
             torch.save(agent, conf['outputs.model'])
-
-            if after_epoch_callback is not None:
-                loss = after_epoch_callback(rollouts)
-                print(f'loss: {loss:.3f}')

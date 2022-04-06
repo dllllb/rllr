@@ -19,7 +19,9 @@ def test():
         'master': (0.90156251, 1.0),
         'ssim_master': (0.936718762, 1.0),
         'ssim_master_lava': (0.95499998, 1.0),
-        'ssim_worker': (0, 0),
+        'ssim_worker': (0.0, 0.0),
+        'worker_doorkey': (0.0, 0.0),
+        'master_doorkey': (0.981718, 1.0),
         'direct_ppo': (0.87695312, 1.0),
         'ppo_dynobs': (0.0, 0.0),
         'ppo_lava': (0.952777, 1.0),
@@ -56,6 +58,14 @@ def play(mode, viz, n_episodes):
     elif mode == 'ssim_worker':
         from train_worker import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_first_step_ssim.hocon')
+
+    elif mode == 'worker_doorkey':
+        from train_worker import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_first_step_doorkey.hocon')
+
+    elif mode == 'master_doorkey':
+        from train_master import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_second_step_doorkey.hocon')
 
     elif mode == 'ssim_master':
         from train_master import gen_env_with_seed
@@ -157,6 +167,7 @@ def play(mode, viz, n_episodes):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--mode', choices=['worker', 'master', 'ssim_master', 'ssim_master_lava', 'ssim_worker',
+                                           'worker_doorkey', 'master_doorkey',
                                            'direct_ppo', 'ppo_dynobs', 'ppo_lava', 'ppo_doorkey', 'ppo_fourrooms',
                                            'ppo_keycorridor', 'ppo_putnear',
                                            'rnd_ppo', 'rnd_ppo_lava','rnd_ppo_doorkey', 'rnd_ppo_fourrooms',
