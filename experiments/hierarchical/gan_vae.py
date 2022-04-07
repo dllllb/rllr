@@ -9,7 +9,7 @@ from rllr.env import make_vec_envs
 from matplotlib import pyplot as plt
 
 
-EMB_SIZE = 128
+EMB_SIZE = 16
 
 
 class VAE(nn.Module):
@@ -113,6 +113,29 @@ class Discriminator(nn.Module):
         return self.fc(enc)
 
 
+class Policy(nn.Module):
+    def __init__(self, emb_size=EMB_SIZE):
+        super(Policy, self).__init__()
+
+        self.mu = nn.Sequential(
+            nn.Linear(emb_size, emb_size),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(emb_size, emb_size)
+        )
+
+        self.logvar = nn.Sequential(
+            nn.Linear(emb_size, emb_size),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(emb_size, emb_size)
+        )
+
+    def forward(self, noize):
+        mu, logvar = self.mu(noize), self.logvar(noize)
+        std = torch.exp(0.5 * logvar)  # e^(1/2 * log(std^2))
+        eps = torch.randn_like(std)  # random ~ N(0, 1)
+        return eps.mul(std).add_(mu)
+
+
 class GANVAE:
     def __init__(self, state_shape, batch_size=32, device='cpu'):
         self.vae = VAE(state_shape).to(device)
@@ -120,6 +143,9 @@ class GANVAE:
 
         self.discr = Discriminator(state_shape).to(device)
         self.discr_opt = torch.optim.RMSprop(self.discr.parameters(), lr=5e-5)
+
+        self.policy = Policy()
+        self.pol_opt = torch.optim.RMSprop(self.policy.parameters(), lr=5e-5)
 
         self.batch_size = batch_size
         self.device = device
@@ -161,13 +187,12 @@ class GANVAE:
                 self.discr_opt.step()
                 discr_loss_epoch += discr_loss.item()
 
-
-            self.vae_opt.zero_grad()
-            Gz = self.vae.decode(noize[ids])
+            self.pol_opt.zero_grad()
+            Gz = self.vae.decode(self.policy(noize[ids]))
             logits_fake = -self.discr(Gz).mean()
             logits_fake.backward()
             # torch.nn.utils.clip_grad_norm_(self.gen.parameters(), 0.5)
-            self.vae_opt.step()
+            self.pol_opt.step()
             gen_loss_epoch += logits_fake.item()
 
         return vae_loss_epoch / n_updates, gen_loss_epoch / n_updates, discr_loss_epoch / n_updates / 5
@@ -188,7 +213,7 @@ if __name__ == '__main__':
 
     gan = GANVAE(env.observation_space.shape, batch_size=32, device=device)
 
-    for _ in trange(10):
+    for _ in trange(1000):
         states = rollout(env)
         vae_loss, gen_loss, discr_loss = gan.update(states)
         print(f'vae_loss {vae_loss}, gen_loss {gen_loss}, discr_loss {discr_loss}')
@@ -196,8 +221,15 @@ if __name__ == '__main__':
 
     gan = torch.load('gan.p', map_location='cpu')
     gan.device = device
-    imgs = gan.generate(100).numpy()
-    for img in imgs:
-        plt.imshow(img.transpose(1, 2, 0))
+    states = rollout(env) / 255.
+    with torch.no_grad():
+        reco = gan.vae.decode(gan.vae.encode(states)).numpy()
+    imgs = gan.generate(states.size(0)).numpy()
+    states = states.numpy()
+    for rec, state, img in zip(reco, states, imgs):
+        fig, ax = plt.subplots(1, 3)
+        ax[0].imshow(state.transpose(1, 2, 0))
+        ax[1].imshow(rec.transpose(1, 2, 0))
+        ax[2].imshow(img.transpose(1, 2, 0))
         plt.show()
 
