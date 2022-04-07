@@ -43,8 +43,8 @@ class VAE(nn.Module):
             nn.Linear(4096, emb0_size), #5184
         )
 
-        self.mu = nn.Linear(in_features=emb_size + emb0_size, out_features=emb_size + emb0_size)
-        self.std = nn.Linear(in_features=emb_size + emb0_size, out_features=emb_size + emb0_size)
+        self.mu = nn.Linear(in_features=emb_size, out_features=emb_size)
+        self.std = nn.Linear(in_features=emb_size, out_features=emb_size)
 
         self.dec = nn.Sequential(
             nn.Linear(emb_size + emb0_size, 4096),
@@ -76,10 +76,14 @@ class VAE(nn.Module):
 
         self.apply(init_params)
 
-    def encode(self, x):
+    def encode(self, x, x0):
         with torch.no_grad():
             hid = self.enc(x)
-            return self.mu(hid)
+            z = self.mu(hid)
+
+            z0 = self.enc0(x0)
+            z = torch.cat([z, z0], dim=1)
+            return z
 
     def decode(self, z):
         return self.dec(z)
@@ -90,13 +94,13 @@ class VAE(nn.Module):
         return eps.mul(std).add_(mu)
 
     def forward(self, x, x0):
-        hid0 = self.enc0(x0)
-        rx0 = self.dec0(hid0)
+        z0 = self.enc0(x0)
+        rx0 = self.dec0(z0)
 
         hid = self.enc(x)
-        hid = torch.cat([hid, hid0], dim=1)
         mu, logvar = self.mu(hid), self.std(hid)
         z = self.sample(mu, logvar)
+        z = torch.cat([z, z0], dim=1)
         rx = self.dec(z)
         return rx0, rx, mu, logvar
 
@@ -172,9 +176,13 @@ if __name__ == '__main__':
     gan = torch.load('gan.p', map_location='cpu')
     gan.device = device
     states = rollout(env) / 255.
+    x0 = env.reset()[0].repeat(states.size(0), 1, 1, 1).float() / 255.
     with torch.no_grad():
-        reco = gan.vae.decode(gan.vae.encode(states)).numpy()
-    imgs = gan.generate(states.size(0)).numpy()
+        hid = gan.vae.enc(states)
+        hid0 = gan.vae.enc0(x0)
+        hid = torch.cat([hid, hid0], dim=1)
+        reco = gan.vae.decode(hid).numpy()
+    imgs = gan.generate(states.size(0), x0).numpy()
     states = states.numpy()
     for rec, state, img in zip(reco, states, imgs):
         fig, ax = plt.subplots(1, 3)
