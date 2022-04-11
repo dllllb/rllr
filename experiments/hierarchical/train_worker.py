@@ -27,24 +27,59 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
 class Wrapper(gym.Wrapper):
     def __init__(self, env):
         super(Wrapper, self).__init__(env)
-        self.observation_space = env.observation_space['image']
+        self.observation_space = gym.spaces.Box(
+            0,
+            255,
+            (*env.observation_space['image'].shape[:2], env.observation_space['image'].shape[2] * 2)
+        )
+        self.goal = None
+
+    def observation(self, obs):
+        return np.concatenate([obs['image'], self.goal], axis=-1).astype(np.float32) / 255.
 
     def reset(self):
-        return self.env.reset()['image']
+        self.goal = self.sample_goal()
+        return self.observation(self.env.reset())
 
     def step(self, action):
-        obs, rew, done, info = self.env.step(action)
-        if rew > 0:
-            done = False
-        return obs['image'], rew, done, info
+        obs, _, done, info = self.env.step(action)
+        rew = self.calc_reward(obs['image'])
+        done = rew > 0
+        return self.observation(obs), rew, done, info
+
+    def calc_reward(self, obs):
+        img1 = self.goal
+        img2 = obs
+        #print(img1.shape, img2.shape)
+        #from matplotlib import pyplot as plt
+        #for diff, i1, i2 in zip(torch.abs(img1.view(img1.size(0), -1) - img2.view(img1.size(0), -1)).sum(dim=1), img1, img2):
+        #    fix, ax = plt.subplots(1, 2)
+        #    ax[0].imshow(i1)
+        #    ax[1].imshow(i2)
+        #    plt.title(f'{diff}')
+        #    plt.show()
+        #img1 = img1.view(img1.size(0), -1)
+        #img2 = img2.view(img2.size(0), -1)
+        #print(torch.abs(img1 - img2))
+        diff = np.abs(img1.reshape(-1) - img2.reshape(-1)).sum(axis=0)
+        return float(diff < 0.1)
+
+    def sample_goal(self):
+        # probs = agent.get_value(torch.cat([x0, gg], dim=-1)).view(-1)
+        #(goal_ids,) = torch.where((probs > 0.1))
+        #if len(goal_ids) == 0:
+        return GOALS[np.random.randint(0, GOALS.shape[0], (1,))][0]
+        # return gg[goal_ids[torch.randint(0, goal_ids.size(0), (16,))]]
 
 
-def gen_env_with_seed(seed):
+
+def gen_env_with_seed(seed, with_goal=True):
     env = gym.make('MiniGrid-Empty-8x8-v0')
     env.seed(seed)
     env = minigrid_envs.RGBImgObsWrapper(env)
     env = minigrid_envs.FixResetSeedWrapper(env, 0)
-    env = Wrapper(env)
+    if with_goal:
+        env = Wrapper(env)
     return EpisodeInfoWrapper(env)
 
 
@@ -57,6 +92,7 @@ class PolicyModel(nn.Module):
         self.is_recurrent = False
 
         w, h, c = state_shape
+        c = c // 2
 
         self.enc = nn.Sequential(
             nn.Conv2d(in_channels=c, out_channels=16, kernel_size=4, stride=4),
@@ -112,20 +148,21 @@ class PolicyModel(nn.Module):
         return value, dist.log_probs(actions), dist.entropy().mean(), rnn_hxs
 
 
-def init_goal_buffer(env, conf):
-    obs = env.reset()
-    states = torch.zeros((128 * 10, 16, *env.observation_space.shape)).to(device)
+def init_goal_buffer(conf):
+    env = gen_env_with_seed(123, with_goal=False)
+    states = [env.reset()['image']]
 
     for i in trange(conf['training.n_steps'] * 10):
-        action = torch.tensor([[env.action_space.sample()] for _ in range(obs.shape[0])])
-        obs, _, _, _ = env.step(action)
-        states[i] = obs.float() / 255.
-    return states
+        obs, _, _, _ = env.step(env.action_space.sample())
+        states.append(obs['image'])
+    return np.asarray(states)
 
 
 if __name__ == '__main__':
-    device = 'cuda:1'
     conf = get_conf()
+    device = conf['agent.device']
+
+    GOALS = init_goal_buffer(conf)
 
     env = make_vec_envs(
         lambda env_id: lambda: gen_env_with_seed(env_id),
@@ -150,40 +187,11 @@ if __name__ == '__main__':
     rollouts = RolloutStorage(
         conf['training.n_steps'],
         conf['training.n_processes'],
-        gym.spaces.Box(0, 1, (*env.observation_space.shape[:2], 2 * env.observation_space.shape[2])),
+        env.observation_space,
         env.action_space
     )
 
-    goals = init_goal_buffer(env, conf)
-    x0 = env.reset()[0:1].repeat(128 * 16 * 10, 1, 1, 1).float() / 255.
-    print(goals.device, x0.device)
-
-    def sample_goals():
-        gg = goals.view(-1, *env.observation_space.shape)
-        # probs = agent.get_value(torch.cat([x0, gg], dim=-1)).view(-1)
-        #(goal_ids,) = torch.where((probs > 0.1))
-        #if len(goal_ids) == 0:
-        return gg[torch.randint(0, gg.size(0), (16,))]
-        # return gg[goal_ids[torch.randint(0, goal_ids.size(0), (16,))]]
-
-    def calc_reward(img1, img2):
-        #print(img1.shape, img2.shape)
-        #from matplotlib import pyplot as plt
-        #for diff, i1, i2 in zip(torch.abs(img1.view(img1.size(0), -1) - img2.view(img1.size(0), -1)).sum(dim=1), img1, img2):
-        #    fix, ax = plt.subplots(1, 2)
-        #    ax[0].imshow(i1)
-        #    ax[1].imshow(i2)
-        #    plt.title(f'{diff}')
-        #    plt.show()
-        #img1 = img1.view(img1.size(0), -1)
-        #img2 = img2.view(img2.size(0), -1)
-        #print(torch.abs(img1 - img2))
-        diff = torch.abs(img1.view(img1.size(0), -1) - img2.view(img1.size(0), -1)).sum(dim=1)
-        return (diff < 0.1).view(-1, 1).float()
-
-    curr_obs = env.reset()
-    curr_goal = sample_goals()
-    obs = torch.cat([curr_obs, curr_goal], dim=-1)
+    obs = env.reset()
     rollouts.set_first_obs(obs)
     rollouts.to(conf['agent.device'])
 
@@ -198,28 +206,18 @@ if __name__ == '__main__':
         for step in range(conf['training.n_steps']):
             # Sample actions
             value, action, action_log_prob, _ = agent.act(obs)
-            curr_obs, curr_reward, done, infos = env.step(action)
-            curr_obs = curr_obs.float() / 255.
+            obs, reward, done, infos = env.step(action)
 
             for info in infos:
                 if 'episode' in info.keys():
                     episode_rewards.append(info['episode']['r'])
 
-            idx = (j * conf['training.n_steps'] + step) % goals.size(0)
+            # idx = (j * conf['training.n_steps'] + step) % goals.size(0)
             # goals[idx] = curr_obs
-            reward = calc_reward(curr_obs, curr_goal)
-            if (torch.sum(reward)):
-                print(reward.cpu().view(-1).numpy())
+
 
             # If done then clean the history of observations.
-            #masks = torch.FloatTensor([0. if done_ or rew else 1. for rew, done_ in zip(reward, done)]).to(device)
-            #masks = masks.view(-1, 1, 1, 1)
-            masks = 1 - reward
-            masks = masks.view(-1, 1, 1, 1)
-            curr_goal = masks * curr_goal + (1 - masks) * sample_goals()
-            masks = masks.view(-1, 1)
-
-            obs = torch.cat([curr_obs, curr_goal], dim=-1)
+            masks = torch.FloatTensor([[0.] if done_ or rew else [1.] for rew, done_ in zip(reward, done)]).to(device)
             rollouts.insert(obs, action, action_log_prob, value, reward, masks)
 
         next_value = agent.get_value(rollouts.get_last_obs())
