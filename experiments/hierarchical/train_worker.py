@@ -40,7 +40,7 @@ class Wrapper(gym.Wrapper):
 
 
 def gen_env_with_seed(seed):
-    env = gym.make('MiniGrid-DoorKey-8x8-v0')
+    env = gym.make('MiniGrid-Empty-8x8-v0')
     env.seed(seed)
     env = minigrid_envs.RGBImgObsWrapper(env)
     env = minigrid_envs.FixResetSeedWrapper(env, 0)
@@ -78,7 +78,7 @@ class PolicyModel(nn.Module):
             nn.Linear(emb_size * 2, 512),
             nn.LeakyReLU(inplace=True),
             nn.Linear(512, 1),
-            nn.Sigmoid()
+            # nn.Sigmoid()
         )
 
         init_params(self)
@@ -114,9 +114,9 @@ class PolicyModel(nn.Module):
 
 def init_goal_buffer(env, conf):
     obs = env.reset()
-    states = torch.zeros((128, 16, *env.observation_space.shape))
+    states = torch.zeros((128 * 10, 16, *env.observation_space.shape)).to(device)
 
-    for i in trange(conf['training.n_steps']):
+    for i in trange(conf['training.n_steps'] * 10):
         action = torch.tensor([[env.action_space.sample()] for _ in range(obs.shape[0])])
         obs, _, _, _ = env.step(action)
         states[i] = obs.float() / 255.
@@ -124,7 +124,7 @@ def init_goal_buffer(env, conf):
 
 
 if __name__ == '__main__':
-    device = 'cpu'
+    device = 'cuda:1'
     conf = get_conf()
 
     env = make_vec_envs(
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         lr=1e-4,
         eps=1e-5,
         max_grad_norm=0.5
-    )
+    ).to(device)
 
     writer = SummaryWriter(conf['outputs.logs'])
 
@@ -155,13 +155,16 @@ if __name__ == '__main__':
     )
 
     goals = init_goal_buffer(env, conf)
-    x0 = env.reset()[0:1].repeat(128 * 16, 1, 1, 1).float() / 255.
+    x0 = env.reset()[0:1].repeat(128 * 16 * 10, 1, 1, 1).float() / 255.
+    print(goals.device, x0.device)
 
     def sample_goals():
         gg = goals.view(-1, *env.observation_space.shape)
-        probs = agent.get_value(torch.cat([x0, gg], dim=-1)).view(-1)
-        (goal_ids,) = torch.where((probs > 0.1) * (probs < 0.9))
-        return gg[goal_ids[torch.randint(0, goal_ids.size(0), (16,))]]
+        # probs = agent.get_value(torch.cat([x0, gg], dim=-1)).view(-1)
+        #(goal_ids,) = torch.where((probs > 0.1))
+        #if len(goal_ids) == 0:
+        return gg[torch.randint(0, gg.size(0), (16,))]
+        # return gg[goal_ids[torch.randint(0, goal_ids.size(0), (16,))]]
 
     def calc_reward(img1, img2):
         #print(img1.shape, img2.shape)
@@ -203,11 +206,15 @@ if __name__ == '__main__':
                     episode_rewards.append(info['episode']['r'])
 
             idx = (j * conf['training.n_steps'] + step) % goals.size(0)
-            goals[idx] = curr_obs
+            # goals[idx] = curr_obs
             reward = calc_reward(curr_obs, curr_goal)
+            if (torch.sum(reward)):
+                print(reward.cpu().view(-1).numpy())
 
             # If done then clean the history of observations.
-            masks = torch.FloatTensor([0. if done_ or rew else 1. for rew, done_ in zip(reward, done)])
+            #masks = torch.FloatTensor([0. if done_ or rew else 1. for rew, done_ in zip(reward, done)]).to(device)
+            #masks = masks.view(-1, 1, 1, 1)
+            masks = 1 - reward
             masks = masks.view(-1, 1, 1, 1)
             curr_goal = masks * curr_goal + (1 - masks) * sample_goals()
             masks = masks.view(-1, 1)
