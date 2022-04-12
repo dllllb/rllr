@@ -9,15 +9,15 @@ from rllr.env import make_vec_envs
 from matplotlib import pyplot as plt
 
 
-EMB_SIZE = 2
-EMB0_SIZE = 128
+EMB_SIZE = 16
+EMB0_SIZE = 16
 
 
 class VAE(nn.Module):
     def __init__(self, state_shape, emb_size=EMB_SIZE, emb0_size=EMB0_SIZE):
         super(VAE, self).__init__()
         self.state_shape = state_shape
-        self.beta = 1.0
+        self.beta = 5.0
 
         c, w, h = state_shape
 
@@ -76,14 +76,10 @@ class VAE(nn.Module):
 
         self.apply(init_params)
 
-    def encode(self, x, x0):
+    def encode(self, x):
         with torch.no_grad():
             hid = self.enc(x)
-            z = self.mu(hid)
-
-            z0 = self.enc0(x0)
-            z = torch.cat([z, z0], dim=1)
-            return z
+            return self.mu(hid)
 
     def decode(self, z):
         return self.dec(z)
@@ -167,7 +163,7 @@ if __name__ == '__main__':
 
     gan = CCVAE(env.observation_space.shape, batch_size=32, device=device)
 
-    for _ in trange(1000):
+    for _ in trange(0):
         states = rollout(env)
         vae_loss = gan.update(states, x0)
         print(f'vae_loss {vae_loss}')
@@ -178,7 +174,7 @@ if __name__ == '__main__':
     states = rollout(env) / 255.
     x0 = env.reset()[0].repeat(states.size(0), 1, 1, 1).float() / 255.
     with torch.no_grad():
-        hid = gan.vae.enc(states)
+        hid = gan.vae.encode(states)
         hid0 = gan.vae.enc0(x0)
         hid = torch.cat([hid, hid0], dim=1)
         reco = gan.vae.decode(hid).numpy()

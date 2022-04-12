@@ -9,7 +9,7 @@ from rllr.env import make_vec_envs
 from matplotlib import pyplot as plt
 
 
-EMB_SIZE = 16
+EMB_SIZE = 2
 
 
 class VAE(nn.Module):
@@ -213,7 +213,7 @@ if __name__ == '__main__':
 
     gan = GANVAE(env.observation_space.shape, batch_size=32, device=device)
 
-    for _ in trange(1000):
+    for _ in trange(0):
         states = rollout(env)
         vae_loss, gen_loss, discr_loss = gan.update(states)
         print(f'vae_loss {vae_loss}, gen_loss {gen_loss}, discr_loss {discr_loss}')
