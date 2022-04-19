@@ -53,7 +53,7 @@
   seed: 42,
 
   outputs: {
-      model: artifacts/models/minigrid_lava_master_ssim_fixed_seed.p,
-      logs: artifacts/logs/minigrid_lava_master_ssim_better_fixed_seed
+      model: artifacts/models/minigrid_lava_S9N3_master_ssim_fixed_seed.p,
+      logs: artifacts/logs/minigrid_lava_S9N3_master_ssim_better_fixed_seed
   }
 }

@@ -79,7 +79,7 @@ python enjoy.py --mode master
 | MiniGrid-PutNear-6x6-N2-v0                     | 0.40 | 0.78      |         |
 | MiniGrid-PutNear-6x6-N2-v0 (fixed seed)        | 0.79 | 0.01      |         |
 | MiniGrid-LavaCrossingS9N3-v0                   | 0.88 | 0.90      |         |
-| MiniGrid-LavaCrossingS9N3-v0 (fixed seed)      | 0.00 | 0.91      | 0.94    |
+| MiniGrid-LavaCrossingS9N3-v0 (fixed seed)      | 0.00 | 0.91      | 0.91    |
 | MiniGrid-DoorKey-8x8-v0                        | 0.98 | 0.91      |         |
 | MiniGrid-DoorKey-8x8-v0 (fixed seed)           | 0.98 | 0.92      | 0.97    |
 | MiniGrid-FourRooms-v0                          | 0.79 | 0.72      |         |
@@ -99,7 +99,7 @@ python enjoy.py --mode master
 | MiniGrid-PutNear-6x6-N2-v0                     | 6.30   | 7.25      |         |
 | MiniGrid-PutNear-6x6-N2-v0 (fixed seed)        | 7.00   | 27.75     |         |
 | MiniGrid-LavaCrossingS9N3-v0                   | 37.36  | 35.45     |         |
-| MiniGrid-LavaCrossingS9N3-v0 (fixed seed)      | 324.00 | 31.02     | 18.38   |
+| MiniGrid-LavaCrossingS9N3-v0 (fixed seed)      | 324.00 | 31.02     | 28.25   |
 | MiniGrid-DoorKey-8x8-v0                        | 16.89  | 66.11     |         |
 | MiniGrid-DoorKey-8x8-v0 (fixed seed)           | 12.00  | 53.78     | 18.41   |
 | MiniGrid-FourRooms-v0                          | 23.21  | 30.85     |         |
