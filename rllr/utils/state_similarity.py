@@ -57,22 +57,10 @@ class ContrastiveStateSimilarity:
                 episode_end = np.delete(episode_end, bad_ids)
 
                 pos_ids = np.random.randint(pos_ids_low, pos_ids_high+1)
-                #neg_ids = np.random.randint(0, n_observations, pos_ids.shape)
-                #neg_ids = np.random.randint(episode_start, episode_end, pos_ids.shape)
                 neg_ids = get_neg_ids(episode_start, pos_ids_low, pos_ids_high, episode_end)
                 targets = observations[target_ids]
                 positives = observations[pos_ids]
                 negatives = observations[neg_ids]
-                #from matplotlib import pyplot as plt
-                #for i, (trg, pos, neg) in enumerate(zip(targets, positives, negatives)):
-                #    f, ax = plt.subplots(1, 3)
-                #    ax[0].imshow(trg)
-                #    ax[1].imshow(pos)
-                #    ax[2].imshow(neg)
-                #    st = min(pos_ids[i], target_ids[i])
-                #    end = max(pos_ids[i], target_ids[i])
-                #    ax[0].set_title(str(dones[st:end + 1]))
-                #    plt.show()
 
                 self.optimizer.zero_grad()
                 pos_labels = self.ssim_network(targets, positives).squeeze()
