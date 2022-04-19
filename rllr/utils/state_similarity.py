@@ -4,6 +4,15 @@ import numpy as np
 import torch.optim as optim
 
 
+@np.vectorize
+def get_neg_ids(episode_start, pos_ids_low, pos_ids_high, episode_end):
+    qq = [i for i in range(episode_start, pos_ids_low)] + [i for i in range(pos_ids_high+1, episode_end+1)]
+    if len(qq) == 0:
+        print(episode_start, pos_ids_low, pos_ids_high, episode_end)
+    return np.random.choice([i for i in range(episode_start, pos_ids_low)] +
+                            [i for i in range(pos_ids_high+1, episode_end+1)])
+
+
 class ContrastiveStateSimilarity:
 
     def __init__(self,
@@ -34,17 +43,23 @@ class ContrastiveStateSimilarity:
 
                 end_ids = np.searchsorted(reset_ids, target_ids)
                 episode_start = reset_ids[end_ids - 1]
-                episode_end = reset_ids[end_ids]
+                episode_end = reset_ids[end_ids] - 1
                 pos_ids_low = np.maximum(target_ids - self.radius, episode_start)
                 pos_ids_high = np.minimum(target_ids + self.radius, episode_end)
 
-                bad_ids, = np.where(pos_ids_low >= pos_ids_high)
+                bad_ids, = np.where(np.logical_or(pos_ids_low >= pos_ids_high,
+                                                  np.logical_and(pos_ids_low == episode_start,
+                                                                 pos_ids_high == episode_end)))
                 target_ids = np.delete(target_ids, bad_ids)
                 pos_ids_low = np.delete(pos_ids_low, bad_ids)
                 pos_ids_high = np.delete(pos_ids_high, bad_ids)
+                episode_start = np.delete(episode_start, bad_ids)
+                episode_end = np.delete(episode_end, bad_ids)
 
-                pos_ids = np.random.randint(pos_ids_low, pos_ids_high)
-                neg_ids = np.random.randint(0, n_observations, pos_ids.shape)
+                pos_ids = np.random.randint(pos_ids_low, pos_ids_high+1)
+                #neg_ids = np.random.randint(0, n_observations, pos_ids.shape)
+                #neg_ids = np.random.randint(episode_start, episode_end, pos_ids.shape)
+                neg_ids = get_neg_ids(episode_start, pos_ids_low, pos_ids_high, episode_end)
                 targets = observations[target_ids]
                 positives = observations[pos_ids]
                 negatives = observations[neg_ids]
@@ -69,7 +84,7 @@ class ContrastiveStateSimilarity:
 
                 total_loss += loss.detach().cpu().numpy()
 
-        return total_loss / self.epochs
+        return total_loss / self.epochs / n_batches
 
     def similarity(self, state1, state2):
         with torch.no_grad():
