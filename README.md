@@ -91,7 +91,6 @@ python enjoy.py --mode master
     Table 1. MiniGrid, fully observed: Mean return over 1000 episodes
 </p> 
 
-
 | task / method                                  | PPO    | PPO + RND | PATH RL |
 |------------------------------------------------|--------|-----------|---------|
 | MiniGrid-Dynamic-Obstacles-8x8-v0              | 256    | 110.77    | 25.32   |
