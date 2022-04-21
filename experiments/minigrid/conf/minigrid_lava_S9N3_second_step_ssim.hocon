@@ -13,7 +13,7 @@
   },
 
   worker_agent: {
-    path: "artifacts/models/minigrid_lava_S9N3_worker_ssim_fixed_seed.p",
+    path: "../artifacts/minigrid/models/minigrid_lava_S9N3_worker_ssim_fixed_seed.p",
     device: "cpu"
   }
 
