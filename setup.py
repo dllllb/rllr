@@ -21,7 +21,7 @@ setup(
         'torch',
         'torchvision',
         'gym[atari, accept-rom-license]==0.19.0',
-        'ale-py',
+        'ale-py==0.7.4',
         'matplotlib',
         'pyhocon',            # utils.config :: get_conf
         'jupyter',            # utils.plotting :: IPython
