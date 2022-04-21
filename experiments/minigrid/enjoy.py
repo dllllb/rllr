@@ -71,7 +71,7 @@ def play(mode, viz, n_episodes):
         config = ConfigFactory.parse_file('conf/minigrid_second_step.hocon')
 
     elif mode == 'ssim_worker':
-        from experiments.minigrid.train_worker import gen_env_with_seed
+        from train_worker import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_first_step_ssim.hocon')
 
     elif mode == 'worker_doorkey':
