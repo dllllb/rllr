@@ -1,0 +1,52 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-KeyCorridorS3R3-v0,
+    rgb_image: true,
+    tile_size: 4,
+    action_size: 6,
+    reset_seed: 0,
+  },
+
+  encoder: {
+    state_encoder_type: simple_cnn,
+    n_channels: [16, 16],
+    kernel_sizes: [4, 3],
+    strides: [4, 1],
+    paddings: [0, 1],
+    head: {
+        hidden_size: 64
+    }
+  },
+
+  agent: {
+    device: "cuda:2",
+    ext_coef: 2.0,
+    im_coef: 1.0,
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.01,
+    lr: 0.001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.999,
+    im_gamma: 0.99,
+    gae_lambda: 0.95
+  },
+
+  training: {
+    n_env_steps: 15000000,
+    n_steps: 128,
+    n_processes: 16,
+    verbose: 1,
+  },
+
+  seed: 42,
+
+  outputs: {
+    model: ../artifacts/minigrid/models/minigrid_rnd_ppo_keycorridor_fixed_seed.p,
+    logs: ../artifacts/minigrid/logs/minigrid_rnd_ppo_keycorridor_fixed_seed
+  }
+}

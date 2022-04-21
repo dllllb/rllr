@@ -76,8 +76,8 @@
   seed: 42,
 
   outputs: {
-    ssim_model: artifacts/models/minigrid_lava_S9N3_ssim.p
-    model: artifacts/models/minigrid_agent_lava_S9N3_ssim.p
-    logs: artifacts/logs/minigrid_agent_lava_S9N3_ssim
+    ssim_model: ../artifacts/minigrid/models/minigrid_lava_S9N3_ssim.p
+    model: ../artifacts/minigrid/models/minigrid_agent_lava_S9N3_ssim.p
+    logs: ../artifacts/minigrid/logs/minigrid_agent_lava_S9N3_ssim
   }
 }
