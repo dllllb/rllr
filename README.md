@@ -71,7 +71,8 @@ python enjoy.py --mode master
 
 
 ```
-## Benchmarks 
+## Benchmarks
+
 | task / method                                  | PPO  | PPO + RND | PATH RL |
 |------------------------------------------------|------|-----------|---------|
 | MiniGrid-Dynamic-Obstacles-8x8-v0              | 0.00 | 0.61      | 0.90    |
