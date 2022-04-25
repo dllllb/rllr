@@ -35,13 +35,28 @@ def test():
         'rnd_ppo_fourrooms': (0.73, 1.0),
         'rnd_ppo_keycorridor': (0.7233333, 1.0),
         'rnd_ppo_putnear': (0.79, 1.0),
-        'multi': (0.77222222, 1.0)
+
+        'ppo_dynobs_fixed_seed': (0.0, 0.0),
+        'ppo_lava_fixed_seed': (0.0, 0.0),
+        'ppo_doorkey_fixed_seed': (0.9831249713897705, 1.0),
+        'ppo_fourrooms_fixed_seed': (0.8289999961853027, 1.0),
+        'ppo_keycorridor_fixed_seed': (0.0, 0.0),
+        'ppo_putnear_fixed_seed': (0.7900000214576721, 1.0),
+        'rnd_ppo_fixed_seed': (0.746874988079071, 1.0),
+        'rnd_ppo_lava_fixed_seed': (0.8361111283302307, 1.0),
+        'rnd_ppo_doorkey_fixed_seed': (0.9564062356948853, 1.0),
+        'rnd_ppo_fourrooms_fixed_seed': (0.0, 0.0),
+        'rnd_ppo_keycorridor_fixed_seed': (0.7099999785423279, 1.0),
+        #'rnd_ppo_putnear_fixed_seed': (0.01, 0.01),
+
+        'multi': (0.77222222, 1.0),
+        'ssim_lava_fixed_seed': (0.925000011920929, 1.0)
     }
 
     for algo, (expected_reward, expected_success) in algos.items():
         switch_reproducibility_on()
         rewards, steps, success = play(mode=algo, viz=False, n_episodes=1)
-        print(algo, rewards, steps,success)
+        print(algo, rewards, steps, success)
         assert np.allclose(rewards, expected_reward)
         assert np.allclose(success, expected_success)
 
@@ -128,9 +143,61 @@ def play(mode, viz, n_episodes):
         from train_lang_rnd_ppo import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_putnear.hocon')
 
+    elif mode == 'ppo_dynobs_fixed_seed':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_dynobst_fixed_seed.hocon')
+
+    elif mode == 'ppo_lava_fixed_seed':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_lava_fixed_seed.hocon')
+
+    elif mode == 'ppo_doorkey_fixed_seed':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_doorkey_fixed_seed.hocon')
+
+    elif mode == 'ppo_fourrooms_fixed_seed':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_fourrooms_fixed_seed.hocon')
+
+    elif mode == 'ppo_keycorridor_fixed_seed':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_keycorridor_fixed_seed.hocon')
+
+    elif mode == 'ppo_putnear_fixed_seed':
+        from train_direct_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_ppo_putnear_fixed_seed.hocon')
+
+    elif mode == 'rnd_ppo_fixed_seed':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_fixed_seed.hocon')
+
+    elif mode == 'rnd_ppo_lava_fixed_seed':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_lava_fixed_seed.hocon')
+
+    elif mode == 'rnd_ppo_doorkey_fixed_seed':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_doorkey_fixed_seed.hocon')
+
+    elif mode == 'rnd_ppo_fourrooms_fixed_seed':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_fourrooms_fixed_seed.hocon')
+
+    elif mode == 'rnd_ppo_keycorridor_fixed_seed':
+        from train_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_keycorridor_fixed_seed.hocon')
+
+    elif mode == 'rnd_ppo_putnear_fixed_seed':
+        from train_lang_rnd_ppo import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_rnd_ppo_putnear_fixed_seed.hocon')
+
     elif mode == 'multi':
         from train_multitask import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_multitask.hocon')
+
+    elif mode == 'ssim_lava_fixed_seed':
+        from train_master import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_lava_S9N3_second_step_ssim.hocon')
 
     else:
         assert False
@@ -170,9 +237,14 @@ if __name__ == '__main__':
                                            'worker_doorkey', 'master_doorkey',
                                            'direct_ppo', 'ppo_dynobs', 'ppo_lava', 'ppo_doorkey', 'ppo_fourrooms',
                                            'ppo_keycorridor', 'ppo_putnear',
-                                           'rnd_ppo', 'rnd_ppo_lava','rnd_ppo_doorkey', 'rnd_ppo_fourrooms',
+                                           'rnd_ppo', 'rnd_ppo_lava', 'rnd_ppo_doorkey', 'rnd_ppo_fourrooms',
                                            'rnd_ppo_keycorridor', 'rnd_ppo_putnear',
-                                           'multi'])
+                                           'ppo_dynobs_fixed_seed', 'ppo_lava_fixed_seed', 'ppo_doorkey_fixed_seed',
+                                           'ppo_fourrooms_fixed_seed', 'ppo_keycorridor_fixed_seed',
+                                           'ppo_putnear_fixed_seed', 'rnd_ppo_fixed_seed', 'rnd_ppo_lava_fixed_seed',
+                                           'rnd_ppo_doorkey_fixed_seed', 'rnd_ppo_fourrooms_fixed_seed',
+                                           'rnd_ppo_keycorridor_fixed_seed', 'rnd_ppo_putnear_fixed_seed',
+                                           'multi', 'ssim_lava_fixed_seed'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()
