@@ -487,5 +487,5 @@ class ActorCriticNetwork(nn.Module):
     def embed_parameters(self, recurse: bool = True):
         for name, param in self.named_parameters(recurse=recurse):
             if 'embed_layers' in name:
-                param.requires_grad = False
+                #param.requires_grad = False
                 yield param
