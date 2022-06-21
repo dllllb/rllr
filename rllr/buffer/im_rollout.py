@@ -16,10 +16,27 @@ class IMRolloutStorage(object):
         else:
             self.obs = torch.zeros(num_steps + 1, num_processes, *obs_space.shape)
 
-        if action_space.__class__.__name__ == 'Discrete':
+        if action_space.__class__.__name__ == 'Dict':
+            self.actions = dict()
+            self.action_log_probs = dict()
+            for key in action_space:
+                space = action_space[key]
+                self.action_log_probs[key] = torch.zeros(num_steps, num_processes, 1)
+                if space.__class__.__name__ == 'Discrete':
+                    self.actions[key] = torch.zeros(num_steps, num_processes, 1).long()
+                elif space.__class__.__name__ == 'Box':
+                    self.actions[key] = torch.zeros(num_steps, num_processes, space.shape[0])
+                else:
+                    raise NotImplementedError(f'{space.__class__.__name__} action space is not implemented')
+            torch.zeros(num_steps, num_processes, 1).long()
+        elif action_space.__class__.__name__ == 'Discrete':
+            self.action_log_probs = torch.zeros(num_steps, num_processes, 1)
             self.actions = torch.zeros(num_steps, num_processes, 1).long()
-        else:
+        elif action_space.__class__.__name__ == 'Box':
+            self.action_log_probs = torch.zeros(num_steps, num_processes, 1)
             self.actions = torch.zeros(num_steps, num_processes, action_space.shape[0])
+        else:
+            raise NotImplementedError(f'{action_space.__class__.__name__} action space is not implemented')
 
         self.recurrent_hidden_states = torch.zeros(
             num_steps + 1, num_processes, recurrent_hidden_state_size)
@@ -33,7 +50,6 @@ class IMRolloutStorage(object):
         self.returns = torch.zeros(num_steps + 1, num_processes, 1)
         self.im_returns = torch.zeros(num_steps + 1, num_processes, 1)
 
-        self.action_log_probs = torch.zeros(num_steps, num_processes, 1)
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
         self.num_processes = num_processes
         self.num_steps = num_steps
@@ -72,18 +88,20 @@ class IMRolloutStorage(object):
         self.returns = self.returns.to(device)
         self.im_returns = self.im_returns.to(device)
 
-        self.action_log_probs = self.action_log_probs.to(device)
-        self.actions = self.actions.to(device)
         self.masks = self.masks.to(device)
+        if type(self.actions) == dict:
+            for key in self.actions:
+                self.actions[key] = self.actions[key].to(device)
+                self.action_log_probs[key] = self.action_log_probs[key].to(device)
+        else:
+            self.actions = self.actions.to(device)
+            self.action_log_probs = self.action_log_probs.to(device)
 
     def insert(self, obs, recurrent_hidden_states, actions, action_log_probs,
                value_preds, im_value_preds, rewards, im_rewards, masks):
         self.copy_obs(obs, self.step + 1)
 
         self.recurrent_hidden_states[self.step + 1].copy_(recurrent_hidden_states)
-
-        self.actions[self.step].copy_(actions)
-        self.action_log_probs[self.step].copy_(action_log_probs)
 
         self.value_preds[self.step].copy_(value_preds)
         self.im_value_preds[self.step].copy_(im_value_preds)
@@ -92,6 +110,13 @@ class IMRolloutStorage(object):
         self.im_rewards[self.step].copy_(im_rewards.view(-1, 1))
 
         self.masks[self.step + 1].copy_(masks)
+        if type(self.actions) == dict:
+            for key in self.actions:
+                self.actions[key][self.step].copy_(actions[key])
+                self.action_log_probs[key][self.step].copy_(action_log_probs[key])
+        else:
+            self.actions[self.step].copy_(actions)
+            self.action_log_probs[self.step].copy_(action_log_probs)
 
         self.step = (self.step + 1) % self.num_steps
 
@@ -146,7 +171,15 @@ class IMRolloutStorage(object):
                 obs_batch = self.obs[:-1].view(-1, *self.obs.size()[2:])[indices]
                 next_obs_batch = self.obs[1:].view(-1, *self.obs.size()[2:])[indices]
 
-            actions_batch = self.actions.view(-1, self.actions.size(-1))[indices]
+            if type(self.actions) == dict:
+                actions_batch = {key: self.actions[key].view(-1, self.actions[key].size(-1))[indices]
+                                 for key in self.actions}
+                old_action_log_probs_batch = {key: self.action_log_probs[key].view(-1, 1)[indices]
+                                              for key in self.actions}
+            else:
+                actions_batch = self.actions.view(-1, self.actions.size(-1))[indices]
+                old_action_log_probs_batch = self.action_log_probs.view(-1, 1)[indices]
+
             value_preds_batch = self.value_preds[:-1].view(-1, 1)[indices]
             im_value_preds_batch = self.im_value_preds[:-1].view(-1, 1)[indices]
 
@@ -154,7 +187,6 @@ class IMRolloutStorage(object):
             im_return_batch = self.im_returns[:-1].view(-1, 1)[indices]
 
             masks_batch = self.masks[:-1].view(-1, 1)[indices]
-            old_action_log_probs_batch = self.action_log_probs.view(-1, 1)[indices]
 
             adv_targ = advantages.view(-1, 1)[indices]
 
@@ -203,15 +235,20 @@ class IMRolloutStorage(object):
                     next_obs_batch.append(self.obs[1:, ind])
                 recurrent_hidden_states_batch.append(
                     self.recurrent_hidden_states[0:1, ind])
-                actions_batch.append(self.actions[:, ind])
                 value_preds_batch.append(self.value_preds[:-1, ind])
                 im_value_preds_batch.append(self.im_value_preds[:-1, ind])
                 return_batch.append(self.returns[:-1, ind])
                 im_return_batch.append(self.im_returns[:-1, ind])
                 masks_batch.append(self.masks[:-1, ind])
-                old_action_log_probs_batch.append(
-                    self.action_log_probs[:, ind])
                 adv_targ.append(advantages[:, ind])
+
+                if type(self.actions) == dict:
+                    for key in actions_batch:
+                        actions_batch[key].append(self.actions[key][:, ind])
+                        old_action_log_probs_batch[key].append(self.action_log_probs[key][:, ind])
+                else:
+                    actions_batch.append(self.actions[:, ind])
+                    old_action_log_probs_batch.append(self.action_log_probs[:, ind])
 
             T, N = self.num_steps, num_envs_per_batch
             # These are all tensors of size (T, N, -1)
@@ -222,14 +259,18 @@ class IMRolloutStorage(object):
                 obs_batch = torch.stack(obs_batch, 1)
                 next_obs_batch = torch.stack(next_obs_batch, 1)
 
-            actions_batch = torch.stack(actions_batch, 1)
+            if type(self.actions) == dict:
+                actions_batch = {key: torch.stack(value, 1) for key, value in actions_batch.items()}
+                old_action_log_probs_batch = {key: torch.stack(value, 1) for key, value in old_action_log_probs_batch.items()}
+            else:
+                actions_batch = torch.stack(actions_batch, 1)
+                old_action_log_probs_batch = torch.stack(old_action_log_probs_batch, 1)
+
             value_preds_batch = torch.stack(value_preds_batch, 1)
             im_value_preds_batch = torch.stack(im_value_preds_batch, 1)
             return_batch = torch.stack(return_batch, 1)
             im_return_batch = torch.stack(im_return_batch, 1)
             masks_batch = torch.stack(masks_batch, 1)
-            old_action_log_probs_batch = torch.stack(
-                old_action_log_probs_batch, 1)
             adv_targ = torch.stack(adv_targ, 1)
 
             # States is just a (N, -1) tensor
