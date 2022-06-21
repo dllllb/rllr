@@ -216,7 +216,7 @@ def play(mode, viz, n_episodes):
 
     elif mode == 'goal_keycorridor_master':
         from train_goal_master import gen_env_with_seed
-        config = ConfigFactory.parse_file('conf/minigrid_goal_second_step_glyphs_ohe_mask.hocon')
+        config = ConfigFactory.parse_file('conf/minigrid_goal_second_step_glyphs_ohe.hocon')
 
     else:
         assert False
