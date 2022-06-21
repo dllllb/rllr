@@ -49,8 +49,11 @@ def test():
         'rnd_ppo_keycorridor_fixed_seed': (0.7099999785423279, 1.0),
         #'rnd_ppo_putnear_fixed_seed': (0.01, 0.01),
 
-        'multi': (0.77222222, 1.0),
-        'ssim_lava_fixed_seed': (0.925000011920929, 1.0)
+        #'multi': (0.77222222, 1.0),
+        'ssim_lava_fixed_seed': (0.925000011920929, 1.0),
+        'ssim_lava_fixed_go_agent': (0.949999988079071, 1),
+        'goal_keycorridor_worker': (0.7599999904632568, 1),
+        #'goal_keycorridor_master': (0.8633333444595337, 1)
     }
 
     for algo, (expected_reward, expected_success) in algos.items():
@@ -199,6 +202,22 @@ def play(mode, viz, n_episodes):
         from train_master import gen_env_with_seed
         config = ConfigFactory.parse_file('conf/minigrid_lava_S9N3_second_step_ssim.hocon')
 
+    elif mode == 'ssim_lava_fixed_go_agent_worker':
+        from train_worker import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_lava_S9N3_first_step_ssim_go_agent.hocon')
+
+    elif mode == 'ssim_lava_fixed_go_agent':
+        from train_master import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_lava_S9N3_second_step_ssim_go_agent.hocon')
+
+    elif mode == 'goal_keycorridor_worker':
+        from train_goal_worker import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_goal_first_step_glyphs_ohe_hard.hocon')
+
+    elif mode == 'goal_keycorridor_master':
+        from train_goal_master import gen_env_with_seed
+        config = ConfigFactory.parse_file('conf/minigrid_goal_second_step_glyphs_ohe_mask.hocon')
+
     else:
         assert False
 
@@ -213,7 +232,7 @@ def play(mode, viz, n_episodes):
     rewards, steps, successes = [], [], []
     for _ in trange(n_episodes):
         obs, done, episode_reward = env.reset(), False, 0
-        rnn_hxs = torch.zeros((1, config.get('encoder.recurrent_hidden_size', 1)))
+        rnn_hxs = torch.zeros((1, config.get('encoder.recurrent_hidden_size', 1) * 2))
         masks = torch.ones((1, 1))
 
         while not done:
@@ -244,7 +263,9 @@ if __name__ == '__main__':
                                            'ppo_putnear_fixed_seed', 'rnd_ppo_fixed_seed', 'rnd_ppo_lava_fixed_seed',
                                            'rnd_ppo_doorkey_fixed_seed', 'rnd_ppo_fourrooms_fixed_seed',
                                            'rnd_ppo_keycorridor_fixed_seed', 'rnd_ppo_putnear_fixed_seed',
-                                           'multi', 'ssim_lava_fixed_seed'])
+                                           'multi', 'ssim_lava_fixed_seed', 'ssim_lava_fixed_go_agent_worker',
+                                           'ssim_lava_fixed_go_agent', 'goal_keycorridor_worker',
+                                           'goal_keycorridor_master'])
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--episodes', default=100, type=int)
     args = parser.parse_args()
@@ -254,4 +275,4 @@ if __name__ == '__main__':
     logger.info(f'mode {args.mode}: '
                 f'reward {rewards:.2f}, '
                 f'steps {steps:.2f}, '
-                f'success {successes:.2f}')
+                f'success {successes:.3f}')
