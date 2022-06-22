@@ -28,7 +28,7 @@ def rollout(env):
     states = []
     for _ in range(128):
         states.append(obs)
-        action = torch.randint(0, 3, (obs.size(0), 1))
+        action = torch.randint(0, env.action_space.n, (obs.size(0), 1))
         obs, reward, done, info = env.step(action)
     states.append(obs)
 

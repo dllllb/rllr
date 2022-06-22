@@ -49,6 +49,6 @@ def test_reco(env, vae):
 if __name__ == '__main__':
     env = make_vec_envs(lambda env_id: lambda: gen_env_with_seed(env_id), 1, 'cpu')
 
-    vae = VAE(env.observation_space.shape)
+    vae = VAE(env.observation_space.shape, 32)
     vae.load_state_dict(torch.load('vae.pt', map_location='cpu'))
     test_reco(env, vae)

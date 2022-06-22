@@ -1,7 +1,6 @@
 import gym
 from gym_minigrid.wrappers import RGBImgObsWrapper
 from rllr.env import EpisodeInfoWrapper
-import numpy as np
 
 
 class GoalWrapper(gym.Wrapper):
@@ -29,5 +28,4 @@ def gen_env_with_seed(seed):
     env = GoalWrapper(env)
     env = EpisodeInfoWrapper(env)
     return env
-
 

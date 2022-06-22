@@ -75,4 +75,3 @@ class VAE(nn.Module):
         kl_diverge = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
         return (recon_loss + self.beta * kl_diverge) / x.shape[0]  # divide total loss by batch size
-
