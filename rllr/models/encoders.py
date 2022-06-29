@@ -4,9 +4,11 @@ from torch import nn
 import torch
 import torch.nn.functional as F
 
-from functools import reduce
+from functools import reduce, partial
+from rllr.utils.common import get_output_shape
 
 
+#LEGACY
 class MLP(nn.Module):
     """Multi Layer Perceptron"""
     def __init__(self, input_size: int, hidden_layers_sizes: list):
@@ -26,24 +28,67 @@ class MLP(nn.Module):
 
 
 class MLPEncoder(nn.Module):
-    def __init__(self, conf):
+    def __init__(self, input_shape, conf):
         super().__init__()
-        input_size = conf['input_size']
+        input_size = input_shape[-1]
         hidden_layers_sizes = conf.get('hidden_layers_sizes', list())
+        drop_out_rates = conf.get('dropout', [0 for _ in hidden_layers_sizes])
+        use_batch_norm = conf.get('batch_norm', [0 for _ in hidden_layers_sizes])
+        last_layer_activation = conf.get('last_layer_activation', True)
+        self.unit_norm = conf.get('unit_norm', False)
+
+        activation_type = conf.get('activation_type', 'relu')
+        if activation_type == 'relu':
+            activation = partial(nn.ReLU, inplace=True)
+        elif activation_type == 'leaky_relu':
+            activation = partial(nn.LeakyReLU, 0.2, inplace=True)
+        else:
+            raise NotImplementedError('Activation function not implemented')
 
         layers = list()
-        for layer_size in hidden_layers_sizes:
+        for layer_size, drop_out_rate, batch_norm in zip(hidden_layers_sizes[:-1], drop_out_rates[:-1], use_batch_norm[:-1]):
             layers.append(nn.Linear(input_size, layer_size))
-            layers.append(nn.ReLU())
+            if batch_norm:
+                layers.append(nn.BatchNorm1d(layer_size))
+            layers.append(activation())
+            if drop_out_rate > 0:
+                layers.append(nn.Dropout(drop_out_rate))
             input_size = layer_size
 
+        layers.append(nn.Linear(input_size, hidden_layers_sizes[-1]))
+        if last_layer_activation:
+            layers.append(activation())
+        if drop_out_rates[-1] > 0:
+            layers.append(nn.Dropout(drop_out_rates[-1]))
+
         self.fc_net = nn.Sequential(*layers)
-        self.output_size = input_size
+        self.output_shape = (*input_shape[:-1], input_size)
 
     def forward(self, x):
-        return self.fc_net(x.view(x.shape[0], -1))
+        if self.unit_norm:
+            x = x.float() / 255.
+        return self.fc_net(x)
 
 
+class Sigmoid(nn.Module):
+    def __init__(self, input_shape, conf):
+        super().__init__()
+        self.output_shape = input_shape
+
+    def forward(self, x):
+        return torch.sigmoid(x)
+
+
+class Tanh():
+    def __init__(self, input_shape, config):
+        super().__init__()
+        self.output_shape = input_shape
+
+    def forward(self, x):
+        return torch.tanh(x)
+
+
+#LEGACY
 class Flattener(nn.Module):
     def __init__(self, model):
         super().__init__()
@@ -56,9 +101,30 @@ class Flattener(nn.Module):
         return self.model(x)
 
 
-class Permute(nn.Module):
-    def __init__(self, *args):
+class Flatten(nn.Module):
+    def __init__(self, input_shape, conf):
         super().__init__()
+        self.start_dim = conf.get('start_dim', 1)
+        self.output_shape = (reduce((lambda x, y: x * y), input_shape[self.start_dim-1:]),)
+
+    def forward(self, x):
+        return x.flatten(start_dim=self.start_dim)
+
+
+class Reshape(nn.Module):
+    def __init__(self, input_shape, conf):
+        super().__init__()
+        self.output_shape = conf['shape']
+
+    def forward(self, x):
+        return x.reshape(x.shape[0], *self.output_shape)
+
+
+class Permute(nn.Module):
+    def __init__(self, input_shape, *args):
+        super().__init__()
+        input_shape = ['bs', *input_shape]
+        self.output_shape = tuple([input_shape[d] for d in args])[1:]
         self.dims = args
 
     def forward(self, x):
@@ -66,11 +132,23 @@ class Permute(nn.Module):
 
 
 class Split(nn.Module):
-    def __init__(self, dim, channels_names=None, squeeze=False):
+    def __init__(self, input_shape, config):
         super().__init__()
-        self.dim = dim
-        self.channels_names = channels_names
-        self.squeeze = squeeze
+        self.dim = config['dim'],
+        self.channels_names = config.get('channels_names', None),
+        self.squeeze = config.get('squeeze', False)
+
+        base_shape = list(input_shape)
+        if self.squeeze:
+            base_shape.pop(self.dim)
+        else:
+            base_shape[self.dim] = 1
+        base_shape = tuple(base_shape)
+
+        if self.channels_names is not None:
+            self.output_shape = {name: base_shape for name in self.channels_names}
+        else:
+            self.output_shape = {i: base_shape for i in range(input_shape[self.dim])}
 
     def forward(self, x):
         tensors = torch.split(x, 1, dim=self.dim)
@@ -79,21 +157,52 @@ class Split(nn.Module):
 
         if self.channels_names is not None:
             tensors = {name: tensor for name, tensor in zip(self.channels_names, tensors)}
+        else:
+            tensors = {i: tensor for i, tensor in enumerate(tensors)}
         return tensors
 
 
 class Concat(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, input_shape, config):
         super().__init__()
-        self.dim = dim
+        self.dim = config['dim']
+
+        assert isinstance(input_shape, dict), f'input shape for Concat layer must be dict'
+        base_output_shape = list(list(input_shape.values())[0])
+        concat_dim_size = sum([shape[self.dim] for shape in input_shape.values()])
+        base_output_shape[self.dim] = concat_dim_size
+        self.output_shape = tuple(base_output_shape)
 
     def forward(self, x):
         if type(x) is list:
             return torch.cat(x, dim=self.dim)
         elif type(x) is dict:
-            return torch.cat([v for v in x.values()], dim=self.dim)
+            return torch.cat([x[k] for k in sorted(x.keys())], dim=self.dim)
 
 
+class DictChoose(nn.Module):
+    def __init__(self, input_shape, conf):
+        super().__init__()
+        self.key = conf['key']
+
+        assert isinstance(input_shape, dict), f'input shape for Concat layer must be dict'
+        self.output_shape = input_shape[self.key]
+
+    def forward(self, x):
+        return x[self.key]
+
+
+class NoiseVec(nn.Module):
+    def __init__(self, input_shape, conf):
+        super().__init__()
+        self.vec_size = conf['vec_size']
+        self.output_shape = (self.vec_size,)
+
+    def forward(self, x):
+        return torch.randn((x.shape[0], self.vec_size))
+
+
+#LEGACY
 class SimpleCNN(nn.Module):
     def __init__(self, grid_size, conf):
         super().__init__()
@@ -141,7 +250,7 @@ class SimpleCNN(nn.Module):
 
 
 class SimpleCNNEncoder(nn.Module):
-    def __init__(self, grid_size, conf):
+    def __init__(self, input_shape, conf):
         super().__init__()
         conv_params = zip(
             conf['n_channels'],
@@ -149,23 +258,44 @@ class SimpleCNNEncoder(nn.Module):
             conf['max_pools'] if conf.get('max_pools', False) else [1] * len(conf['n_channels']),
             conf['strides'] if conf.get('strides', False) else [1] * len(conf['n_channels']),
             conf['paddings'] if conf.get('paddings', False) else [0] * len(conf['n_channels']),
+            conf['dropout'] if conf.get('dropout', False) else [0] * len(conf['n_channels']),
+            conf['batch_norm'] if conf.get('batch_norm', False) else [None] * len(conf['n_channels'])
         )
+        use_batch_norm = conf.get('use_batch_norm', False)
         pre_permute = conf.get('pre_permute', False)
         post_permute = conf.get('post_permute', False)
-        input_channels = conf.get('input_channels', 3)
         self.unit_norm = conf.get('unit_norm', False)
         last_layer_activation = conf.get('last_layer_activation', True)
 
-        if pre_permute:
-            conv_layers = [Permute(*pre_permute)]
-            test_input = torch.zeros(1, grid_size, grid_size, input_channels)
+        if conf.get('conv_type', 'encode') == 'encode':
+            conv = nn.Conv2d
+        elif conf.get('conv_type', 'encode') == 'decode':
+            conv = nn.ConvTranspose2d
         else:
-            conv_layers = list()
-            test_input = torch.zeros(1, input_channels, grid_size, grid_size)
-        cur_channels = input_channels
-        for n_channels, kernel_size, max_pool, stride, padding in conv_params:
-            conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size, stride, padding))
-            conv_layers.append(nn.ReLU(inplace=True))
+            raise NotImplementedError(f'{conf["conv_type"]} conv type not implemented')
+
+        if conf.get('activation_type', 'relu') == 'relu':
+            activation = partial(nn.ReLU, inplace=True)
+        elif conf.get('activation_type', 'relu') == 'leaky_relu':
+            activation = partial(nn.LeakyReLU, 0.2, inplace=True)
+        else:
+            raise NotImplementedError(f'{conf["activation_type"]} activation type not implemented')
+
+        if pre_permute:
+            self.pre_permute = Permute(input_shape, *pre_permute)
+            input_shape = self.pre_permute.output_shape
+        else:
+            self.pre_permute = None
+
+        conv_layers = list()
+        cur_channels = input_shape[0]
+        for n_channels, kernel_size, max_pool, stride, padding, dropout, batch_norm in conv_params:
+            conv_layers.append(conv(cur_channels, n_channels, kernel_size, stride, padding))
+            if batch_norm:
+                conv_layers.append(nn.BatchNorm2d(n_channels))
+            conv_layers.append(activation())
+            if dropout > 0:
+                conv_layers.append(nn.Dropout(dropout))
             cur_channels = n_channels
             if max_pool == 'global':
                 conv_layers.append(nn.AdaptiveMaxPool2d(1))
@@ -174,69 +304,34 @@ class SimpleCNNEncoder(nn.Module):
 
         if not last_layer_activation:
             conv_layers.pop(-1)
-        if post_permute:
-            conv_layers.append(Permute(*post_permute))
 
         self.conv_net = nn.Sequential(*conv_layers)
+        input_shape = get_output_shape(self.conv_net, input_shape)
 
-        with torch.no_grad():
-            test_output = self.conv_net(test_input)
-        self.output_shape = list(test_output.shape[1:])
+        if post_permute:
+            self.post_permute = Permute(input_shape, *post_permute)
+            input_shape = self.post_permute.output_shape
+        else:
+            self.post_permute = None
+
+        self.output_shape = input_shape
         self.output_size = reduce((lambda x, y: x * y), self.output_shape)
 
     def forward(self, x):
         if self.unit_norm:
-            x = self.conv_net(x.float() / 255.)
-        else:
-            x = self.conv_net(x.float())
+            x = x.float() / 255.
+
+        if self.pre_permute:
+            x = self.pre_permute(x)
+
+        x = self.conv_net(x)
+
+        if self.post_permute:
+            x = self.post_permute(x)
         return x
 
 
-class AttentionCNNNetwork(SimpleCNNEncoder):
-    def __init__(self, grid_size, conf):
-        super().__init__(grid_size, conf)
-        conv_params = zip(
-            conf['attention.n_channels'],
-            conf['attention.kernel_sizes'],
-            conf['attention.max_pools'] if conf.get('attention.max_pools', False) else [1] * len(conf['attention.n_channels']),
-            conf['attention.strides'] if conf.get('attention.strides', False) else [1] * len(conf['attention.n_channels']),
-            conf['attention.paddings'] if conf.get('attention.paddings', False) else [0] * len(conf['attention.n_channels']),
-        )
-
-        conv_layers = list()
-        cur_channels = self.output_shape[0]
-        for n_channels, kernel_size, max_pool, stride, padding in conv_params:
-            conv_layers.append(nn.Conv2d(cur_channels, n_channels, kernel_size, stride, padding))
-            conv_layers.append(nn.ReLU(inplace=True))
-            cur_channels = n_channels
-            if max_pool > 1:
-                conv_layers.append(nn.MaxPool2d(max_pool, max_pool))
-        conv_layers.append(nn.Conv2d(cur_channels, 1, 1, 1, 0))
-        self.attention_net = nn.Sequential(*conv_layers)
-
-        test_input = torch.zeros(1, *self.output_shape)
-        with torch.no_grad():
-            test_output = self.attention_net(test_input)
-
-        hidden_layers_sizes = conf.get('hidden_layers_sizes', list())
-        fc_layers = list()
-        cur_size = self.output_shape[0]
-        for layer_size in hidden_layers_sizes:
-            fc_layers.append(nn.Linear(cur_size, layer_size))
-            fc_layers.append(nn.ReLU(inplace=True))
-            cur_size = layer_size
-        self.fc_net = nn.Sequential(*fc_layers)
-
-        self.output_size = cur_size
-
-    def forward(self, x):
-        x = super().forward(x)
-        attention_map = torch.softmax(self.attention_net(x).view(x.shape[0], 1, -1), dim=-1).view(x.shape[0], 1, *x.shape[2:])
-        x = (x * attention_map).sum(dim=(-1, -2))
-        x = self.fc_net(x)
-        return x
-
-
+#LEGACY
 class CNNAllLayers(nn.Module):
     def __init__(self, grid_size, conf):
         super().__init__()
@@ -276,6 +371,7 @@ class CNNAllLayers(nn.Module):
         return torch.cat(result, dim=1)
 
 
+#LEGACY
 class ResNet(nn.Module):
     def __init__(self, conf):
         super().__init__()
@@ -300,6 +396,7 @@ class ResNet(nn.Module):
         return self.resnet(x).reshape(x.shape[0], -1)
 
 
+#LEGACY
 class DummyRawStateEncoder(nn.Module):
     """
     code minigrid raw states as agent position and direction via one hot encoder
@@ -318,6 +415,7 @@ class DummyRawStateEncoder(nn.Module):
         return torch.cat([x[:, :, :, 0].flatten(start_dim=1), directions], dim=1)
 
 
+#LEGACY
 class DummyImageStateEncoder(nn.Module):
     """
     code minigrid image states as agent position and direction via one hot encoder
@@ -343,17 +441,25 @@ class DummyImageStateEncoder(nn.Module):
 
 
 class OneHot(nn.Module):
-    def __init__(self, n, *args):
+    def __init__(self, input_shape, n, *args):
         super().__init__()
         self.register_buffer('one_hot', torch.eye(n))
+        self.output_shape = (*input_shape, n)
 
     def forward(self, x):
         return F.embedding(x, self.one_hot)
 
 
+class DenseEmbed(nn.Embedding):
+    def __init__(self, input_shape, n, dim, *args, **kwargs):
+        super().__init__(n, dim, *args, **kwargs)
+        self.output_shape = (*input_shape, dim)
+
+
 class MultiEmbeddingNetwork(nn.Module):
-    def __init__(self, conf):
+    def __init__(self, input_shape, conf):
         super().__init__()
+        assert isinstance(input_shape, dict), 'input_shape for MultiEmbeddingNetwork layer must be dict'
 
         embed_dims = conf['embed_dims']
         embed_n = conf['embed_n']
@@ -362,12 +468,14 @@ class MultiEmbeddingNetwork(nn.Module):
 
         embed_type = conf.get('embed_type', 'embed')
         if embed_type == 'embed':
-            embed_l = nn.Embedding
+            embed_l = DenseEmbed
         elif embed_type == 'ohe':
             embed_l = OneHot
         else:
             raise NotImplementedError(f'{embed_type} embeddings is not implemented')
-        embed_layers = dict(zip(self.embed_names, [embed_l(n, dim) for n, dim in zip(embed_n, embed_dims)]))
+        embed_layers = dict()
+        for i, name in enumerate(self.embed_names):
+            embed_layers[name] = embed_l(input_shape[name], embed_n[i], embed_dims[i])
         self.embed_layers = nn.ModuleDict(embed_layers)
 
         fc_in = sum(embed_dims)
@@ -378,6 +486,7 @@ class MultiEmbeddingNetwork(nn.Module):
             fc_in = fc_out
         self.fc_net = nn.Sequential(*fc)
 
+        self.output_shape = (fc_in,)
         self.output_size = fc_in
 
     def forward(self, x):
@@ -388,6 +497,7 @@ class MultiEmbeddingNetwork(nn.Module):
         return self.fc_net(embeds)
 
 
+#LEGACY
 class GoalStateEncoder(nn.Module):
     def __init__(self, state_encoder, goal_state_encoder):
         super().__init__()
@@ -399,11 +509,12 @@ class GoalStateEncoder(nn.Module):
         if 'goal_emb' in states_and_goals.keys():
             goal_encoding = states_and_goals['goal_emb']
         else:
-            goal_encoding = self.goal_state_encoder.forward(states_and_goals)
+            goal_encoding = self.goal_state_encoder.forward(states_and_goals['goal_state'])
         state_encoding = self.state_encoder.forward(states_and_goals['image'])
         return torch.cat([state_encoding, goal_encoding], dim=1)
 
 
+#LEGACY
 class ConvGoalStateEncoder(nn.Module):
     def __init__(self, goal_encoder, first_cnn_encoder, second_cnn_encoder, fc_encoder):
         super().__init__()
@@ -430,6 +541,7 @@ class ConvGoalStateEncoder(nn.Module):
         return encodings
 
 
+#LEGACY
 class RemoveOuterWalls(nn.Module):
     def __init__(self, model, tile_size):
         super().__init__()
@@ -442,6 +554,7 @@ class RemoveOuterWalls(nn.Module):
         return self.model(x[:, self.tile_size: -self.tile_size, self.tile_size: -self.tile_size])
 
 
+#LEGACY
 class NormEncoder(nn.Module):
     def __init__(self, model, eps=1e-9):
         super().__init__()
@@ -454,6 +567,7 @@ class NormEncoder(nn.Module):
         return out / (out.pow(2).sum(dim=1) + self.eps).pow(0.5).unsqueeze(-1).expand(*out.size())
 
 
+#LEGACY
 class LastActionEncoder(nn.Module):
     def __init__(self, enc, n_actions):
         super().__init__()
@@ -467,6 +581,7 @@ class LastActionEncoder(nn.Module):
         return torch.cat([state_enc, act_enc], dim=1), rnn_hxs
 
 
+#LEGACY
 class RNNEncoder(nn.Module):
     def __init__(self, model, output_size, num_layers=1):
         super().__init__()
@@ -558,26 +673,19 @@ class RNNEncoder(nn.Module):
         return x, hxs
 
 
-class MultiNet(nn.Module):
-    def __init__(self, grid_size, conf):
+class Sequence(nn.Module):
+    def __init__(self, input_shape, conf):
         super().__init__()
         self.models_names = conf['transformations']
         models = dict()
 
         for model_name in self.models_names:
-            models[model_name] = get_encoder(grid_size, conf[model_name])
+            model = get_encoder(None, conf[model_name], input_shape)
+            input_shape = model.output_shape
+            models[model_name] = model
 
         self.models = nn.ModuleDict(models)
-        self.output_size = None
-
-
-class Sequence(MultiNet):
-    def __init__(self, grid_size, conf):
-        super().__init__(grid_size, conf)
-        #self.output_size = self.models[self.models_names[-1]].output_size
-        self.output_shape = [23, 10, 10]
-        self.output_size = 32
-
+        self.output_shape = input_shape
 
     def forward(self, x):
         for model_name in self.models_names:
@@ -585,20 +693,29 @@ class Sequence(MultiNet):
         return x
 
 
-class Parallel(MultiNet):
-    def __init__(self, grid_size, conf):
-        super().__init__(grid_size, conf)
-        self.output_size = 0
+class Parallel(nn.Module):
+    def __init__(self, input_shape, conf):
+        super().__init__()
+        self.models_names = conf['transformations']
+        models = dict()
+        out_shapes = dict()
+
         for model_name in self.models_names:
-            self.output_size += self.models[model_name].output_size
+            model = get_encoder(None, conf[model_name], input_shape)
+            models[model_name] = model
+            out_shapes[model_name] = model.output_shape
+
+        self.models = nn.ModuleDict(models)
+        self.output_shape = out_shapes
 
     def forward(self, x):
-        outputs = list()
+        outputs = dict()
         for model_name in self.models_names:
-            outputs.append(self.models[model_name](x[model_name]))
-        return torch.cat(outputs, dim=-1)
+            outputs[model_name] = self.models[model_name](x[model_name])
+        return outputs
 
 
+#LEGACY
 class ImageTextEncoder(nn.Module):
     def __init__(self, image_shape, sent_shape):
         super(ImageTextEncoder, self).__init__()
@@ -626,18 +743,16 @@ class ImageTextEncoder(nn.Module):
         return torch.cat([img_enc, msg_enc], dim=1)
 
 
-def get_encoder(grid_size, config):
+def get_encoder(grid_size, config, input_shape=None):
     if config['state_encoder_type'] == 'simple_mlp':
         state_size = 3 * (grid_size - 2) ** 2
         state_encoder = Flattener(MLP(state_size, config['hidden_layers_sizes']))
     elif config['state_encoder_type'] == 'mlp_encoder':
-        state_encoder = MLPEncoder(config)
+        state_encoder = MLPEncoder(input_shape, config)
     elif config['state_encoder_type'] == 'simple_cnn':
         state_encoder = SimpleCNN(grid_size, config)
     elif config['state_encoder_type'] == 'cnn_encoder':
-        state_encoder = SimpleCNNEncoder(grid_size, config)
-    elif config['state_encoder_type'] == 'attention_cnn_encoder':
-        state_encoder = AttentionCNNNetwork(grid_size, config)
+        state_encoder = SimpleCNNEncoder(input_shape, config)
     elif config['state_encoder_type'] == 'cnn_all_layers':
         state_encoder = CNNAllLayers(grid_size, config)
     elif config['state_encoder_type'] == 'resnet':
@@ -651,30 +766,45 @@ def get_encoder(grid_size, config):
         state_encoder = RNNEncoder(cnn_encoder,
                                    config.get('rnn_output', cnn_encoder.output_size),
                                    config.get('rnn_num_layers', 1))
+    elif config['state_encoder_type'] == 'sequence_rnn':
+        sequence_encoder = Sequence(input_shape, config['inner_encoder'])
+        state_encoder = RNNEncoder(sequence_encoder,
+                                   config.get('rnn_output', sequence_encoder.output_size),
+                                   config.get('rnn_num_layers', 1))
     elif config['state_encoder_type'] == 'multi_embeddings':
-        state_encoder = MultiEmbeddingNetwork(config)
+        state_encoder = MultiEmbeddingNetwork(input_shape, config)
     elif config['state_encoder_type'] == 'cnn_hindsight_encoder':
-        goal_encoder = get_encoder(grid_size, config['goal_encoder'])
-        first_cnn_encoder = get_encoder(grid_size, config['first_cnn_encoder'])
+        goal_encoder = get_encoder(grid_size, config['goal_encoder'], input_shape)
+        first_cnn_encoder = get_encoder(grid_size, config['first_cnn_encoder'], input_shape)
         config['second_cnn_encoder']['input_channels'] = goal_encoder.output_size + first_cnn_encoder.output_shape[0]
         grid_size = first_cnn_encoder.output_shape[1]
-        second_cnn_encoder = get_encoder(grid_size, config['second_cnn_encoder'])
+        second_cnn_encoder = get_encoder(grid_size, config['second_cnn_encoder'], input_shape)
         grid_size = second_cnn_encoder.output_size
         config['fc_encoder']['input_size'] = second_cnn_encoder.output_size
-        fc_encoder = get_encoder(grid_size, config['fc_encoder'])
+        fc_encoder = get_encoder(grid_size, config['fc_encoder'], input_shape)
         state_encoder = ConvGoalStateEncoder(goal_encoder, first_cnn_encoder, second_cnn_encoder, fc_encoder)
     elif config['state_encoder_type'] == 'sequence':
-        state_encoder = Sequence(grid_size, config)
+        state_encoder = Sequence(input_shape, config)
     elif config['state_encoder_type'] == 'parallel':
-        state_encoder = Parallel(grid_size, config)
+        state_encoder = Parallel(input_shape, config)
     elif config['state_encoder_type'] == 'permute':
-        state_encoder = Permute(*config['channels'])
+        state_encoder = Permute(input_shape, *config['channels'])
     elif config['state_encoder_type'] == 'split':
-        state_encoder = Split(dim=config['dim'],
-                              channels_names=config.get('channels_names', None),
-                              squeeze=config.get('squeeze', False))
+        state_encoder = Split(input_shape, config)
     elif config['state_encoder_type'] == 'concat':
-        state_encoder = Concat(dim=config['dim'])
+        state_encoder = Concat(input_shape, config)
+    elif config['state_encoder_type'] == 'sigmoid':
+        state_encoder = Sigmoid(input_shape, config)
+    elif config['state_encoder_type'] == 'tanh':
+        state_encoder = Tanh(input_shape, config)
+    elif config['state_encoder_type'] == 'flatten':
+        state_encoder = Flatten(input_shape, config)
+    elif config['state_encoder_type'] == 'reshape':
+        state_encoder = Reshape(input_shape, config)
+    elif config['state_encoder_type'] == 'dict_choose':
+        state_encoder = DictChoose(input_shape, config)
+    elif config['state_encoder_type'] == 'noise_vec':
+        state_encoder = NoiseVec(input_shape, config)
     else:
         raise AttributeError(f"unknown nn_type '{config['master.state_encoder_type']}'")
 

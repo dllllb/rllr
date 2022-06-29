@@ -56,3 +56,10 @@ class RunningMeanStd(object):
         self.mean = new_mean
         self.var = new_var
         self.count = new_count
+
+
+def get_output_shape(model, input_shape):
+    test_input = torch.zeros(1, *input_shape)
+    with torch.no_grad():
+        test_out = model(test_input)
+    return tuple(test_out.shape[1:])
