@@ -14,8 +14,7 @@ class Discriminator(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(emb_size, 128),
             nn.LeakyReLU(inplace=True),
-            nn.Linear(128, 1),
-            nn.LogSigmoid()
+            nn.Linear(128, 1)
         )
 
     def forward(self, t):
@@ -104,7 +103,7 @@ class GAN:
 
     def generate(self, states):
         with torch.no_grad():
-            return self.gen(states)
+            return self.gen.mu(states)
 
 
 
