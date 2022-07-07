@@ -1,36 +1,41 @@
 import torch
 from torch import nn
+from env import gen_env_with_seed
+from utils import train_vae, rollout
+from vae import VAE
+from rllr.env import make_vec_envs
 import os
 from tqdm import trange
-import numpy as np
-from env import gen_env_with_seed
-from vae import VAE
-from utils import train_vae, rollout
-from matplotlib import pyplot as plt
 
-from rllr.env import make_vec_envs
+
+class Discriminator(nn.Module):
+    def __init__(self, emb_size):
+        super(Discriminator, self).__init__()
+        self.net = nn.Sequential(
+            nn.Linear(emb_size, 128),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(128, 1),
+            nn.LogSigmoid()
+        )
+
+    def forward(self, t):
+        return self.net(t)
 
 
 class Master(nn.Module):
-    def __init__(self, vae, emb_size=256):
+    def __init__(self, emb_size):
         super(Master, self).__init__()
-        self.enc = vae.enc
-        self.dec = vae.dec
-        for param in self.enc.parameters():
-            param.requires_grad = False
-        for param in self.dec.parameters():
-            param.requires_grad = False
-
+        print(emb_size)
         self.mu = nn.Sequential(
-            nn.Linear(in_features=emb_size, out_features=emb_size),
+            nn.Linear(emb_size, emb_size),
             nn.LeakyReLU(inplace=True),
-            nn.Linear(in_features=emb_size, out_features=emb_size)
+            nn.Linear(emb_size, emb_size)
         )
 
-        self.std = nn.Sequential(
-            nn.Linear(in_features=emb_size, out_features=emb_size),
+        self.logstd = nn.Sequential(
+            nn.Linear(emb_size, emb_size),
             nn.LeakyReLU(inplace=True),
-            nn.Linear(in_features=emb_size, out_features=emb_size)
+            nn.Linear(emb_size, emb_size)
         )
 
     def sample(self, mu, logvar):
@@ -39,43 +44,75 @@ class Master(nn.Module):
         return eps.mul(std).add_(mu)
 
     def forward(self, t):
-        hid = self.enc(x.float() / 255.)
-        mu, logvar = self.mu(hid), self.std(hid)
-        z = self.sample(mu, logvar)
-        rx = self.dec(z)
-        return rx, mu, logvar
-
-    def loss(self, recon_x, x, mu, logvar):
-        # reconstruction losses are summed over all elements and batch
-        recon_loss = F.binary_cross_entropy(recon_x, x.float() / 255., reduction='sum')
-
-        # see Appendix B from VAE paper:
-        # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
-        # https://arxiv.org/abs/1312.6114
-        # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-        kl_diverge = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-
-        return (recon_loss + self.beta * kl_diverge) / x.shape[0]  # divide total loss by batch size
+        mu, logstd = self.mu(t), self.logstd(t)
+        return self.sample(mu, logstd)
 
 
-def update_master(vae, optimizer, states, initial_states, batch_size=32):
-    rec_loss = []
-    for _ in range(states.shape[0] // batch_size):
-        ids = torch.randint(0, states.shape[0], (batch_size,))
-        imgs = states[ids]
-        rec, mu, logvar = vae(imgs)
 
-        optimizer.zero_grad()
-        loss = vae.loss(rec, initial_states, mu, logvar)
-        loss.backward()
-        optimizer.step()
+class GAN:
+    def __init__(self, state_shape, batch_size=32, device='cpu'):
+        self.gen = Master(state_shape).to(device)
+        self.gen_opt = torch.optim.RMSprop(self.gen.parameters(), lr=5e-5)
 
-        rec_loss.append(loss.detach().cpu().numpy())
-    return np.mean(rec_loss)
+        self.discr = Discriminator(state_shape).to(device)
+        self.discr_opt = torch.optim.RMSprop(self.discr.parameters(), lr=5e-5)
+
+        self.batch_size = batch_size
+        self.device = device
+
+    def update(self, states):
+        gen_loss_epoch = 0
+        gen_dist = 0
+        discr_loss_epoch = 0
+
+        n_updates = states.shape[0] // self.batch_size
+
+        for i in range(n_updates):
+            ids = torch.randint(0, states.shape[0], (self.batch_size,))
+            x = states[ids]
+
+            for _ in range(5):
+                self.discr_opt.zero_grad()
+
+                Gz = self.gen(states[ids])
+                logits_fake = self.discr(Gz).mean()
+                logits_real = self.discr(x).mean()
+
+                discr_loss = (logits_fake - logits_real)
+                discr_loss.backward()
+
+                for p in self.discr.parameters():
+                    p.data.clamp_(-0.01, 0.01)
+                # torch.nn.utils.clip_grad_norm_(self.discr.parameters(), 0.5)
+
+                self.discr_opt.step()
+                discr_loss_epoch += discr_loss.item()
+
+
+            self.gen_opt.zero_grad()
+            Gz = self.gen(states[ids])
+            mse_dist = torch.nn.functional.mse_loss(Gz, states[ids])
+            gen_dist += mse_dist.detach().cpu()
+            logits_fake = -self.discr(Gz).mean()
+            (logits_fake - torch.clip(mse_dist, 0, 1)).backward()
+            # torch.nn.utils.clip_grad_norm_(self.gen.parameters(), 0.5)
+            self.gen_opt.step()
+            gen_loss_epoch += logits_fake.item()
+
+
+        return gen_loss_epoch / n_updates, discr_loss_epoch / n_updates / 5, gen_dist / n_updates
+
+    def generate(self, states):
+        with torch.no_grad():
+            return self.gen(states)
+
 
 
 if __name__ == '__main__':
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    emb_size = 256
+    n_epoch = 1000
+    test = False
 
     env = make_vec_envs(
         lambda env_id: lambda: gen_env_with_seed(env_id),
@@ -83,21 +120,38 @@ if __name__ == '__main__':
         device=device
     )
 
-    vae = VAE(env.observation_space.shape, 256).to(device)
+
+    vae = VAE(env.observation_space.shape, emb_size=emb_size).to(device)
+    gan = GAN(emb_size, device=device)
 
     if os.path.isfile('vae.pt'):
         vae.load_state_dict(torch.load('vae.pt', map_location=device))
     else:
         train_vae(env, vae)
 
-    master = Master(vae).to(device)
+    if test:
+        gan.gen.load_state_dict(torch.load('master.pt', map_location=device))
+        gan.discr.load_state_dict(torch.load('discr.pt', map_location=device))
 
-    optimizer = torch.optim.Adam(vae.parameters())
+    for epoch in trange(n_epoch):
+        with torch.no_grad():
+            states = rollout(env)
+            states_enc = vae.encode(states)
 
-    initial_states = env.reset()
-    for epoch in trange(1000):
-        target_states = rollout(env)
-        rec_loss = update_master(vae, optimizer, target_states, initial_states, batch_size=32)
-        print('rec_loss', rec_loss)
-        torch.save(master.state_dict(), 'master.pt')
+            if test:
+                gen_enc = gan.generate(states_enc)
+                dec = vae.decode(gen_enc)
+                from matplotlib import pyplot as plt
+                for i, d in enumerate(dec):
+                    f, axarr = plt.subplots(1, 2)
+                    axarr[0].imshow(states[i].permute(1, 2, 0) / 255.)
+                    axarr[1].imshow(d.permute(1, 2, 0))
+                    plt.show()
+                exit(0)
+
+
+        print(gan.update(states_enc))
+
+        torch.save(gan.gen.state_dict(), 'master.pt')
+        torch.save(gan.discr.state_dict(), 'discr.pt')
 
