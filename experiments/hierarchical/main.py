@@ -91,7 +91,7 @@ class GAN:
 
     def generate(self, states):
         with torch.no_grad():
-            return self.gen(torch.cat([states, torch.randn_like(states)], dim=1))
+            return self.gen(torch.cat([states, torch.zeros_like(states)], dim=1))
 
 
 
@@ -129,10 +129,13 @@ if __name__ == '__main__':
                 gen_enc = gan.generate(states_enc)
                 dec = vae.decode(gen_enc)
                 from matplotlib import pyplot as plt
+                import time
                 for i, d in enumerate(dec):
                     f, axarr = plt.subplots(1, 2)
                     axarr[0].imshow(states[i].permute(1, 2, 0) / 255.)
+                    axarr[0].set_title('state')
                     axarr[1].imshow(d.permute(1, 2, 0))
+                    axarr[1].set_title('goal')
                     plt.show()
                 exit(0)
 

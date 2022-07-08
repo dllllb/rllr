@@ -22,7 +22,7 @@ class GoalWrapper(gym.Wrapper):
 
 
 def gen_env_with_seed(seed):
-    env = gym.make('MiniGrid-Empty-8x8-v0')
+    env = gym.make('MiniGrid-Empty-8x8-v0', agent_start_pos=None)
     env.seed(seed=seed)
     env = RGBImgObsWrapper(env, tile_size=8)
     env = GoalWrapper(env)

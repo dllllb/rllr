@@ -3,6 +3,7 @@ from tqdm import trange, tqdm
 import torch
 from matplotlib import pyplot as plt
 from torch import nn
+import gym_minigrid
 
 
 def init_params(m):
