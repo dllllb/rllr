@@ -24,27 +24,13 @@ class Discriminator(nn.Module):
 class Master(nn.Module):
     def __init__(self, emb_size):
         super(Master, self).__init__()
-        self.mu = nn.Sequential(
+        self.net = nn.Sequential(
             nn.Linear(emb_size * 2, emb_size),
             nn.LeakyReLU(inplace=True),
             nn.Linear(emb_size, emb_size)
         )
-
-        self.logstd = nn.Sequential(
-            nn.Linear(emb_size * 2, emb_size),
-            nn.LeakyReLU(inplace=True),
-            nn.Linear(emb_size, emb_size)
-        )
-
-    def sample(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)  # e^(1/2 * log(std^2))
-        eps = torch.randn_like(std)  # random ~ N(0, 1)
-        return eps.mul(std).add_(mu)
-
     def forward(self, t):
-        mu, logstd = self.mu(t), self.logstd(t)
-        return self.sample(mu, logstd)
-
+        return self.net(t)
 
 
 class GAN:
@@ -94,7 +80,7 @@ class GAN:
             mse_dist = torch.nn.functional.mse_loss(Gz, states[ids])
             gen_dist += mse_dist.detach().cpu()
             logits_fake = -self.discr(Gz).mean()
-            (logits_fake - torch.clip(mse_dist, 0, 1)).backward()
+            (logits_fake - torch.clip(mse_dist, 0, 0.1)).backward()
             # torch.nn.utils.clip_grad_norm_(self.gen.parameters(), 0.5)
             self.gen_opt.step()
             gen_loss_epoch += logits_fake.item()
