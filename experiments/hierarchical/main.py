@@ -29,6 +29,7 @@ class Master(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.Linear(emb_size, emb_size)
         )
+
     def forward(self, t):
         return self.net(t)
 
