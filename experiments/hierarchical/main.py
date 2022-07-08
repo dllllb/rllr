@@ -24,15 +24,14 @@ class Discriminator(nn.Module):
 class Master(nn.Module):
     def __init__(self, emb_size):
         super(Master, self).__init__()
-        print(emb_size)
         self.mu = nn.Sequential(
-            nn.Linear(emb_size, emb_size),
+            nn.Linear(emb_size * 2, emb_size),
             nn.LeakyReLU(inplace=True),
             nn.Linear(emb_size, emb_size)
         )
 
         self.logstd = nn.Sequential(
-            nn.Linear(emb_size, emb_size),
+            nn.Linear(emb_size * 2, emb_size),
             nn.LeakyReLU(inplace=True),
             nn.Linear(emb_size, emb_size)
         )
@@ -65,6 +64,8 @@ class GAN:
         discr_loss_epoch = 0
 
         n_updates = states.shape[0] // self.batch_size
+        noize = torch.randn_like(states)
+        gen_inp = torch.cat([states, noize], dim=1)
 
         for i in range(n_updates):
             ids = torch.randint(0, states.shape[0], (self.batch_size,))
@@ -73,7 +74,7 @@ class GAN:
             for _ in range(5):
                 self.discr_opt.zero_grad()
 
-                Gz = self.gen(states[ids])
+                Gz = self.gen(gen_inp[ids])
                 logits_fake = self.discr(Gz).mean()
                 logits_real = self.discr(x).mean()
 
@@ -89,7 +90,7 @@ class GAN:
 
 
             self.gen_opt.zero_grad()
-            Gz = self.gen(states[ids])
+            Gz = self.gen(gen_inp[ids])
             mse_dist = torch.nn.functional.mse_loss(Gz, states[ids])
             gen_dist += mse_dist.detach().cpu()
             logits_fake = -self.discr(Gz).mean()
@@ -103,7 +104,7 @@ class GAN:
 
     def generate(self, states):
         with torch.no_grad():
-            return self.gen.mu(states)
+            return self.gen(torch.cat([states, torch.randn_like(states)], dim=1))
 
 
 
