@@ -14,6 +14,10 @@ class Discriminator(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(emb_size, 128),
             nn.LeakyReLU(inplace=True),
+            nn.Dropout(p=0.3),
+            nn.Linear(128, 128),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(p=0.1),
             nn.Linear(128, 1)
         )
 
