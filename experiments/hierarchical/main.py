@@ -31,6 +31,8 @@ class Master(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(emb_size, emb_size),
             nn.LeakyReLU(inplace=True),
+            nn.Linear(emb_size, emb_size),
+            nn.LeakyReLU(inplace=True),
             nn.Linear(emb_size, emb_size)
         )
 
@@ -112,7 +114,6 @@ if __name__ == '__main__':
         num_processes=32,
         device=device
     )
-
 
     vae = VAE(env.observation_space.shape, emb_size=emb_size).to(device)
     gan = GAN(emb_size, device=device)
