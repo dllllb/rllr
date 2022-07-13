@@ -25,7 +25,7 @@ class Master(nn.Module):
     def __init__(self, emb_size):
         super(Master, self).__init__()
         self.net = nn.Sequential(
-            nn.Linear(emb_size * 2, emb_size),
+            nn.Linear(emb_size, emb_size),
             nn.LeakyReLU(inplace=True),
             nn.Linear(emb_size, emb_size)
         )
@@ -52,7 +52,8 @@ class GAN:
 
         n_updates = states.shape[0] // self.batch_size
         noize = torch.randn_like(states)
-        gen_inp = torch.cat([states, noize], dim=1)
+        # gen_inp = torch.cat([states, noize], dim=1)
+        gen_inp = noize
 
         for i in range(n_updates):
             ids = torch.randint(0, states.shape[0], (self.batch_size,))
@@ -81,7 +82,8 @@ class GAN:
             mse_dist = torch.nn.functional.mse_loss(Gz, states[ids])
             gen_dist += mse_dist.detach().cpu()
             logits_fake = -self.discr(Gz).mean()
-            (logits_fake - torch.clip(mse_dist, 0, 0.1)).backward()
+            # (logits_fake - torch.clip(mse_dist, 0, 0.1)).backward()
+            logits_fake.backward()
             # torch.nn.utils.clip_grad_norm_(self.gen.parameters(), 0.5)
             self.gen_opt.step()
             gen_loss_epoch += logits_fake.item()
@@ -91,7 +93,7 @@ class GAN:
 
     def generate(self, states):
         with torch.no_grad():
-            return self.gen(torch.cat([states, torch.zeros_like(states)], dim=1))
+            return self.gen(torch.randn_like(states))
 
 
 
