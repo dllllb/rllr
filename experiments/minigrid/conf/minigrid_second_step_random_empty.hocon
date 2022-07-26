@@ -1,0 +1,70 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-Empty-8x8-v0,
+    action_size: 3,
+    rgb_image: true,
+    tile_size: 8,
+    num_processes: 16
+  },
+
+  vae: {
+    path: ../artifacts/minigrid/models/minigrid_random_empty_vae.p,
+    device: "cpu",
+  },
+
+  discriminator{
+    state_encoder_type: sequence,
+    transformations: [mlp],
+    mlp: {
+      state_encoder_type: mlp_encoder,
+      hidden_layers_sizes: [256, 128, 128, 1],
+      dropout: [0.3, 0.3, 0.3, 0],
+      activation_type: leaky_relu
+      last_layer_activation: False,
+    },
+  },
+
+  worker_agent: {
+    path: ../artifacts/minigrid/models/minigrid_worker_random_empty_gauss.p,
+    device: "cpu"
+  }
+
+  master: {
+    state_encoder_type: mlp_encoder,
+    hidden_layers_sizes: [256, 512],
+    activation_type: leaky_relu
+    head: {
+        hidden_size: []
+    },
+  }
+
+  agent: {
+    device: "cpu",
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.000001,
+    lr: 0.001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.99,
+    gae_lambda: 0.95
+  }
+
+  training: {
+    n_env_steps: 20000000,
+    worker_n_steps: 5,
+    n_steps: 128,
+    n_processes: 16,
+    verbose: 1,
+  },
+
+  seed: 42,
+
+  outputs: {
+      model: ../artifacts/minigrid/models/minigrid_master_random_empty_2.p,
+      logs: ../artifacts/minigrid/logs/minigrid_master_random_empty_2
+  }
+}

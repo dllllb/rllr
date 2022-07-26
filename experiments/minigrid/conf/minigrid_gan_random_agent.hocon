@@ -1,10 +1,11 @@
 {
   env: {
     env_type: gym_minigrid,
-    env_task: MiniGrid-Empty-Random-6x6-v0,
+    env_task: MiniGrid-Empty-8x8-v0,
     action_size: 3,
     rgb_image: true,
-    tile_size: 4,
+    tile_size: 8,
+    random_start_pos: True
   },
 
   generator: {
@@ -27,7 +28,7 @@
     },
     noise: {
       state_encoder_type: noise_vec,
-      vec_size: 108,
+      vec_size: 36,
     },
     mlp: {
       state_encoder_type: mlp_encoder,
@@ -36,12 +37,12 @@
     },
     reshape: {
       state_encoder_type: reshape,
-      shape: [3, 6, 6],
+      shape: [1, 6, 6],
     }
     cnn_decoder: {
       state_encoder_type: cnn_encoder,
       conv_type: decode,
-      n_channels: [64, 32, 16, 3],
+      n_channels: [32, 32, 16, 3],
       kernel_sizes: [4, 4, 3, 3],
       strides: [2, 2, 1, 1],
       paddings: [1, 1, 1, 1],
@@ -54,7 +55,7 @@
       state_encoder_type: sigmoid,
     },
     tanh: {
-      state_encoder_type: sigmoid,
+      state_encoder_type: tanh,
     }
   },
 
@@ -78,7 +79,6 @@
       paddings: [0, 1, 1],
       batch_norm: [0, 1, 1]
       pre_permute: [0, 3, 1, 2],
-      unit_norm: True,
       activation_type: leaky_relu
     },
     flatten: {
@@ -103,7 +103,7 @@
     agent_steps: 2,
     generator_lr: 0.0002,
     discriminator_lr: 0.0002,
-    max_grad_norm: 0.1,
+    max_grad_norm: 0.2,
     disc_update_n: 1,
     n_steps: 1000000,
     n_processes: 16,
@@ -111,6 +111,7 @@
     verbose: 10,
     device: cpu,
     pool_size: 1000,
+    epochs: 100,
   },
 
   seed: 42,
@@ -118,5 +119,7 @@
   outputs: {
     model: ../artifacts/minigrid/models/minigrid_gan_random_agent.p,
     logs: ../artifacts/minigrid/logs/minigrid_gan_random_agent
+    vae: ../artifacts/minigrid/models/minigrid_random_empty_vae.p
+    vae_logs: ../artifacts/minigrid/logs/minigrid_random_empty_vae
   }
 }

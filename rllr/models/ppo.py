@@ -187,6 +187,15 @@ class ContiniousActorNetwork(nn.Module):
 
         return action, dist, rnn_hxs
 
+    def deterministic_forward(self, states, rnn_hxs, masks):
+        if self.is_recurrent:
+            states_encoding, rnn_hxs = self.state_encoder(states, rnn_hxs, masks)
+        else:
+            states_encoding = self.state_encoder(states)
+
+        mu = self.fc(states_encoding)
+        return mu
+
 
 class MultiOutputActorNetwork(nn.Module):
     def __init__(self, action_space, state_encoder, hidden_size, is_recurrent):
@@ -457,6 +466,9 @@ class ActorCriticNetwork(nn.Module):
         return self.critic.forward(states, rnn_hxs, masks, encodings_feeded=getattr(self, 'same_encoders', False)), \
                action, dist.log_probs(action), actor_rnn_hxs
 
+    def deterministic_forward(self, states, rnn_hxs=None, masks=None):
+        return self.actor.deterministic_forward(states, rnn_hxs, masks)
+
     def get_value(self, states, rnn_hxs, masks):
         return self.critic.forward(states, rnn_hxs, masks)
 
@@ -478,14 +490,3 @@ class ActorCriticNetwork(nn.Module):
         values = self.critic.forward(states, rnn_hxs, masks,
                                      encodings_feeded=getattr(self, 'same_encoders', False))
         return values, dist.log_probs(actions), dist.entropy().mean(), rnn_hxs
-
-    def parameters(self, recurse: bool = True):
-        for name, param in self.named_parameters(recurse=recurse):
-            if 'embed_layers' not in name:
-                yield param
-
-    def embed_parameters(self, recurse: bool = True):
-        for name, param in self.named_parameters(recurse=recurse):
-            if 'embed_layers' in name:
-                #param.requires_grad = False
-                yield param

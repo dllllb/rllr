@@ -38,6 +38,11 @@ class EmptyEnvRandom(EmptyEnv):
         self.mission = "get to the green goal square"
 
 
+class EmptyEnvRandom6x6(EmptyEnvRandom):
+    def __init__(self):
+        super().__init__(size=6)
+
+
 class KeyCorridorNoSameColors(KeyCorridor):
     def __init__(self, num_rows=3, obj_type="ball", room_size=6, seed=None):
         self.door_object_ind = OBJECT_TO_IDX['door']
@@ -214,6 +219,9 @@ register(id='MiniGrid-Empty-32x32-v0',
 
 register(id='MiniGrid-Empty-RandomGoal-8x8-v0',
          entry_point='rllr.env.custom_envs:EmptyEnvRandom')
+
+register(id='MiniGrid-Empty-RandomGoal-6x6-v0',
+         entry_point='rllr.env.custom_envs:EmptyEnvRandom6x6')
 
 register(id='MiniGrid-KeyCorridorNoSameColorsS6R3-v0',
          entry_point='rllr.env.custom_envs:KeyCorridorNoSameColors')

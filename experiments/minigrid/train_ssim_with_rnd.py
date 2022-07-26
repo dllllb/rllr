@@ -122,7 +122,7 @@ def train_ssim_with_rnd(env, agent, ssim, conf):
     action_stats = defaultdict(int)
 
     for j in trange(num_updates):
-        update_linear_schedule(agent.optimizer, j, num_updates, conf['agent.lr'])
+        update_linear_schedule(agent.agent_optimizer, j, num_updates, conf['agent.lr'])
 
         for step in range(conf['training.n_steps']):
             # Sample actions

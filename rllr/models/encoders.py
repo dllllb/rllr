@@ -63,6 +63,7 @@ class MLPEncoder(nn.Module):
 
         self.fc_net = nn.Sequential(*layers)
         self.output_shape = (*input_shape[:-1], input_size)
+        self.output_size = self.output_shape[-1]
 
     def forward(self, x):
         if self.unit_norm:
@@ -79,7 +80,7 @@ class Sigmoid(nn.Module):
         return torch.sigmoid(x)
 
 
-class Tanh():
+class Tanh(nn.Module):
     def __init__(self, input_shape, config):
         super().__init__()
         self.output_shape = input_shape
@@ -121,10 +122,11 @@ class Reshape(nn.Module):
 
 
 class Permute(nn.Module):
-    def __init__(self, input_shape, *args):
+    #def __init__(self, input_shape, *args):
+    def __init__(self, *args):
         super().__init__()
-        input_shape = ['bs', *input_shape]
-        self.output_shape = tuple([input_shape[d] for d in args])[1:]
+        #input_shape = ['bs', *input_shape]
+        #self.output_shape = tuple([input_shape[d] for d in args])[1:]
         self.dims = args
 
     def forward(self, x):

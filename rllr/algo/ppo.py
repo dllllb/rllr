@@ -27,9 +27,7 @@ class PPO:
 
         self.max_grad_norm = max_grad_norm
 
-        self.optimizer = optim.Adam([{'params': actor_critic.parameters()},
-                                     {'params': actor_critic.embed_parameters(), 'lr': 0.000001}],
-                                    lr=lr, eps=eps)
+        self.optimizer = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
 
     def to(self, device):
         self.actor_critic = self.actor_critic.to(device)
