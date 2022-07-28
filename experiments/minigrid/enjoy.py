@@ -47,13 +47,13 @@ def test():
         'rnd_ppo_doorkey_fixed_seed': (0.9564062356948853, 1.0),
         'rnd_ppo_fourrooms_fixed_seed': (0.0, 0.0),
         'rnd_ppo_keycorridor_fixed_seed': (0.7099999785423279, 1.0),
-        #'rnd_ppo_putnear_fixed_seed': (0.01, 0.01),
+        'rnd_ppo_putnear_fixed_seed': (0.01, 0.01),
 
-        #'multi': (0.77222222, 1.0),
+        'multi': (0.77222222, 1.0),
         'ssim_lava_fixed_seed': (0.925000011920929, 1.0),
         'ssim_lava_fixed_go_agent': (0.949999988079071, 1),
         'goal_keycorridor_worker': (0.7599999904632568, 1),
-        #'goal_keycorridor_master': (0.8633333444595337, 1)
+        'goal_keycorridor_master': (0.8633333444595337, 1)
     }
 
     for algo, (expected_reward, expected_success) in algos.items():
