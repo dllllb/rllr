@@ -26,7 +26,7 @@
   },
 
   worker_agent: {
-    path: ../artifacts/minigrid/models/minigrid_worker_random_empty_gauss.p,
+    path: ../artifacts/minigrid/models/minigrid_worker_random_empty.p,
     device: "cpu"
   }
 
@@ -64,7 +64,7 @@
   seed: 42,
 
   outputs: {
-      model: ../artifacts/minigrid/models/minigrid_master_random_empty_2.p,
-      logs: ../artifacts/minigrid/logs/minigrid_master_random_empty_2
+      model: ../artifacts/minigrid/models/minigrid_master_random_empty.p,
+      logs: ../artifacts/minigrid/logs/minigrid_master_random_empty
   }
 }

@@ -63,5 +63,7 @@
   outputs: {
     model: ../artifacts/minigrid/models/minigrid_worker_random_empty_vae.p,
     logs: ../artifacts/minigrid/logs/minigrid_worker_random_empty_vae
+    vae: ../artifacts/minigrid/models/minigrid_random_empty_vae.p
+    vae_logs: ../artifacts/minigrid/logs/minigrid_random_empty_vae
   }
 }

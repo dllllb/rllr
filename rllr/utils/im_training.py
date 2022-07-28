@@ -63,7 +63,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
     episode_stats = defaultdict(lambda: defaultdict(lambda: deque(maxlen=10)))
 
     for epoch in trange(num_updates):
-        update_linear_schedule(agent.agent_optimizer, epoch, num_updates, conf['agent.lr'])
+        update_linear_schedule(agent.optimizer, epoch, num_updates, conf['agent.lr'])
 
         for step in range(conf['training.n_steps']):
             # Sample actions

@@ -5,7 +5,6 @@ from .wrappers import FullyRenderWrapper
 from .wrappers import IntrinsicEpisodicReward
 from .wrappers import EpisodeInfoWrapper
 from .wrappers import HierarchicalWrapper
-from .wrappers import HierarchicalWrapperVAE
 from .wrappers import ZeroRewardWrapper
 from .wrappers import HashCounterWrapper
 from .wrappers import TripletNavigationWrapper

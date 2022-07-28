@@ -122,11 +122,19 @@ class Reshape(nn.Module):
 
 
 class Permute(nn.Module):
-    #def __init__(self, input_shape, *args):
     def __init__(self, *args):
         super().__init__()
-        #input_shape = ['bs', *input_shape]
-        #self.output_shape = tuple([input_shape[d] for d in args])[1:]
+        self.dims = args
+
+    def forward(self, x):
+        return x.permute(self.dims)
+
+
+class PermuteLayer(nn.Module):
+    def __init__(self, input_shape, *args):
+        super().__init__()
+        input_shape = ['bs', *input_shape]
+        self.output_shape = tuple([input_shape[d] for d in args])[1:]
         self.dims = args
 
     def forward(self, x):
@@ -284,7 +292,7 @@ class SimpleCNNEncoder(nn.Module):
             raise NotImplementedError(f'{conf["activation_type"]} activation type not implemented')
 
         if pre_permute:
-            self.pre_permute = Permute(input_shape, *pre_permute)
+            self.pre_permute = PermuteLayer(input_shape, *pre_permute)
             input_shape = self.pre_permute.output_shape
         else:
             self.pre_permute = None
@@ -311,7 +319,7 @@ class SimpleCNNEncoder(nn.Module):
         input_shape = get_output_shape(self.conv_net, input_shape)
 
         if post_permute:
-            self.post_permute = Permute(input_shape, *post_permute)
+            self.post_permute = PermuteLayer(input_shape, *post_permute)
             input_shape = self.post_permute.output_shape
         else:
             self.post_permute = None
@@ -790,7 +798,7 @@ def get_encoder(grid_size, config, input_shape=None):
     elif config['state_encoder_type'] == 'parallel':
         state_encoder = Parallel(input_shape, config)
     elif config['state_encoder_type'] == 'permute':
-        state_encoder = Permute(input_shape, *config['channels'])
+        state_encoder = PermuteLayer(input_shape, *config['channels'])
     elif config['state_encoder_type'] == 'split':
         state_encoder = Split(input_shape, config)
     elif config['state_encoder_type'] == 'concat':

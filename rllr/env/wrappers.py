@@ -306,7 +306,6 @@ class NavigationGoalWrapper(gym.Wrapper):
         state = super().reset()
         self.gen_goal(state)
         self.is_goal_achieved = False
-        self.curr_steps = 0
         return state
 
     def step(self, action):
@@ -330,34 +329,10 @@ class RandomGoalWrapper(NavigationGoalWrapper):
     def __init__(self, env, goal_achieving_criterion, random_goal_generator, verbose=False):
         self.verbose = verbose
         self.random_goal_generator = random_goal_generator
-        self.max_steps = 10
         super().__init__(env, goal_achieving_criterion)
 
     def gen_goal_(self, state):
-        #self.goal_state = next(self.random_goal_generator)
-        ##
-        curr_pos = self.unwrapped.agent_pos
-        self.unwrapped.agent_pos = np.random.randint(0, 4, 2) + 1
-        self.goal_state, _, _, _ = self.env.step(1)
-        self.unwrapped.agent_pos = curr_pos
-        self.env.step(0)
-
-    def step(self, action):
-        next_state, env_reward, _, info = self.env.step(action)
-        self.is_goal_achieved = self._goal_achieved(next_state)
-        self.curr_steps += 1
-
-        if self.is_goal_achieved:
-            reward = 1 - 0.9 * (self.curr_steps / self.max_steps)
-        else:
-            reward = 0
-
-        if self.is_goal_achieved or self.curr_steps >= self.max_steps:
-            done = True
-        else:
-            done = False
-
-        return next_state, reward, done, info
+        self.goal_state = next(self.random_goal_generator)
 
 
 class FromBufferGoalWrapper(NavigationGoalWrapper):
@@ -755,38 +730,6 @@ class HierarchicalWrapper(gym.Wrapper):
             cum_reward += reward
             step += 1
         return self.state, cum_reward, done, info
-
-
-class HierarchicalWrapperVAE(HierarchicalWrapper):
-    def __init__(self, vae, env, low_level_policy, action_shape, n_steps=1):
-        super(HierarchicalWrapper, self).__init__(env)
-        self.policy = low_level_policy
-        self.state = None
-        self.n_steps = n_steps
-        self.action_space = gym.spaces.Box(-1, 1, action_shape)
-        self.vae = vae
-
-    def reset(self):
-        self.state = self.env.reset()
-        return self.encode(torch.from_numpy(self.state))
-
-    def encode(self, img):
-        return self.vae.encoder(img)
-
-    def decode(self, code):
-        return self.vae.decode(code)
-
-    def step(self, action):
-        cum_reward, step, done, info = 0, 0, False, {}
-        while not done and step < self.n_steps:
-            _, low_action, _, _ = self.policy.act({
-                'image': torch.from_numpy(self.state).unsqueeze(dim=0),
-                'goal_emb': torch.from_numpy(action).unsqueeze(dim=0)
-            }, None, None, deterministic=True)
-            self.state, reward, done, info = self.env.step(low_action)
-            cum_reward += reward
-            step += 1
-        return self.encode(self.state), cum_reward, done, info
 
 
 class ZeroRewardWrapper(gym.Wrapper):

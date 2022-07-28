@@ -27,6 +27,44 @@ def init_params(m):
         nn.init.constant_(m.bias, 0)
 
 
+class VAEEncoder(nn.Module):
+    def __init__(self, vae):
+        super().__init__()
+        self.vae = vae
+        for p in self.vae.parameters():
+            p.requires_grad = False
+
+    def forward(self, x):
+        with torch.no_grad():
+            #x = self.vae.encode_and_sample(x)
+            x = self.vae.encode(x)
+        return x
+
+
+class VAEDecoder(nn.Module):
+    def __init__(self, vae):
+        super().__init__()
+        self.vae = vae
+        for p in self.vae.parameters():
+            p.requires_grad = False
+
+    def forward(self, x):
+        with torch.no_grad():
+            x = self.vae.decode(x)
+        return x
+
+
+class GaussDropout(nn.Module):
+    def __init__(self, alpha=0.983):
+        super().__init__()
+        self.alpha = alpha
+
+    def forward(self, x):
+        noise = torch.randn_like(x)
+        x = x * (1 + self.alpha * noise)
+        return x
+
+
 class VAE(nn.Module):
     def __init__(self, state_shape, emb_size=256):
         super(VAE, self).__init__()
@@ -109,6 +147,7 @@ class VAE(nn.Module):
 def gen_env(conf, seed):
     conf['env']['deterministic'] = True
     conf['env']['seed'] = seed
+    conf['env']['random_start_pos'] = True
     verbose = 0
     env = environments.minigrid_envs.gen_wrapped_env(conf['env'], verbose=verbose)
     return EpisodeInfoWrapper(env)
@@ -129,8 +168,6 @@ def train_vae(vae, data, writer, conf):
     total_iter = 0
 
     for epoch in range(5000):
-        train_data = iter(data)
-
         print("training epoch %d" % epoch)
         for x, in tqdm(data):
             optimizer.zero_grad()

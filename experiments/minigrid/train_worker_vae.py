@@ -1,5 +1,6 @@
 import logging
 import torch
+from torch import nn
 
 import rllr.env as environments
 import rllr.models as models
@@ -9,25 +10,12 @@ from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper
 from rllr.models import encoders
 from rllr.utils import train_ppo, im_train_ppo, get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
-from vae import VAE
-from torch import nn
+from vae import VAE, VAEEncoder, GaussDropout
+
+from copy import deepcopy
 
 
 logger = logging.getLogger(__name__)
-
-
-class VAEEncoder(nn.Module):
-    def __init__(self, vae):
-        super().__init__()
-        self.vae = vae
-        for p in self.vae.parameters():
-            p.requires_grad = False
-
-    def forward(self, x):
-        with torch.no_grad():
-            x = self.vae.encode_and_sample(x)
-            #x = self.vae.encode(x)
-        return x
 
 
 def get_goal_achieving_criterion(config):
@@ -95,31 +83,8 @@ def get_encoders(env, conf):
     return state_encoder, goal_state_encoder
 
 
-####
-
-import torch
-from torch import nn
-
-class GaussDropout(nn.Module):
-    def __init__(self, alpha=0.983):
-        super().__init__()
-        self.alpha = alpha
-
-    def forward(self, x):
-        #noise = torch.randn_like(x)
-        #x = x * (1 + self.alpha * noise)
-        return x
-####
-
-
 def get_hindsight_state_encoder(state_encoder, goal_state_encoder, config):
-    hidden_size_master = config['master']['head.hidden_size']
-    emb_size = config['master']['emb_size']
-    # FIXME: DDPG's actor looks strange here
-    #goal_state_encoder = models.ActorNetwork(emb_size, goal_state_encoder, hidden_size_master)
-
-    vae_model = VAE((64, 64, 3))
-
+    vae_model = torch.load(config['master.vae_path'])
     goal_state_encoder = nn.Sequential(VAEEncoder(vae_model), GaussDropout())
     goal_state_encoder.output_size = 256
     return models.GoalStateEncoder(state_encoder=state_encoder, goal_state_encoder=goal_state_encoder)
@@ -142,10 +107,11 @@ def get_ppo_worker_agent(env, config):
         config['agent.max_grad_norm']
     )
 
-    vae_state_dict = torch.load('vae.pt', map_location='cpu')
+    vae_model = torch.load(config['master.vae_path'])
+    state_dict = vae_model.state_dict()
+    vae_state_dict = deepcopy(state_dict)
     ppo.actor_critic.actor.state_encoder.goal_state_encoder.get_submodule('0').vae.load_state_dict(vae_state_dict)
     ppo.actor_critic.critic.state_encoder.goal_state_encoder.get_submodule('0').vae.load_state_dict(vae_state_dict)
-
     return ppo
 
 

@@ -5,11 +5,12 @@ from torch import nn
 from rllr.algo import PPOGAN
 from rllr.env import make_vec_envs, HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward, minigrid_envs
 from rllr.models import encoders, ActorCriticNetwork, StateEmbedder
-from rllr.utils import train_ppo, get_conf, switch_reproducibility_on
+from rllr.utils import train_ppo_with_gan, get_conf, switch_reproducibility_on
 from rllr.utils.logger import init_logger
-from vae import VAE
+from vae import VAE, VAEEncoder, VAEDecoder, GaussDropout
 
-from train_worker_vae import GaussDropout
+from copy import deepcopy
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,43 +32,13 @@ def init_params(m):
         nn.init.constant_(m.bias, 0)
 
 
-class VAEEncoder(nn.Module):
-    def __init__(self, vae):
-        super().__init__()
-        self.vae = vae
-        for p in self.vae.parameters():
-            p.requires_grad = False
-
-    def forward(self, x):
-        with torch.no_grad():
-            x = self.vae.encode(x)
-        return x
-
-
-class VAEDecoder(nn.Module):
-    def __init__(self, vae):
-        super().__init__()
-        self.vae = vae
-        for p in self.vae.parameters():
-            p.requires_grad = False
-
-    def forward(self, x):
-        with torch.no_grad():
-            x = self.vae.decode(x)
-        return x
-
-
 def get_master_agent(env, conf):
-    #vae_model = torch.load(conf['vae']['path'])
-    vae_model = VAE((64, 64, 3))
-    vae_state_dict = torch.load('vae.pt', map_location='cpu')
-    vae_model.load_state_dict(vae_state_dict)
+    vae_model = torch.load(conf['vae.path'])
+    state_dict = vae_model.state_dict()
+    vae_state_dict = deepcopy(state_dict)
 
     encoder = VAEEncoder(vae_model)
     decoder = VAEDecoder(vae_model)
-
-    encoder.vae.load_state_dict(vae_state_dict)
-    decoder.vae.load_state_dict(vae_state_dict)
 
     grid_size = env.observation_space.shape[0]
     actor_state_encoder = nn.Sequential(encoder,
@@ -145,7 +116,7 @@ def main(args=None):
     master_agent.to(config['agent.device'])
 
     logger.info(f"Running agent training: { config['training.n_steps'] * config['training.n_processes']} steps")
-    train_ppo(env, master_agent, config)
+    train_ppo_with_gan(env, master_agent, config)
 
 
 if __name__ == '__main__':

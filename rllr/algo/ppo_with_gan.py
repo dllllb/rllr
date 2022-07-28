@@ -4,8 +4,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-
-
+# TODO: clean it
 import numpy as np
 import gym
 from rllr.env import minigrid_envs
@@ -34,8 +33,6 @@ def datagen(data):
         for batch, in data:
             yield batch
 reals_data = datagen(data)
-
-
 
 
 class BCEGANLoss(nn.Module):
@@ -176,8 +173,6 @@ class PPOGAN:
 
                 self.agent_optimizer.zero_grad()
                 (value_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef + 0.002 * G_loss).backward()
-                #(value_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef).backward()
-                #G_loss.backward()
                 #nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.agent_optimizer.step()
 
