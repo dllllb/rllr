@@ -1,4 +1,4 @@
-from .common import convert_to_torch, switch_reproducibility_on
+from .common import convert_to_torch, switch_reproducibility_on, get_space_shape
 from .training import train_ppo
 from .im_training import im_train_ppo
 from .training_with_gan import train_ppo_with_gan

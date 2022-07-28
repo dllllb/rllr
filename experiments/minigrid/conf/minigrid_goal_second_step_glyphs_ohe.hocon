@@ -22,7 +22,11 @@
     state_encoder_type: sequence_rnn,
     inner_encoder: {
       state_encoder_type: sequence,
-      transformations: [split_channels, embed, permute, cnn_encoder, fc_encoder],
+      transformations: [choose_img, split_channels, embed, permute, cnn_encoder, flatten, fc_encoder],
+      choose_img: {
+        state_encoder_type: dict_choose,
+        key: image,
+      }
       split_channels: {
         state_encoder_type: split,
         dim: -1,
@@ -49,6 +53,9 @@
         strides: [1, 1, 1, 1],
         paddings: [0, 1, 1, 1],
         max_pools: [1, 1, 1, global],
+      },
+      flatten: {
+        state_encoder_type: flatten,
       },
       fc_encoder: {
         state_encoder_type: mlp_encoder,

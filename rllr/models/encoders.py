@@ -66,7 +66,7 @@ class MLPEncoder(nn.Module):
         self.output_size = self.output_shape[-1]
 
     def forward(self, x):
-        if self.unit_norm:
+        if getattr(self, 'unit_norm', False):
             x = x.float() / 255.
         return self.fc_net(x)
 
@@ -144,8 +144,8 @@ class PermuteLayer(nn.Module):
 class Split(nn.Module):
     def __init__(self, input_shape, config):
         super().__init__()
-        self.dim = config['dim'],
-        self.channels_names = config.get('channels_names', None),
+        self.dim = config['dim']
+        self.channels_names = config.get('channels_names', None)
         self.squeeze = config.get('squeeze', False)
 
         base_shape = list(input_shape)
@@ -195,7 +195,7 @@ class DictChoose(nn.Module):
         super().__init__()
         self.key = conf['key']
 
-        assert isinstance(input_shape, dict), f'input shape for Concat layer must be dict'
+        assert isinstance(input_shape, dict), f'input shape for DictChoose layer must be dict'
         self.output_shape = input_shape[self.key]
 
     def forward(self, x):
@@ -331,12 +331,12 @@ class SimpleCNNEncoder(nn.Module):
         if self.unit_norm:
             x = x.float() / 255.
 
-        if self.pre_permute:
+        if getattr(self, 'pre_permute', None):
             x = self.pre_permute(x)
 
         x = self.conv_net(x)
 
-        if self.post_permute:
+        if getattr(self, 'post_permute', None):
             x = self.post_permute(x)
         return x
 
@@ -470,6 +470,7 @@ class MultiEmbeddingNetwork(nn.Module):
     def __init__(self, input_shape, conf):
         super().__init__()
         assert isinstance(input_shape, dict), 'input_shape for MultiEmbeddingNetwork layer must be dict'
+        self.trainable = conf.get('trainable', True)
 
         embed_dims = conf['embed_dims']
         embed_n = conf['embed_n']
@@ -486,6 +487,7 @@ class MultiEmbeddingNetwork(nn.Module):
         embed_layers = dict()
         for i, name in enumerate(self.embed_names):
             embed_layers[name] = embed_l(input_shape[name], embed_n[i], embed_dims[i])
+            sample_input_shape = input_shape[name]
         self.embed_layers = nn.ModuleDict(embed_layers)
 
         fc_in = sum(embed_dims)
@@ -496,7 +498,7 @@ class MultiEmbeddingNetwork(nn.Module):
             fc_in = fc_out
         self.fc_net = nn.Sequential(*fc)
 
-        self.output_shape = (fc_in,)
+        self.output_shape = (*sample_input_shape, fc_in)
         self.output_size = fc_in
 
     def forward(self, x):
@@ -505,6 +507,12 @@ class MultiEmbeddingNetwork(nn.Module):
             embeds.append(self.embed_layers[n](x[n].int()))
         embeds = torch.cat(embeds, dim=-1)
         return self.fc_net(embeds)
+
+    def parameters(self, recurse = True):
+        for name, param in self.named_parameters(recurse=recurse):
+            if not self.trainable:
+                param.requires_grad = False
+            yield param
 
 
 #LEGACY
@@ -696,6 +704,7 @@ class Sequence(nn.Module):
 
         self.models = nn.ModuleDict(models)
         self.output_shape = input_shape
+        self.output_size = self.output_shape[-1]
 
     def forward(self, x):
         for model_name in self.models_names:

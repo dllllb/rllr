@@ -4,15 +4,16 @@ import torch
 from rllr.algo import PPO
 from rllr.env import make_vec_envs, TripletHierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward, minigrid_envs
 from rllr.models import encoders, ActorCriticNetwork, StateEmbedder
-from rllr.utils import train_ppo, get_conf, switch_reproducibility_on
+from rllr.utils import train_ppo, get_conf, switch_reproducibility_on, get_space_shape
 from rllr.utils.logger import init_logger
 
 logger = logging.getLogger(__name__)
 
 
 def get_master_agent(env, conf):
-    grid_size = env.observation_space['image'].shape[0]
-    state_encoder = encoders.get_encoder(grid_size, conf['master'])
+    #grid_size = env.observation_space['image'].shape[0]
+    #state_encoder = encoders.get_encoder(grid_size, conf['master'])
+    state_encoder = encoders.get_encoder(None, conf['master'], get_space_shape(env.observation_space))
 
     hidden_size = conf['master.head.hidden_size']
     master_network = ActorCriticNetwork(
