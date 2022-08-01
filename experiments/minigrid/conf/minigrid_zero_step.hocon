@@ -33,6 +33,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_state_distance_encoder.p,
+    model: ../artifacts/minigrid/models/minigrid_state_distance_encoder.p,
+    logs: ../artifacts/minigrid/logs/minigrid_state_distance_encoder
   }
 }

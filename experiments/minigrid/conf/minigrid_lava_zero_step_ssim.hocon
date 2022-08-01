@@ -8,7 +8,6 @@
     action_size: 3,
     rgb_image: true,
     tile_size: 4,
-    video_path: artifacts/video/,
   },
 
   state_similarity: {
@@ -66,6 +65,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_lava_ssim.p
+    model: ../artifacts/minigrid/models/minigrid_lava_ssim.p
+    logs: ../artifacts/minigrid/logs/minigrid_lava_ssim
   }
 }

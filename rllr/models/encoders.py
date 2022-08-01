@@ -323,6 +323,33 @@ class RNNEncoder(nn.Module):
         return x, hxs
 
 
+class ImageTextEncoder(nn.Module):
+    def __init__(self, image_shape, sent_shape):
+        super(ImageTextEncoder, self).__init__()
+        self.cnn = nn.Sequential(
+            nn.Conv2d(image_shape[2], 16, kernel_size=(4, 4), stride=(4, 4)),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.LeakyReLU(inplace=True),
+            nn.Flatten()
+        )
+
+        self.word_enc = nn.Linear(in_features=sent_shape[1], out_features=sent_shape[1], bias=False)
+        self.rnn = nn.LSTM(sent_shape[1], 128, batch_first=True)
+
+        self.output_size = 576 + 128
+
+    def forward(self, t):
+        img, msg = t['state'].float() / 255., t['mission']
+        img_enc = self.cnn(img.permute(0, 3, 1, 2))
+
+        word_enc = self.word_enc(msg.view(-1, msg.shape[2])).view(msg.shape[0], msg.shape[1], msg.shape[2])
+        out, (h, c) = self.rnn(word_enc)
+        msg_enc = h.squeeze(dim=0)
+
+        return torch.cat([img_enc, msg_enc], dim=1)
+
+
 def get_encoder(grid_size, config):
     if config['state_encoder_type'] == 'simple_mlp':
         state_size = 3 * (grid_size - 2) ** 2

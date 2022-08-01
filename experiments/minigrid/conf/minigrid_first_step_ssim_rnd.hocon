@@ -39,11 +39,10 @@
     random_goal_seed: 123456789,
     goal_achieving_criterion: state_similarity,
     ssim_network_params: {
-        path: artifacts/models/minigrid_ssim.p,
+        path: ../artifacts/minigrid/models/minigrid_ssim.p,
         device: "cpu",
         threshold: 0.35
     },
-    video_path: artifacts/video/
   },
 
   worker: {
@@ -94,6 +93,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_worker_ssim_rnd_buffer.p,
+    model: ../artifacts/minigrid/models/minigrid_worker_ssim_rnd_buffer.p,
+    logs: ../artifacts/minigrid/logs/minigrid_worker_ssim_rnd_buffer
   }
 }

@@ -1,0 +1,27 @@
+{
+  agent: {
+    device: "cpu",
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.01,
+    lr: 0.0001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.99,
+    gae_lambda: 0.95
+  },
+
+  training: {
+    n_env_steps: 2000000,
+    n_steps: 128,
+    n_processes: 16,
+    verbose: 1,
+  },
+
+  outputs: {
+    model: ../artifacts/hierarchical/models/worker.p,
+    logs: ../artifacts/hierarchical/logs/worker
+  }
+}

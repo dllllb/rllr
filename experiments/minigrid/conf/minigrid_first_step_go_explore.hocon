@@ -6,7 +6,6 @@
     action_size: 3,
     goal_type: random,
     goal_achieving_criterion: position,
-    video_path: artifacts/video/
   },
 
   worker: {
@@ -51,6 +50,7 @@
 
   outputs: {
     save_example: true,
-    path: artifacts/models/minigrid_simple.p,
+    model: ../artifacts/minigrid/models/minigrid_simple.p,
+    logs: ../artifacts/minigrid/logs/minigrid_simple
   }
 }

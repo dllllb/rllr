@@ -2,6 +2,7 @@ from tqdm import trange
 import time
 from collections import deque, defaultdict
 import torch
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 from rllr.buffer.im_rollout import IMRolloutStorage
@@ -42,9 +43,7 @@ def init_obs_rms(env, conf):
 
 
 def im_train_ppo(env, agent, conf, after_epoch_callback=None):
-    """
-    Runs a series of episode and collect statistics
-    """
+    writer = SummaryWriter(conf['outputs.logs'])
     reward_rms = RunningMeanStd(device=conf['agent.device'])
     obs_rms = init_obs_rms(env, conf)
 
@@ -63,8 +62,8 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
 
     episode_stats = defaultdict(lambda: defaultdict(lambda: deque(maxlen=10)))
 
-    for j in trange(num_updates):
-        update_linear_schedule(agent.optimizer, j, num_updates, conf['agent.lr'])
+    for epoch in trange(num_updates):
+        update_linear_schedule(agent.optimizer, epoch, num_updates, conf['agent.lr'])
 
         for step in range(conf['training.n_steps']):
             # Sample actions
@@ -111,35 +110,40 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
         rollouts.compute_returns(next_value, conf['agent.gamma'], conf['agent.gae_lambda'])
         rollouts.compute_im_returns(next_im_value, conf['agent.im_gamma'], conf['agent.gae_lambda'])
 
-        value_loss, im_value_loss, action_loss, dist_entropy, aenc_loss, vqent, hinge_loss = agent.update(rollouts, obs_rms)
+        value_loss, im_value_loss, action_loss, dist_entropy = agent.update(rollouts, obs_rms)
+
+        if after_epoch_callback is not None:
+            loss = after_epoch_callback(rollouts)
+            print(f'loss: {loss:.3f}')
+
         rollouts.after_update()
 
-        if j % conf['training.verbose'] == 0:
-            total_num_steps = (j + 1) * conf['training.n_processes'] * conf['training.n_steps']
+        if epoch % conf['training.verbose'] == 0:
+            total_num_steps = (epoch + 1) * conf['training.n_processes'] * conf['training.n_steps']
             end = time.time()
-            print(f'Updates {j}, '
+            print(f'Updates {epoch}, '
                   f'num timesteps {total_num_steps}, '
                   f'FPS {int(total_num_steps / (end - start))} \n'
-                  f'dist_entropy {dist_entropy:.2f}, '
-                  f'value_loss {value_loss:.1e}, '
-                  f'im_value_loss {im_value_loss:.1e}, '
-                  f'action_loss {action_loss:.1e}, '
-                  f'aenc_loss {aenc_loss:.1e},'
-                  f'hinge {hinge_loss:.1e},'
-                  f'vqent {vqent:.2f},'
+                  f'dist_entropy {dist_entropy:.3f}, '
+                  f'value_loss {value_loss:.3f}, '
+                  f'im_value_loss {im_value_loss:.3f}, '
+                  f'action_loss {action_loss:.3f}'
             )
+
+            writer.add_scalar('dist_entropy', dist_entropy, total_num_steps)
+            writer.add_scalar('value_loss', value_loss, total_num_steps)
+            writer.add_scalar('im_value_loss', im_value_loss, total_num_steps)
+            writer.add_scalar('action_loss', action_loss, total_num_steps)
+
             for task in episode_stats:
                 print(f'Task {task}:')
                 task_stats = episode_stats[task]
                 for key, value in task_stats.items():
+                    writer.add_scalar(f'{task}/{key}', np.mean(value), total_num_steps)
                     print(
-                        f'mean/median {key} {np.mean(value):.2f}/{np.median(value):.2f}, '
-                        f'min/max {key} {np.min(value):.2f}/{np.max(value):.2f}'
+                        f'mean/median {key} {np.mean(value):.3f}/{np.median(value):.3f}, '
+                        f'min/max {key} {np.min(value):.3f}/{np.max(value):.3f}'
                     )
                 print()
 
-            torch.save(agent, conf['outputs.path'])
-
-            if after_epoch_callback is not None:
-                loss = after_epoch_callback(rollouts)
-                print(f'loss: {loss:.2f}')
+            torch.save(agent, conf['outputs.model'])

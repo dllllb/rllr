@@ -20,7 +20,7 @@ setup(
         'numpy',
         'torch',
         'torchvision',
-        'gym[accept-rom-license]',
+        'gym[atari, accept-rom-license]==0.19.0',
         'ale-py',
         'matplotlib',
         'pyhocon',            # utils.config :: get_conf
@@ -29,7 +29,9 @@ setup(
         'scipy',              # environments.py :: scipy.stats
         'tqdm',
         'stable-baselines3',
-        'opencv-python'
+        'opencv-python',
+        'tensorboardX',
+        'tensorboard'
     ],
 )
 

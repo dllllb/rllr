@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import torch
 
-from collections import deque
+from collections import deque, defaultdict
 from gym.wrappers import Monitor
 import torch.nn.functional as F
 from rllr.models import encoders
@@ -52,11 +52,11 @@ class NavigationGoalWrapper(gym.Wrapper):
         self.is_goal_achieved = self._goal_achieved(next_state)
         reward = int(self.is_goal_achieved)
 
-        if self.is_goal_achieved and not done:
-            self.gen_goal(next_state)
-
         if env_reward > 0 and done:
             done = False
+
+        if self.is_goal_achieved and not done:
+            self.gen_goal(next_state)
 
         return next_state, reward, done, info
 
@@ -87,16 +87,19 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
             self.unachieved_buffer_size = conf['unachieved_buffer_size']
             self.unachieved_buffer = deque(maxlen=self.unachieved_buffer_size)
 
-        self.verbose = verbose
         self.warmup_steps = conf['warmup_steps']
         super().__init__(env, goal_achieving_criterion)
 
         self.count = 0
         self.flag = 0
-        self.verbose = 200
         self.seed = seed
         np.random.seed(seed)
-        self.count = np.random.randint(0, self.verbose)
+
+        self.verbose = 200 if verbose else 0
+        if self.verbose:
+            self.count = np.random.randint(0, self.verbose)
+        else:
+            self.count = 0
         self.verbose_episode = False
 
     def gen_goal(self, state):
@@ -107,7 +110,8 @@ class FromBufferGoalWrapper(NavigationGoalWrapper):
 
     def reset(self):
         self.count += 1
-        self.verbose_episode = self.count % self.verbose == 0 and self.goal_state is not None
+        if self.verbose:
+            self.verbose_episode = self.count % self.verbose == 0 and self.goal_state is not None
 
         if not self.is_goal_achieved and self.goal_state is not None:
             self.unachieved_buffer.append(self.goal_state)
@@ -329,26 +333,26 @@ class EpisodeInfoWrapper(gym.Wrapper):
         super(EpisodeInfoWrapper, self).__init__(env)
         self.episode_reward = 0
         self.episode_steps = 0
-        self.visits_stats = dict()
+        self.visits_stats = defaultdict(int)
 
     def reset(self):
         self.episode_reward = 0
         self.episode_steps = 0
-        self.visits_stats = dict()
+        self.visits_stats.clear()
         return self.env.reset()
 
     def step(self, action):
         state, reward, done, info = self.env.step(action)
         self.episode_reward += reward
         self.episode_steps += 1
-        pos = tuple(self.agent_pos)
-        if pos in self.visits_stats:
-            self.visits_stats[pos] += 1
-        else:
-            self.visits_stats[pos] = 1
+        self.visits_stats[tuple(self.agent_pos)] += 1
         info['visit_stats'] = self.visits_stats
         if done:
-            info['episode'] = {'r': self.episode_reward, 'steps': self.episode_steps}
+            info['episode'] = {
+                'task': self.env.unwrapped.spec.id,
+                'r': self.episode_reward,
+                'steps': self.episode_steps
+            }
         return state, reward, done, info
 
 
@@ -380,4 +384,7 @@ class HierarchicalWrapper(gym.Wrapper):
 class ZeroRewardWrapper(gym.Wrapper):
     def step(self, action):
         state, reward, done, info = self.env.step(action)
+        if reward > 0 and done:
+            done = False
+
         return state, 0, done, info

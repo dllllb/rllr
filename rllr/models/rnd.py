@@ -21,7 +21,8 @@ class RNDModel(nn.Module):
 
             if isinstance(p, nn.Linear):
                 init.orthogonal_(p.weight, np.sqrt(2))
-                p.bias.data.zero_()
+                if hasattr(p.bias, 'data'):
+                    p.bias.data.zero_()
 
         for param in self.target.parameters():
             param.requires_grad = False

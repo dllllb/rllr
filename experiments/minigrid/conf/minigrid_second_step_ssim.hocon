@@ -11,7 +11,7 @@
   },
 
   worker_agent: {
-    path: "artifacts/models/minigrid_worker_ssim.p",
+    path: ../artifacts/minigrid/models/minigrid_worker_ssim.p,
     device: "cpu"
   }
 
@@ -22,8 +22,9 @@
     strides: [4, 1],
     paddings: [0, 1],
     head: {
-        hidden_size: 64
-    }
+        hidden_size: []
+    },
+    normalize: true,
   }
 
   agent: {
@@ -51,6 +52,7 @@
   seed: 42,
 
   outputs: {
-      path: artifacts/models/minigrid_master_ssim.p,
+      model: ../artifacts/minigrid/models/minigrid_master_ssim.p,
+      logs: ../artifacts/minigrid/logs/minigrid_master_ssim
   }
 }

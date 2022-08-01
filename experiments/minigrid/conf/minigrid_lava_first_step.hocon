@@ -6,7 +6,6 @@
     action_size: 3,
     fully_observed: false,
     grid_size: 7,
-    fix_reset_seed: true,
     reset_seed: 42,
     rgb_image: true,
     tile_size: 4,
@@ -20,7 +19,6 @@
         unachieved_prob: 0.5,
     },
     goal_achieving_criterion: position_and_direction,
-    video_path: artifacts/video/
   },
 
   worker: {
@@ -71,6 +69,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_lava_worker.p,
+    model: ../artifacts/minigrid/models/minigrid_lava_worker.p,
+    logs: ../artifacts/minigrid/logs/minigrid_lava_worker
   }
 }

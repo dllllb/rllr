@@ -39,8 +39,8 @@
   seed: 0,
 
   outputs: {
-    save_example: true,
-    path: artifacts/models/minigrid_simple.p,
+    model: ../artifacts/minigrid/models/minigrid_simple.p,
+    logs: ../artifacts/minigrid/logs/minigrid_simple
   }
 
 }

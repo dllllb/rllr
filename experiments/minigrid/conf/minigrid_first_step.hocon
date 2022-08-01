@@ -9,7 +9,6 @@
     goal_type: random,
     random_goal_seed: 123456789,
     goal_achieving_criterion: position,
-    video_path: artifacts/video/,
   },
 
   worker: {
@@ -59,6 +58,7 @@
   seed: 42,
 
   outputs: {
-    path: artifacts/models/minigrid_worker.p,
+    model: ../artifacts/minigrid/models/minigrid_worker.p,
+    logs: ../artifacts/minigrid/logs/minigrid_worker
   }
 }
