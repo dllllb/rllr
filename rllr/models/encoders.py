@@ -599,45 +599,26 @@ class LastActionEncoder(nn.Module):
         return torch.cat([state_enc, act_enc], dim=1), rnn_hxs
 
 
-#LEGACY
 class RNNEncoder(nn.Module):
-    def __init__(self, model, output_size, num_layers=1):
+    def __init__(self, model, output_size):
         super().__init__()
-        self.num_layers = num_layers
         self.model = model
         self.output_size = output_size
-        self.rnn = nn.LSTM(model.output_size, output_size, num_layers=num_layers)
+        self.rnn = nn.LSTM(model.output_size, output_size)
 
     def forward(self, out: torch.Tensor, rnn_rhs: torch.Tensor, masks: torch.Tensor):
         out = self.model(out)
         out, rnn_rhs = self._forward_rnn(out, rnn_rhs, masks)
         return out, rnn_rhs
 
-    def flatten_hc(self, h, c):
-        h = torch.permute(h, (1, 0, 2))
-        h = h.reshape(h.size(0), -1)
-        c = torch.permute(c, (1, 0, 2))
-        c = c.reshape(h.size(0), -1)
-        hxs = torch.cat([h, c], dim=1)
-        return hxs
-
-    def unflatten_hxs(self, n, hxs):
-        hxs = hxs.view(n, 2, hxs.size(1) // 2)
-        h = hxs[:, 0, :].unsqueeze(0)
-        h = h.reshape(-1, getattr(self, 'num_layers', 1), h.size(-1) // getattr(self, 'num_layers', 1))
-        h = torch.permute(h, (1, 0, 2))
-        c = hxs[:, 1, :].unsqueeze(0)
-        c = h.reshape(-1, getattr(self, 'num_layers', 1), c.size(-1) // getattr(self, 'num_layers', 1))
-        c = torch.permute(c, (1, 0, 2))
-        return h, c
-
     def _forward_rnn(self, x, hxs, masks):
         if x.size(0) == hxs.size(0):
-            n = x.size(0)
-            h, c = self.unflatten_hxs(n, hxs)
-            x, (h, c) = self.rnn(x.unsqueeze(0), (h * masks, c * masks))
+            hxs = hxs.view(x.size(0), 2, hxs.size(1) // 2)
+            h = hxs[:, 0, :]
+            c = hxs[:, 1, :]
+            x, (h, c) = self.rnn(x.unsqueeze(0), ((h * masks).unsqueeze(0), (c * masks).unsqueeze(0)))
             x = x.squeeze(0)
-            hxs = self.flatten_hc(h, c)
+            hxs = torch.cat([h.squeeze(0), c.squeeze(0)], dim=1)
         else:
             # x is a (T, N, -1) tensor that has been flatten to (T * N, -1)
             N = hxs.size(0)
@@ -666,7 +647,10 @@ class RNNEncoder(nn.Module):
 
             # add t=0 and t=T to the list
             has_zeros = [0] + has_zeros + [T]
-            h, c = self.unflatten_hxs(N, hxs)
+
+            hxs = hxs.view(N, 2, -1)
+            h = hxs[:, 0, :].unsqueeze(0)
+            c = hxs[:, 1, :].unsqueeze(0)
             outputs = []
             for i in range(len(has_zeros) - 1):
                 # We can now process steps that don't have any zeros in masks together!
@@ -686,10 +670,9 @@ class RNNEncoder(nn.Module):
             x = torch.cat(outputs, dim=0)
             # flatten
             x = x.view(T * N, -1)
-            hxs = self.flatten_hc(h, c)
+            hxs = torch.cat([h.squeeze(0), c.squeeze(0)], dim=1)
 
         return x, hxs
-
 
 class Sequence(nn.Module):
     def __init__(self, input_shape, conf):
@@ -783,13 +766,11 @@ def get_encoder(grid_size, config, input_shape=None):
     elif config['state_encoder_type'] == 'cnn_rnn':
         cnn_encoder = SimpleCNN(grid_size, config)
         state_encoder = RNNEncoder(cnn_encoder,
-                                   config.get('rnn_output', cnn_encoder.output_size),
-                                   config.get('rnn_num_layers', 1))
+                                   config.get('rnn_output', cnn_encoder.output_size))
     elif config['state_encoder_type'] == 'sequence_rnn':
         sequence_encoder = Sequence(input_shape, config['inner_encoder'])
         state_encoder = RNNEncoder(sequence_encoder,
-                                   config.get('rnn_output', sequence_encoder.output_size),
-                                   config.get('rnn_num_layers', 1))
+                                   config.get('rnn_output', sequence_encoder.output_size))
     elif config['state_encoder_type'] == 'multi_embeddings':
         state_encoder = MultiEmbeddingNetwork(input_shape, config)
     elif config['state_encoder_type'] == 'cnn_hindsight_encoder':

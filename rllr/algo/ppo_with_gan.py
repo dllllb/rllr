@@ -4,35 +4,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-# TODO: clean it
-import numpy as np
-import gym
-from rllr.env import minigrid_envs
-from torch.utils.data import DataLoader, TensorDataset
-env_conf = {
-    "env_task": "MiniGrid-Empty-8x8-v0",
-    "grid_size": 8,
-    "action_size": 3,
-    "rgb_image": True,
-    "tile_size": 8,
-    "random_start_pos": True
-}
-env = minigrid_envs.gen_wrapped_env(env_conf)
-def gather_data(n=4096):
-    data = list()
-    env = minigrid_envs.gen_wrapped_env(env_conf)
-    for _ in range(n):
-        obs = env.reset()
-        data.append(torch.Tensor(obs))
-    return data
-dataset = gather_data()
-dataset = TensorDataset(torch.stack(dataset, dim=0))
-data = DataLoader(dataset, batch_size=512, shuffle=True)
 def datagen(data):
     while True:
         for batch, in data:
             yield batch
-reals_data = datagen(data)
 
 
 class BCEGANLoss(nn.Module):
@@ -63,7 +38,8 @@ class PPOGAN:
                  entropy_coef,
                  lr=None,
                  eps=None,
-                 max_grad_norm=None):
+                 max_grad_norm=None,
+                 gt_states_generator=None):
 
         self.actor_critic = actor_critic
 
@@ -89,6 +65,8 @@ class PPOGAN:
         self.agent_optimizer = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
         self.discriminator_optimizer = optim.Adam(self.discriminator.parameters(), lr=lr, eps=eps, betas=(0.5, 0.999))
 
+        self.gt_states_generator = gt_states_generator
+
     def to(self, device):
         self.actor_critic = self.actor_critic.to(device)
         return self
@@ -104,6 +82,9 @@ class PPOGAN:
     def update(self, rollouts):
         advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
+
+        if self.gt_states_generator is not None:
+            gt = datagen(self.gt_states_generator)
 
         value_loss_epoch = 0
         action_loss_epoch = 0
@@ -128,9 +109,12 @@ class PPOGAN:
                     obs_batch, actions_batch, recurrent_hidden_states_batch, masks_batch)
 
                 with torch.no_grad():
-                    reals = next(reals_data)
+                    if self.gt_states_generator is not None:
+                        reals = next(gt)
+                    else:
+                        reals = obs_batch
                     reals = self.encoder(reals)
-                    #reals = self.encoder(obs_batch)
+
                     fakes = self.actor_critic.deterministic_forward(obs_batch, recurrent_hidden_states_batch, masks_batch)
 
                 for _ in range(1):

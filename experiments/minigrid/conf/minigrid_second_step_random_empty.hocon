@@ -55,6 +55,8 @@
 
   training: {
     n_env_steps: 20000000,
+    gt_dataset_size: 4096,
+    gt_data_batch_size: 512,
     worker_n_steps: 5,
     n_steps: 128,
     n_processes: 16,

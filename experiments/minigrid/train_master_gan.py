@@ -1,6 +1,7 @@
 import logging
 import torch
 from torch import nn
+from torch.utils.data import TensorDataset, DataLoader
 
 from rllr.algo import PPOGAN
 from rllr.env import make_vec_envs, HierarchicalWrapper, EpisodeInfoWrapper, IntrinsicEpisodicReward, minigrid_envs
@@ -59,6 +60,8 @@ def get_master_agent(env, conf):
     discriminator = encoders.get_encoder(grid_size, conf['discriminator'], (256,))
     discriminator.apply(init_params)
 
+    gt_states_generator = get_gt_datagen(conf)
+
     master_agent = PPOGAN(
         master_network,
         encoder,
@@ -71,7 +74,8 @@ def get_master_agent(env, conf):
         conf['agent.entropy_coef'],
         conf['agent.lr'],
         conf['agent.eps'],
-        conf['agent.max_grad_norm']
+        conf['agent.max_grad_norm'],
+        gt_states_generator
     )
 
     master_agent.encoder.vae.load_state_dict(vae_state_dict)
@@ -100,6 +104,24 @@ def gen_env_with_seed(conf, seed):
     return HierarchicalWrapper(
         env, worker_agent, (emb_size,), n_steps=conf['training'].get('worker_n_steps', 1)
     )
+
+
+def get_gt_datagen(conf):
+    conf['env']['random_start_pos'] = True
+    env = minigrid_envs.gen_wrapped_env(conf['env'], verbose=False)
+    dataset = list()
+    for _ in range(conf.get('training.gt_dataset_size', 4096)):
+        obs = env.reset()
+        dataset.append(torch.Tensor(obs))
+    dataset = TensorDataset(torch.stack(dataset, dim=0))
+    data = DataLoader(dataset, batch_size=conf.get('training.gt_data_batch_size', 512), shuffle=True)
+
+    #def datagen():
+    #    while True:
+    #        for batch, in data:
+    #            yield batch
+
+    return data
 
 
 def main(args=None):
