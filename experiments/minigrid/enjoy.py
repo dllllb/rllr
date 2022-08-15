@@ -215,7 +215,7 @@ def play(mode, viz, n_episodes):
 
     elif mode == 'goal_keycorridor_worker':
         from train_goal_worker import gen_env_with_seed
-        config = ConfigFactory.parse_file('conf/minigrid_goal_first_step_glyphs_ohe_hard.hocon')
+        config = ConfigFactory.parse_file('conf/minigrid_goal_first_step_glyphs_ohe.hocon')
 
     elif mode == 'goal_keycorridor_master':
         from train_goal_master import gen_env_with_seed
