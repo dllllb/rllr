@@ -52,7 +52,7 @@ def test():
         'multi': (0.77222222, 1.0),
         'ssim_lava_fixed_seed': (0.925000011920929, 1.0),
         'ssim_lava_fixed_go_agent': (0.949999988079071, 1),
-        'goal_keycorridor_worker': (0.7599999904632568, 1),
+        #'goal_keycorridor_worker': (0.7599999904632568, 1),
         #'goal_keycorridor_master': (0.8633333444595337, 1)
     }
 
