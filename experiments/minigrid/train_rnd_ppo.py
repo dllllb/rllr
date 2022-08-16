@@ -20,17 +20,20 @@ def gen_env_with_seed(conf, seed):
 def get_agent(env, config):
     state_conf = config['encoder']
     hidden_size = state_conf['head']['hidden_size']
-    grid_size = env.observation_space.shape[0]
+    grid_size = env.observation_space['image'].shape[0]
     state_encoder = encoders.get_encoder(grid_size, config['encoder'])
     policy = ActorCriticNetwork(
         env.action_space, state_encoder,
         state_encoder, hidden_size,
-        hidden_size, use_intrinsic_motivation=True
+        hidden_size, use_intrinsic_motivation=True,
+        same_encoders=True,
+        is_recurrent='rnn' in config['encoder.state_encoder_type'],
+        heads_order=state_conf.get('heads_order', None)
     )
 
     rnd = RNDModel(
-        encoders.get_encoder(grid_size, config['encoder']),
-        encoders.get_encoder(grid_size, config['encoder']),
+        encoders.get_encoder(grid_size, config['rnd']),
+        encoders.get_encoder(grid_size, config['rnd']),
         config['agent.device'])
 
     return IMPPO(

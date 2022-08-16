@@ -20,7 +20,7 @@
     head: {
         hidden_size: 64
     },
-    recurrent_hidden_size: 512,
+    recurrent_hidden_size: 256,
   },
 
   rnd_encoder: {

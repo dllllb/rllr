@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import gym
 
 
 def switch_reproducibility_on(seed=42):
@@ -56,3 +57,21 @@ class RunningMeanStd(object):
         self.mean = new_mean
         self.var = new_var
         self.count = new_count
+
+
+def get_output_shape(model, input_shape):
+    test_input = torch.zeros(1, *input_shape)
+    with torch.no_grad():
+        test_out = model(test_input)
+    return tuple(test_out.shape[1:])
+
+
+def get_space_shape(space):
+    if isinstance(space, gym.spaces.Box):
+        return space.shape
+    elif isinstance(space, gym.spaces.Discrete):
+        return 1,
+    elif isinstance(space, gym.spaces.Dict):
+        return {key: get_space_shape(space[key]) for key in space}
+    else:
+        raise NotImplementedError

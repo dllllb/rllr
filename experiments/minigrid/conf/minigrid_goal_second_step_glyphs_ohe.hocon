@@ -1,0 +1,100 @@
+{
+  env: {
+    env_type: gym_minigrid,
+    env_task: MiniGrid-HardKeyCorridorS3R3-v0,
+    action_size: 6,
+    rgb_image: false,
+    tile_size: 4,
+    carrying_obs: true
+  },
+
+  worker_agent: {
+    path: ../artifacts/minigrid/models/minigrid_goal_worker_glyphs_ohe.p,
+    device: cpu,
+  },
+
+  encoder: {
+    recurrent_hidden_size: 32,
+    recurrent_num_layers: 1,
+  },
+
+  master: {
+    state_encoder_type: sequence_rnn,
+    inner_encoder: {
+      state_encoder_type: sequence,
+      transformations: [choose_img, split_channels, embed, permute, cnn_encoder, flatten, fc_encoder],
+      choose_img: {
+        state_encoder_type: dict_choose,
+        key: image,
+      }
+      split_channels: {
+        state_encoder_type: split,
+        dim: -1,
+        squeeze: True,
+        channels_names: [object, color, door_state, carrying],
+      },
+      embed: {
+        state_encoder_type: multi_embeddings,
+        embed_type: ohe,
+        embed_dims: [11, 6, 4, 2],
+        embed_n: [11, 6, 4, 2],
+        embed_names: [object, color, door_state, carrying],
+        fc_layers: [],
+      },
+      permute: {
+        state_encoder_type: permute,
+        channels: [0, 3, 1, 2],
+      },
+      cnn_encoder: {
+        state_encoder_type: cnn_encoder,
+        input_channels: 23,
+        n_channels: [32,  32, 32, 32],
+        kernel_sizes: [1, 3, 3, 3],
+        strides: [1, 1, 1, 1],
+        paddings: [0, 1, 1, 1],
+        max_pools: [1, 1, 1, global],
+      },
+      flatten: {
+        state_encoder_type: flatten,
+      },
+      fc_encoder: {
+        state_encoder_type: mlp_encoder,
+        input_size: 32,
+        hidden_layers_sizes: [32],
+      }
+    },
+    head:{
+        hidden_size: 64,
+    }
+  },
+
+  agent: {
+    device: "cpu",
+    clip_param: 0.2,
+    ppo_epoch: 4,
+    num_mini_batch: 4,
+    value_loss_coef: 0.5,
+    entropy_coef: 0.001,
+    lr: 0.001,
+    eps: 1e-5,
+    max_grad_norm: 0.5,
+    gamma: 0.999,
+    gae_lambda: 0.95
+  },
+
+  training: {
+    algorithm: ppo,
+    n_env_steps: 10000000,
+    n_steps: 128,
+    n_processes: 16,
+    verbose: 1,
+    worker_n_steps: 20,
+  },
+
+  seed: 42,
+
+  outputs: {
+    model: ../artifacts/minigrid/models/minigrid_goal_master_glyphs_ohe.p,
+    logs: ../artifacts/minigrid/logs/minigrid_goal_master_glyphs_ohe
+  }
+}

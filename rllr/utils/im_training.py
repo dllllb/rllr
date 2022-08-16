@@ -18,7 +18,7 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
 
 def get_state(obs):
     if obs.__class__.__name__ == 'dict':
-        return obs["state"]
+        return obs["image"]
     return obs
 
 
@@ -50,7 +50,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
     # training starts
     rollouts = IMRolloutStorage(
         conf['training.n_steps'], conf['training.n_processes'], env.observation_space, env.action_space,
-        conf.get('encoder.recurrent_hidden_size', 1)
+        conf.get('encoder.recurrent_hidden_size', 1) * conf.get('encoder.recurrent_n_layers', 1) * 2
     )
 
     obs = env.reset()
@@ -97,7 +97,7 @@ def im_train_ppo(env, agent, conf, after_epoch_callback=None):
         mean, var, count = torch.mean(im_ret), torch.var(im_ret), len(im_ret)
         reward_rms.update_from_moments(mean, var, count)
 
-        obs_rms.update(get_state(rollouts.obs))
+        #obs_rms.update(get_state(rollouts.obs))
 
         rollouts.im_rewards /= torch.sqrt(reward_rms.var)
 

@@ -76,18 +76,26 @@ class IMPPO:
                     return_batch, im_return_batch, masks_batch, \
                     old_action_log_probs_batch, adv_targ = sample
 
-                next_obs_batch = ((get_state(next_obs_batch) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5)
+                #next_obs_batch = ((get_state(next_obs_batch) - obs_rms.mean) / torch.sqrt(obs_rms.var)).clip(-5, 5)
+                next_obs_batch = get_state(next_obs_batch)
                 im_loss = self.im_model.compute_loss(next_obs_batch)
 
                 # Reshape to do in a single forward pass for all steps
                 (values, im_values), action_log_probs, dist_entropy, rnn_rhs = self.actor_critic.evaluate_actions(
-                    obs_batch, actions_batch, recurrent_hidden_states_batch, masks_batch
-                )
+                    obs_batch, actions_batch, recurrent_hidden_states_batch, masks_batch)
 
-                ratio = torch.exp(action_log_probs - old_action_log_probs_batch)
-                surr1 = ratio * adv_targ
-                surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * adv_targ
-                action_loss = -torch.min(surr1, surr2).mean()
+                if type(action_log_probs) == dict:
+                    action_loss = 0
+                    for key in action_log_probs:
+                        ratio = torch.exp(action_log_probs[key] - old_action_log_probs_batch[key])
+                        surr1 = ratio * adv_targ
+                        surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * adv_targ
+                        action_loss += -torch.min(surr1, surr2).mean()
+                else:
+                    ratio = torch.exp(action_log_probs - old_action_log_probs_batch)
+                    surr1 = ratio * adv_targ
+                    surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * adv_targ
+                    action_loss = -torch.min(surr1, surr2).mean()
 
                 # clipped_value_loss:
                 value_pred_clipped = value_preds_batch + \

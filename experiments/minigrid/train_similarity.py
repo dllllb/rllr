@@ -2,7 +2,7 @@ import logging
 import torch
 
 from rllr.algo import IMPPO
-from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper, ZeroRewardWrapper
+from rllr.env import make_vec_envs, minigrid_envs, EpisodeInfoWrapper, ZeroRewardWrapper, HashCounterWrapper
 from rllr.models import encoders, ActorCriticNetwork, StateSimilarityNetwork, RNDModel
 from rllr.utils import im_train_ppo, get_conf, switch_reproducibility_on
 from rllr.utils.state_similarity import ContrastiveStateSimilarity
@@ -18,12 +18,14 @@ def get_agent(env, config):
     policy = ActorCriticNetwork(
         env.action_space, encoder,
         encoder, hidden_size,
-        hidden_size, use_intrinsic_motivation=True
+        hidden_size, use_intrinsic_motivation=True,
+        is_recurrent=True if config['worker.state_encoder_type'] == 'cnn_rnn' else False,
+        same_encoders=True
     )
 
     rnd = RNDModel(
-        encoders.get_encoder(grid_size, config['worker']),
-        encoders.get_encoder(grid_size, config['worker']),
+        encoders.get_encoder(grid_size, config['rnd']),
+        encoders.get_encoder(grid_size, config['rnd']),
         config['agent.device'])
 
     return IMPPO(
@@ -61,6 +63,14 @@ def gen_env_with_seed(conf, seed):
     env = minigrid_envs.gen_wrapped_env(conf['env'], verbose=False)
 
     env = ZeroRewardWrapper(env)
+    hash_penalty = conf.get('env.hash.hash_penalty', None)
+    if hash_penalty is not None:
+        rnd = None
+        if conf['env.hash.hash_type'] == 'rnd':
+            rnd_grid_size = env.observation_space.shape[0] // conf.get('env.hash.hash_pool_size', 12)
+            rnd = encoders.get_encoder(rnd_grid_size, conf['env.hash.rnd'])
+            rnd.to(conf.get('env.hash.device', 'cpu'))
+        env = HashCounterWrapper(env, hash_penalty, conf['env.hash'], rnd=rnd)
     env = EpisodeInfoWrapper(env)
 
     return env

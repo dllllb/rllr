@@ -3,6 +3,7 @@ import logging
 import numpy as np
 
 from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper, RGBImgPartialObsWrapper
+from gym_minigrid.minigrid import OBJECT_TO_IDX
 
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,20 @@ class GoalPatch(gym.Wrapper):
         if reward > 0 and done:
             done = False
         return next_state, reward, done, info
+
+
+class CarrySomething(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.curr_img_shape = self.observation_space['image'].shape
+        self.observation_space.spaces['image'] = gym.spaces.Box(low=0, high=255,
+                                                                shape=(*self.curr_img_shape[:2], 4),
+                                                                dtype=np.uint8)
+
+    def observation(self, observation):
+        carrying = np.ones((*self.curr_img_shape[:2], 1)) * int(bool(self.unwrapped.carrying))
+        observation['image'] = np.concatenate([observation['image'], carrying], axis=-1)
+        return observation
 
 
 def get_env_name(conf):
@@ -147,6 +162,9 @@ def gen_wrapped_env(conf, verbose=False):
     else:
         if conf.get('rgb_image', False):
             env = RGBImgPartialObsWrapper(env, tile_size=conf['tile_size'])  # Fully observed RGB image
+
+    if conf.get('carrying_obs', False):
+        env = CarrySomething(env)
 
     if conf.get('goal_achieving_criterion', None) in {'position_and_direction', 'position'} or verbose:
         env = PosObsWrapper(env)

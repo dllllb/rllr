@@ -15,7 +15,7 @@ def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
         param_group['lr'] = lr
 
 
-def train_ppo(env, agent, conf, after_epoch_callback=None):
+def train_ppo_with_gan(env, agent, conf, after_epoch_callback=None):
     writer = SummaryWriter(conf['outputs.logs'])
 
     rollouts = RolloutStorage(
@@ -32,7 +32,7 @@ def train_ppo(env, agent, conf, after_epoch_callback=None):
     episode_stats = defaultdict(lambda: defaultdict(lambda: deque(maxlen=16)))
 
     for j in trange(num_updates):
-        update_linear_schedule(agent.optimizer, j, num_updates, conf['agent.lr'])
+        update_linear_schedule(agent.agent_optimizer, j, num_updates, conf['agent.lr'])
 
         for step in range(conf['training.n_steps']):
             # Sample actions
@@ -56,7 +56,7 @@ def train_ppo(env, agent, conf, after_epoch_callback=None):
                                      rollouts.masks[-1])
         rollouts.compute_returns(next_value, conf['agent.gamma'], conf['agent.gae_lambda'])
 
-        value_loss, action_loss, dist_entropy = agent.update(rollouts)
+        value_loss, action_loss, dist_entropy, decoded_img, gan_g_loss, gan_d_loss, non_gan_loss = agent.update(rollouts)
         rollouts.after_update()
 
         #if j % conf['training.verbose'] == 0 and len(episode_rewards) > 1:
@@ -73,6 +73,10 @@ def train_ppo(env, agent, conf, after_epoch_callback=None):
             writer.add_scalar('dist_entropy', dist_entropy, total_num_steps)
             writer.add_scalar('value_loss', value_loss, total_num_steps)
             writer.add_scalar('action_loss', action_loss, total_num_steps)
+            writer.add_scalar('G_loss', gan_g_loss, total_num_steps)
+            writer.add_scalar('D_loss', gan_d_loss, total_num_steps)
+            writer.add_scalar('non_gan_loss', non_gan_loss, total_num_steps)
+            writer.add_image('decoded_img', decoded_img[0], total_num_steps)
 
             for task in episode_stats:
                 print(f'Task {task}:')
