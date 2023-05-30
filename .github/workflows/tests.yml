@@ -30,7 +30,6 @@ jobs:
         pipenv sync --dev
     - name: Test with pytest
       run: |
-        pipenv shell
-        pytest experiments/montezuma/enjoy.py
-        pytest experiments/minigrid/enjoy.py
-        pytest
+        pipenv run pytest experiments/montezuma/enjoy.py
+        pipenv run pytest experiments/minigrid/enjoy.py
+        pipenv run pytest
