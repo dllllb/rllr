@@ -16,22 +16,6 @@ setup(
         'rllr.env.gym_minigrid_navigation',  # namespace only
         'rllr.exploration',
     ],
-    install_requires=[  # as declared im rllr's module code
-        'numpy',
-        'torch',
-        'torchvision',
-        'gym[atari, accept-rom-license]==0.19.0',
-        'ale-py==0.7.4',
-        'matplotlib',
-        'pyhocon',            # utils.config :: get_conf
-        'jupyter',            # utils.plotting :: IPython
-        'gym_minigrid',       # git+https://github.com/maximecb/gym-minigrid.git
-        'scipy',              # environments.py :: scipy.stats
-        'tqdm',
-        'stable-baselines3',
-        'opencv-python',
-        'tensorboardX',
-        'tensorboard'
+    install_requires=[
     ],
 )
-
