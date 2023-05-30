@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 import torch
 
 from rllr.algo import PPO
@@ -39,7 +40,7 @@ def gen_env_with_seed(conf, seed):
     conf['env.deterministic'] = True
     conf['env']['seed'] = seed
 
-    worker_agent = torch.load(conf['worker_agent.path'], map_location='cpu').to(conf['agent.device'])
+    worker_agent = torch.load(Path(__file__).parent / conf['worker_agent.path'], map_location='cpu').to(conf['agent.device'])
     emb_size = worker_agent.actor_critic.actor.state_encoder.goal_state_encoder.output_size
 
     env = minigrid_envs.gen_wrapped_env(conf['env'], verbose=False)

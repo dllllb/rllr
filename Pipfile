@@ -6,25 +6,24 @@ verify_ssl = true
 [dev-packages]
 pytest = "*"
 pylint = "*"
+tensorboard = "*"
+jupyter = "*"
 
 [packages]
-gym = {extras = ["atari", "accept-rom-license"], version = "0.19.0"}
+gym = "==0.22.0"
+atari-py = "==0.2.6"
 ale-py = "==0.7.4"
-numpy = ">=1.20.2"
+numpy = ">=1.20.2,<1.24"
 torch = ">=1.1"
 torchvision = ">=0.3.0"
-pytorch-ignite = ">=0.2"
-opencv-python = "*"
-gym-minigrid = ">=1.0"
+opencv-python = ">=3."
+gym-minigrid = "==1.0.2"
 matplotlib = ">=3.4.1"
 pyhocon = ">=0.3.57"
 rllr = {editable = true, path = "."}
-nle = "*"
 stable-baselines3 = "*"
 scipy = "*"
-jupyter = "*"
 tqdm = "*"
-tensorboard = "*"
 
 [requires]
-python_version = "3.9"
+python_version = "3.10"

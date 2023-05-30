@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def test():
     algos = {
-        'rnd_ppo': (5300, 11)
+        'rnd_ppo': (6500, 12)
     }
 
     for algo, (expected_reward, expected_rooms) in algos.items():
@@ -29,7 +30,7 @@ def test():
 def play(mode, viz, n_episodes):
     if mode == 'rnd_ppo':
         from train_rnd_ppo import gen_env_with_seed
-        config = ConfigFactory.parse_file('conf/montezuma_rnd_ppo.hocon')
+        config = ConfigFactory.parse_file(Path(__file__).parent / 'conf/montezuma_rnd_ppo.hocon')
     else:
         assert False
 
@@ -39,7 +40,7 @@ def play(mode, viz, n_episodes):
         device='cpu'
     )
 
-    agent = torch.load(config['outputs.model'], map_location='cpu')
+    agent = torch.load(Path(__file__).parent / config['outputs.model'], map_location='cpu')
 
     rewards, steps, rooms = [], [], []
     for _ in trange(n_episodes):

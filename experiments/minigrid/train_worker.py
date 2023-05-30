@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 import torch
 
 import rllr.env as environments
@@ -33,7 +34,7 @@ def get_goal_achieving_criterion(config):
         return models.SameStatesCriterion(encoder, device, threshold)
 
     elif config['goal_achieving_criterion'] == 'state_similarity':
-        ssim = torch.load(config['ssim_network_params.path'], map_location='cpu')
+        ssim = torch.load(Path(__file__).parent / config['ssim_network_params.path'], map_location='cpu')
         device = torch.device(config['ssim_network_params.device'])
         threshold = config['ssim_network_params.threshold']
         return models.SSIMCriterion(ssim.ssim_network, device, threshold)
@@ -48,7 +49,7 @@ def gen_navigation_env(conf, verbose=True, goal_achieving_criterion=None):
         goal_achieving_criterion = get_goal_achieving_criterion(conf)
 
     if conf.get('state_distance_network_params', {}).get('path', False):
-        encoder = torch.load(conf['state_distance_network_params.path'], map_location='cpu')
+        encoder = torch.load(Path(__file__).parent / conf['state_distance_network_params.path'], map_location='cpu')
         device = torch.device(conf['state_distance_network_params.device'])
         embedder = models.StateEmbedder(encoder, device)
     else:

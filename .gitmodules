@@ -1,4 +1,0 @@
-[submodule "experiments/artifacts"]
-	path = experiments/artifacts
-	url = git@github.com:dllllb/rllr-artifacts.git
-	shallow = true
