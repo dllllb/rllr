@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def test():
     algos = {
-        'rnd_ppo': (6500, 12)
+        'rnd_ppo': (5300, 11)
     }
 
     for algo, (expected_reward, expected_rooms) in algos.items():

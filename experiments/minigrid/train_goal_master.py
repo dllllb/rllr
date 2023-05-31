@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 import torch
 
 from rllr.algo import PPO
@@ -40,7 +41,7 @@ def get_master_agent(env, conf):
 def gen_env_with_seed(conf, seed):
     conf['env.deterministic'] = True
     conf['env']['seed'] = seed
-    worker_agent = torch.load(conf['worker_agent.path'], map_location='cpu').to(conf['agent.device'])
+    worker_agent = torch.load(Path(__file__).parent / conf['worker_agent.path'], map_location='cpu').to(conf['agent.device'])
     env = minigrid_envs.gen_wrapped_env(conf['env'], verbose=False)
     env = EpisodeInfoWrapper(env)
     return TripletHierarchicalWrapper(env, worker_agent, n_steps=conf['training'].get('worker_n_steps', 1))
