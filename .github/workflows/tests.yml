@@ -26,6 +26,8 @@ jobs:
       uses: astral-sh/setup-uv@v5
     - name: Test with pytest
       run: |
+        : # this pair of tests conflicts with each other
         uv run pytest experiments/montezuma/enjoy.py
         uv run pytest experiments/minigrid/enjoy.py
+        :
         uv run pytest
